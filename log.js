@@ -105,10 +105,10 @@ class Console extends Notification {
 		console.time = this.time.bind(this);
 		console.timeline = this.timeline.bind(this);
 		console.timeEnd = this.timeEnd.bind(this);
-		this._log = log;
-		this._error = error;
-		this._dir = dir;
-		this._warn = warn;
+		console._log = this._log = log;
+		console._error = this._error = error;
+		console._dir = this._dir = dir;
+		console._warn = this._warn = warn;
 		default_console = this;
 		return this;
 	}

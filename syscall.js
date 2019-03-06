@@ -56,10 +56,6 @@ function execSync(cmd) {
 	return spawnSync('sh', ['-c', cmd]);
 }
 
-function exec(cmd) {
-	return spawn('sh', ['-c', cmd]);
-}
-
 function spawnSync(cmd, args = []) {
 	// var ls = cmd.split(/\s+/);
 	// var ch = child_process.spawnSync(ls.shift(), ls);
@@ -89,6 +85,11 @@ function on_error(e, ch) {
 	return log;
 }
 
+
+function exec(cmd, onData = on_data, onError = on_error) {
+	return spawn('sh', ['-c', cmd], onData, onError);
+}
+
 function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 	// var ls = cmd.split(/\s+/);
 	// var ch = child_process.spawn(ls.shift(), ls);
@@ -98,6 +99,8 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 	var stderr = [];
 	var _resolve, _reject;
 	var completed = false, data, err;
+	var prev_stdout_n = true;
+	var prev_stderr_n = true;
 
 	var resolve = function(e) {
 		completed = true;
@@ -117,14 +120,20 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 	ch.stdout.on('data', function(e) {
 		var log = onData(e, ch);
 		if (log) {
-			stdout.push(...log.split('\n'));
+			var ls = log.split('\n');
+			if (stdout.length)
+				ls[0] = stdout.pop() + ls[0];
+			stdout.push(...ls);
 		}
 	});
 
 	ch.stderr.on('error', function(e) {
 		var log = onError(e, ch);
 		if (log) {
-			stderr.push(...log.split('\n'));
+			var ls = log.split('\n');
+			if (stderr.length)
+				ls[0] = stderr.pop() + ls[0];
+			stderr.push(...ls);
 		}
 	});
 
