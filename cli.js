@@ -153,9 +153,12 @@ var Conversation = util.class('Conversation', {
 	 * @arg packet {String|Buffer}
 	 */
 	handlePacket: function(type, packet) {
+		var is_json_text = (type === 0 && packet[0] == '\ufffe');
+		if (is_json_text && packet.length == 1) return;
+
 		this.onMessage.trigger({ type, data: packet });
 
-		if (type === 0 && packet[0] == '\ufffe') { // json text
+		if (is_json_text) { // json text
 			try {
 				var data = JSON.parse(packet.substr(1));
 			} catch(err) {
@@ -506,7 +509,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 	 */
 	ping: function() {
 		if (this.isOpen) {
-			// TODO ...
+			this.m_req.send('\ufffe');
 		} else {
 			this.connect(); // 尝试连接
 		}

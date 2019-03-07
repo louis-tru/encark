@@ -230,9 +230,12 @@ var Conversation = util.class('Conversation', {
 	 * @arg {String|Buffer} packet
 	 */
 	handlePacket: function(type, packet) {
+		var is_json_text = (type === 0 && packet[0] == '\ufffe');
+		if (is_json_text && packet.length == 1) return;
+
 		this.onMessage.trigger({ type, data: packet });
 
-		if (type === 0 && packet[0] == '\ufffe') { // json text
+		if (is_json_text) { // json text
 			try {
 				var data = JSON.parse(packet.substr(1));
 			} catch(err) {
