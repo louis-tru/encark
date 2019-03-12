@@ -152,6 +152,7 @@ var Conversation = util.class('Conversation', {
 	// @event:
 	onError: null,
 	onMessage: null,
+	onPing: null,
 	onClose: null,
 	onOpen: null,
 	
@@ -161,7 +162,7 @@ var Conversation = util.class('Conversation', {
 	 * @constructor
 	 */
 	constructor: function(req, bind_services_name) {
-		event.initEvents(this, 'Open', 'Message', 'Error', 'Close');
+		event.initEvents(this, 'Open', 'Message', 'Ping', 'Error', 'Close');
 		
 		this.server = req.socket.server;
 		this.request = req;
@@ -230,8 +231,12 @@ var Conversation = util.class('Conversation', {
 	 * @arg {String|Buffer} packet
 	 */
 	handlePacket: function(type, packet) {
+
 		var is_json_text = (type === 0 && packet[0] == '\ufffe');
-		if (is_json_text && packet.length == 1) return;
+		if (is_json_text && packet.length == 1) {
+			this.onPing.trigger();
+			return;
+		}
 
 		this.onMessage.trigger({ type, data: packet });
 

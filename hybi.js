@@ -502,6 +502,7 @@ class Hybi extends Conversation {
 		
 		parser.onText.on(e=>self.handlePacket(0, e.data));
 		parser.onData.on(e=>self.handlePacket(1, e.data));
+		parser.onPing.on(e=>self.onPing.trigger());
 		parser.onClose.on(e=>self.close());
 
 		parser.onError.on(function (e) {
@@ -600,6 +601,16 @@ class Hybi extends Conversation {
 			}
 		} else {
 			throw Error.new(errno.ERR_CONNECTION_CLOSE_STATUS);
+		}
+	}
+
+	ping() {
+		if (this.isOpen) {
+			try {
+				Hybi.sendPingPacket(this.socket);
+			} catch (e) {
+				console.error(e);
+			}
 		}
 	}
 

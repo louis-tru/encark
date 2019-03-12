@@ -62,7 +62,7 @@ class PacketParser {
 
 			// \u0000\u0000   // close
 			// \u0000\ufffd		// data
-			// \u0000\ufffb\ubfff\ufffd		// ping
+			// \u0000\ufffe\ufffd		// ping
 			
 			if (len == 2 && this.buffer[1] == '\u0000') {
 				this.onClose.trigger();
@@ -249,6 +249,25 @@ class Early extends Conversation {
 			}
 		} else {
 			throw Error.new(errno.ERR_CONNECTION_CLOSE_STATUS);
+		}
+	}
+
+	ping() {
+		if (this.isOpen) {
+			var msg = '\ufffe';
+			
+			var length = Buffer.byteLength(msg);
+			var buffer = new Buffer(2 + length);
+			
+			buffer.write('\x00', 'binary');
+			buffer.write(msg, 1, 'utf8');
+			buffer.write('\xff', 1 + length, 'binary');
+			
+			try {
+				this.socket.write(buffer);
+			} catch(e) {
+				this.close();
+			}
 		}
 	}
 

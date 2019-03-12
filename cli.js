@@ -73,6 +73,7 @@ var Conversation = util.class('Conversation', {
 
 	onOpen: null,
 	onMessage: null,
+	onPing: null,
 	onError: null,
 	onClose: null,
 
@@ -80,7 +81,7 @@ var Conversation = util.class('Conversation', {
 	 * @constructor
 	 */
 	constructor: function() {
-		event.initEvents(this, 'Open', 'Message', 'Error', 'Close');
+		event.initEvents(this, 'Open', 'Message', 'Ping', 'Error', 'Close');
 		this.onError.on((e)=>this.m_connect = false);
 		this.m_clients = {};
 	},
@@ -154,7 +155,10 @@ var Conversation = util.class('Conversation', {
 	 */
 	handlePacket: function(type, packet) {
 		var is_json_text = (type === 0 && packet[0] == '\ufffe');
-		if (is_json_text && packet.length == 1) return;
+		if (is_json_text && packet.length == 1) {
+			this.onPing.trigger();
+			return;
+		}
 
 		this.onMessage.trigger({ type, data: packet });
 
@@ -342,6 +346,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 
 			parser.onText.on(e=>self.handlePacket(0, e.data));
 			parser.onData.on(e=>self.handlePacket(1, e.data));
+			parser.onPing.on(e=>self.onPing.trigger());
 			parser.onClose.on(e=>self.close());
 
 			parser.onError.on(function(e) {
