@@ -196,7 +196,7 @@ function isNetwork(path) {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-function extendEntries(obj, extd) {
+function extendObject(obj, extd) {
 	for (var item of Object.entries(extd)) {
 		obj[item[0]] = item[1];
 	}
@@ -336,7 +336,7 @@ module.exports = {
 	isLocal,				// 
 	isLocalZip,
 	isNetwork,
-	extendEntries,
+	extendObject,
 	get options() { return options },
 	get config() { return get_config() },
 	cwd: _cwd,
