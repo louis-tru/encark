@@ -251,6 +251,26 @@ haveQgr ? function(options, soptions, resolve, reject, is_https, method, post_da
  */
 function request(pathname, options) {
 	options = Object.assign({}, defaultOptions, options);
+	var { params, method, timeout, headers = {} } = options;
+
+	if (util.dev) {
+		var data = [];
+		if (params) {
+			if (method == 'GET') {
+				pathname += '?' + querystring_stringify(params);
+			} else {
+				data = [`-d '${JSON.stringify(params)}'`];
+			}
+		}
+		var logs = [
+			"'" + pathname + "'",
+			'-X ' + method,
+			...(method == 'POST' ? ["-H 'Content-Type: application/json'"]: []),
+			...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
+			...data,
+		];
+		console.log('curl', logs.join(' \\\n'));
+	}
 
 	return new Promise((resolve, reject)=> {
 		var uri = new url.URL(pathname);
@@ -266,7 +286,6 @@ function request(pathname, options) {
 		Object.assign(headers, options.headers);
 
 		var post_data = null;
-		var { params, method, timeout } = options;
 
 		if (!haveWeb) {
 			// set proxy

@@ -294,6 +294,7 @@ var HttpService = util.class('HttpService', StaticService, {
 		var has_callback = false;
 		
 		var callback = function(err, data) {
+			if (self.m_ok) return;
 			if (has_callback) {
 				throw new Error('callback has been completed');
 			}
@@ -384,8 +385,11 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg data {Object} #    data
 	 */
 	returnData: function(type, data) {
+		if (this.m_ok) throw new Error('request has been completed');
+
 		var res = this.response;
 		var ae = this.request.headers['accept-encoding'];
+		this.m_ok = true;
 		
 		this.setDefaultHeader();
 		res.setHeader('Content-Type', type);
