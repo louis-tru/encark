@@ -124,20 +124,6 @@ var Database = util.class('Database', {
 module.exports = {
 
 	Database: Database,
-	
-	/**
-	 * format sql
-	 * @param  {String} sql
-	 * @param  {Object} args..
-	 * @return {String}
-	 * @static
-	 */
-	sql: function (sql) {
-		var args = arguments;
-		for (var i = 1, l = args.length; i < l; i++)
-			sql = sql.replace(new RegExp('\\{' + (i - 1) + '\\}', 'g'), exports.escape(args[i]));
-		return sql;
-	},
 
 	/**
 	 * escape sql param
@@ -146,7 +132,7 @@ module.exports = {
 	 * @static
 	 */
 	escape: function (param) {
-			
+
 		if (param === undefined || param === null)
 			return 'NULL';
 

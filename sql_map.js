@@ -36,7 +36,7 @@ var db = require('./db');
 var memcached = require('./memcached');
 var fs = require('./fs');
 
-var cache = {};
+var local_cache = {};
 var original_handles = {};
 var original_files = {};
 var REG = /\{(.+?)\}/g;
@@ -60,68 +60,40 @@ var private$transaction = util.class('private$transaction', {
 	/**
 	 * @constructor
 	 */
-	constructor: function(sql_map) {
-		this.map = sql_map;
-		this.db = get_db(sql_map);
+	constructor: function(host) {
+		this.map = host;
+		this.db = get_db(host);
 		this.db.transaction(); // start transaction
 	},
 
 	/**
-	 * get data
-	 */
-	get2: function(name, param, cb) {
-		return funcs.get2(this.map, name, param, cb, this.db);
-	},
-	
-	/**
 	 * @func get(name, param)
 	 */
-	get: function(name, param) {
-		return funcs.get(this.map, name, param, this.db);
-	},
-	
-	/**
-	 * get data list
-	 */
-	gets2: function(name, param, cb) {
-		return funcs.gets2(this.map, name, param, cb, this.db);
+	get: function(name, param, opts) {
+		return funcs.get(this.map, this.db, 1, name, param, opts);
 	},
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets: function(name, param) {
-		return funcs.gets(this.map, name, param, this.db);
-	},
-	
-	/**
-	 * post data
-	 */
-	post2: function(name, param, cb) {
-		return funcs.post2(this.map, name, param, cb, this.db);
+	gets: function(name, param, opts) {
+		return funcs.gets(this.map, this.db, 1, name, param, opts);
 	},
 
 	/**
 	 * @func post(name, param)
 	 */
-	post: function(name, param) {
-		return funcs.post(this.map, name, param, this.db);
-	},
-
-	/**
-	 * @func query2(name, param, cb)
-	 */
-	query2: function(name, param, cb) {
-		return funcs.query2(this.map, name, param, cb, this.db);
+	post: function(name, param, opts) {
+		return funcs.post(this.map, this.db, 1, name, param, opts);
 	},
 
 	/**
 	 * @func query(name, param, cb)
 	 */
-	query: function(name, param) {
-		return funcs.query(this.map, name, param, this.db);
+	query: function(name, param, opts) {
+		return funcs.query(this.map, this.db, 1, name, param, opts);
 	},
-	
+
 	/**
 	 * commit transaction
 	 */
@@ -129,7 +101,7 @@ var private$transaction = util.class('private$transaction', {
 		this.db.commit();
 		this.db.close();
 	},
-	
+
 	/**
 	 * rollback transaction
 	 */
@@ -137,7 +109,7 @@ var private$transaction = util.class('private$transaction', {
 		this.db.rollback();
 		this.db.close();
 	},
-	
+
 });
 
 function read_original_handles(self, original_path) {
@@ -181,16 +153,15 @@ function get_original_handle(self, name) {
 
 	self.m_original_handles[name] = handle = original_handles[original_path + '/' + handle_name];
 	if (!handle) {
-		throw new Error(name + ' : can not find the map');	
+		throw new Error(name + ' : can not find the map');
 	}
 	return handle;
 }
 
 //get db
 function get_db(self) {
-	var db = self.db;
 	var db_class = null;
-	
+
 	switch (self.type) {
 		case 'mysql' : db_class = Mysql; break;
 		case 'mssql' : 
@@ -198,10 +169,9 @@ function get_db(self) {
 		default:
 			break;
 	}
-	
 	util.assert(db_class, 'Not supporting database, {0}', self.type);
-	
-	return new db_class(db);
+
+	return new db_class(self.config);
 }
 
 /**
@@ -352,7 +322,18 @@ function getMap(self, name, param) {
 // where there is no "This", more conducive to the release of resources
 //
 function delCache(key) {
-	delete cache[key];
+	delete local_cache[key];
+}
+
+function setCache(self, key, data, timeout) {
+	if (timeout > 0) {
+		var c = local_cache[key];
+		if (c) {
+			clearTimeout(c.id);
+		}
+		var id = delCache.setTimeout(timeout * 1e3, key);
+		local_cache[key] = { data, id, timeout };
+	}
 }
 
 function noop(err) {
@@ -364,56 +345,66 @@ function select_cb(param, cb) {
 }
 
 //query
-function query(self, type, name, param, cb, transaction_db) {
+function query(self, db, is_transaction, type, name, cb, param, options) {
 	param = { ...param };
-	var db = null;
-	
+
 	try {
-		db = transaction_db || get_db(self);
-		var map = getMap(self, name, param);
-		var cacheTime = parseInt(map.cache) || 0;
+		var map = Object.assign(getMap(self, name, param), options);
+		var cacheTime = parseInt(map.cacheTime) || 0;
 		var sql = map.sql;
-		
+		var key;
+
 		function handle(err, data) {
-			if (!transaction_db) { 
-				// Non transaction, shut down immediately after the query
-				db.close();
+			if (!is_transaction) {
+				db.close(); // Non transaction, shut down immediately after the query
 			}
 			if (err) {
 				cb(err);
 			} else {
-				if (type == 'get' && cacheTime) {
-					if (self.memcached) {
-						memcached.shared.set(key, data, cacheTime);
+				data = data.map(e=>{
+					if (e.rows) {
+						return { rows: e.rows, fields: Object.keys(e.fields) };
+					} else {
+						return e;
 					}
-					else {
-						cache[key] = data;
-						delCache.setTimeout(cacheTime * 1e3, key);
+				});
+				if (type == 'get') {
+					if (cacheTime > 0) {
+						if (self.memcached) {
+							memcached.shared.set(key, data, cacheTime);
+						} else {
+							setCache(self, key, data, cacheTime);
+						}
 					}
 				}
 				cb(null, data);
 			}
 		}
+
 		if (type == 'get') { // use cache
-			var key = util.hash(sql);
-			if (self.memcached) {
-				memcached.shared.get(key, function (err, data) {
-					if (err) {
-						console.err(err);
-					}
-					if (data) {
-						cb(err, data);
+			if (cacheTime > 0) {
+				key = util.hash('get:' + sql);
+				if (self.memcached) {
+					memcached.shared.get(key, function (err, data) {
+						if (err) {
+							console.err(err);
+						}
+						if (data) {
+							cb(err, data);
+						} else {
+							db.query(sql, handle);
+						}
+					});
+				} else {
+					var c = local_cache[key];
+					if (c) {
+						cb(null, c.data);
 					} else {
 						db.query(sql, handle);
 					}
-				});
-			} else {
-				var data = cache[key];
-				if (data) {
-					cb(null, data);
-				} else {
-					db.query(sql, handle);
 				}
+			} else {
+				db.query(sql, handle);
 			}
 		} else {
 			db.query(sql, handle);
@@ -428,117 +419,53 @@ function query(self, type, name, param, cb, transaction_db) {
 
 var funcs = {
 
-	/**
-	 * get data
-	 */
-	get2: function(map, name, param, cb, db) {
-		cb = select_cb(param, cb);
-		query(map, 'get', name, param, function (err, data) {
-			if (err) {
-				cb(err);
-			} else {
-				var [{rows}] = data;
-				cb(null, rows ? (rows[0] || null) : null);
-			}
-		}, db);
-	},
-	
-	/**
-	 * @func get(name, param)
-	 */
-	get: function(map, name, param, db) {
+	get: function(map, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, 'get', name, param, function(err, data) {
+			query(map, db, is_t, 'get', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
 					var [{rows}] = data;
 					resolve(rows ? (rows[0] || null) : null);
 				}
-			}, db);
+			}, param, opts);
 		});
 	},
-	
-	/**
-	 * get data list
-	 */
-	gets2: function(map, name, param, cb, db) {
-		cb = select_cb(param, cb);
-		query(map, 'get', name, param, function(err, data) {
-			if (err) {
-				cb(err);
-			} else {
-				var [{rows}] = data;
-				cb(null, rows || null);
-			}
-		}, db);
-	},
 
-	/**
-	 * @func gets(name, param)
-	 */
-	gets: function(map, name, param, db) {
+	gets: function(map, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, 'get', name, param, function(err, data) {
+			query(map, db, is_t, 'get', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
 					var [{rows}] = data;
 					resolve(rows || null);
 				}
-			}, db);
+			}, param, opts);
 		});
 	},
-	
-	/**
-	 * post data
-	 */
-	post2: function(map, name, param, cb, db) {
-		cb = select_cb(param, cb);
-		query(map, 'post', name, param, function(err, data) {
-			if (err) {
-				cb(err);
-			} else {
-				cb(null, data[0]);
-			}
-		}, db);
-	},
-	
-	/**
-	 * @func post(name, param)
-	 */
-	post: function(map, name, param, db) {
+
+	post: function(map, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, 'post', name, param, function(err, data) {
+			query(map, db, is_t, 'post', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
 					resolve(data[0]);
 				}
-			}, db);
+			}, param, opts);
 		});
 	},
-	
-	/**
-	 * @func query2(name, param, cb)
-	 */
-	query2: function(map, name, param, cb, db) {
-		cb = select_cb(param, cb);
-		query(map, 'query', name, param, cb, db);
-	},
-	
-	/**
-	 * @func query(name, param, cb)
-	 */
-	query: function(map, name, param, cb, db) {
+
+	query: function(map, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, 'query', name, param, function(err, data) {
+			query(map, db, is_t, 'query', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
 					resolve(data);
 				}
-			}, db);
+			}, param, opts);
 		});
 	},
 
@@ -554,12 +481,12 @@ var SqlMap = util.class('SqlMap', {
 	 * @field {String} database type
 	 */
 	type: 'mysql',
-	
+
 	/**
 	 * @field {Boolean} is use memcached
 	 */
 	memcached: false,
-	
+
 	/**
 	 * 
 	 * @field {Object} db config info
@@ -571,7 +498,7 @@ var SqlMap = util.class('SqlMap', {
 	 * @type {String}
 	 */
 	original: '',
-	
+
 	/**
 	 * @constructor
 	 * @arg [conf] {Object} Do not pass use center server config
@@ -580,78 +507,50 @@ var SqlMap = util.class('SqlMap', {
 		this.m_original_handles = {};
 		if (conf) {
 			util.update(this, conf);
-			this.db = {
+			this.config = {
 				port: 3306,
 				host: 'localhost',
 				user: 'root',
 				password: '',
 				database: '',
-				...this.db,
+				...this.config,
 			};
+			this.config = this.db;
 		} else {
 			// use center server config
 			// on event
 			throw new Error('use center server config');
 		}
 	},
-	
-	
-	/**
-	 * get data
-	 */
-	get2: function(name, param, cb) {
-		return funcs.get2(this, name, param, cb);
-	},
-	
+
 	/**
 	 * @func get(name, param)
 	 */
-	get: function(name, param) {
-		return funcs.get(this, name, param);
-	},
-	
-	/**
-	 * get data list
-	 */
-	gets2: function(name, param, cb) {
-		return funcs.gets2(this, name, param, cb);
+	get: function(name, param, opts) {
+		return funcs.get(this, get_db(this), 0, name, param, opts);
 	},
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets: function(name, param) {
-		return funcs.gets(this, name, param);
-	},
-	
-	/**
-	 * post2 data
-	 */
-	post2: function(name, param, cb) {
-		return funcs.post2(this, name, param, cb);
+	gets: function(name, param, opts) {
+		return funcs.gets(this, get_db(this), 0, name, param, opts);
 	},
 
 	/**
 	 * @func post(name, param)
 	 */
-	post: function(name, param) {
-		return funcs.post(this, name, param);
-	},
-
-	/**
-	 * @func query2(name, param, cb)
-	 */
-	query2: function(name, param, cb) {
-		return funcs.query2(this, name, param, cb);
+	post: function(name, param, opts) {
+		return funcs.post(this, get_db(this), 0, name, param, opts);
 	},
 
 	/**
 	 * @func query(name, param, cb)
 	 */
-	query: function(name, param) {
-		return funcs.query(this, name, param);
+	query: function(name, param, opts) {
+		return funcs.query(this, get_db(this), 0, name, param, opts);
 	},
-	
+
 	/**
 		* start transaction
 		* @return {private$transaction}
@@ -659,7 +558,7 @@ var SqlMap = util.class('SqlMap', {
 	transaction: function() {
 		return new private$transaction(this);
 	},
-	
+
 });
 
 var shared = null;
