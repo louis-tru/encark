@@ -42,7 +42,6 @@ application/x-mpegURL  m3u8
 # Added by: mjrusso
 video/MP2T  ts
 
-text/plain					txt text conf def list log in b64 base64 map x module keys script
+text/plain					txt text conf def list log in b64 base64 map x module keys script gyp gypi
 application/xml			xml xsl vx
 application/javascript-xml	jsx
-
