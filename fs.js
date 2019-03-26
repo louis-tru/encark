@@ -105,6 +105,10 @@ function inl_copy_dir(path, target, cancel_handle, options, cb) {
 			if (err) return cb(err);
 			
 			if (stat.isSymbolicLink()) {
+				if (fs.lstatSync(target2).isSymbolicLink()) {
+					// TODO sync ?
+					fs.unlinkSync(target2);
+				}
 				fs.readlink(path2, (e,p)=>{
 					if (e) 
 						return cb(err);
@@ -194,6 +198,9 @@ function inl_copy_dir_sync(path, target, options, check) {
 		
 		if (stat.isSymbolicLink()) {
 			try {
+				if (fs.lstatSync(target2).isSymbolicLink()) {
+					fs.unlinkSync(target2);
+				}
 				fs.symlinkSync(fs.readlinkSync(path2), target2);
 			} catch(err) { console.error(err); }
 		}
