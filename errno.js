@@ -40,4 +40,5 @@ module.exports = {
 	ERR_REQUEST_AUTH_FAIL: [-30010, 'request auth fail'],
 	ERR_REQUEST_ABORT: [-30011, 'request abort'],
 	ERR_HTTP_REQUEST_TIMEOUT: [-10045, 'http request timeout'],
+	ERR_METHOD_UNREALIZED: [-10046, 'method unrealized'],
 };
