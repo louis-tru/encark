@@ -63,7 +63,6 @@ var Query = util.class('Query', {
 	 */
 	onRow: null,
 
-
 	/**
 	 * @event onEnd
 	 */
@@ -88,7 +87,7 @@ var Query = util.class('Query', {
 		switch (packet.type) {
 			case parser.OK_PACKET:
 				self.onResolve.trigger(packet.toUserObject());
-				if (packet.serverStatus == 2) {
+				if (packet.serverStatus == 2 || packet.serverStatus == 3) {
 					self.onEnd.trigger();
 				}
 				break;

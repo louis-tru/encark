@@ -241,10 +241,9 @@ exports.Mysql = util.class('Mysql', Database, {
 		}
 		else {
 			query.onError.on(function (e) {
-				self.onerror.trigger(e.data);
 				dequeue(self);
 			});
-			query.onend.on(function () {
+			query.onEnd.on(function () {
 				dequeue(self);
 			});
 		}

@@ -219,9 +219,8 @@ function compilation(self, exp, param) {
 
 	for (var i in variable) {
 		var item = variable[i];
-		var value =
-			item instanceof Date ? 'new Date({0})'.format(item.valueOf()) :
-			JSON.stringify(item);
+		var value = item instanceof Date ?
+			'new Date({0})'.format(item.valueOf()) : JSON.stringify(item);
 		code.push('var {0} = {1};'.format(i, value));
 	}
 
@@ -266,8 +265,15 @@ function ifMap(self, item, param) {
 			return null;
 		}
 	}
-	else if (name && !(name in param)) {
-		return null;
+	else if (name) {
+		if (name[0] == '!') {
+			name = name.substr(1);
+			if (name in param) {
+				return null;
+			}
+		} else if (!(name in param)) {
+			return null;
+		}
 	}
 
 	var sql = lsMap(self, item.__ls__, param);
@@ -411,7 +417,9 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 		}
 	} catch (err) {
 		if (db) {
-			db.close();
+			if (!is_transaction) {
+				db.close();
+			}
 		}
 		cb(err);
 	}
@@ -555,8 +563,19 @@ var SqlMap = util.class('SqlMap', {
 		* start transaction
 		* @return {private$transaction}
 		*/
-	transaction: function() {
-		return new private$transaction(this);
+	transaction: function(cb) {
+		util.assert(cb);
+		util.assert(util.isAsync(cb));
+
+		var tr = new private$transaction(this);
+
+		return cb(tr).then(e=>{
+			tr.commit();
+			return e;
+		}).catch(e=>{
+			tr.rollback();
+			throw e;
+		});
 	},
 
 });
