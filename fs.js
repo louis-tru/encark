@@ -39,126 +39,168 @@ var chown = fs.chown;
 
 Object.assign(exports, fs);
 
-function inl_copy_file(path, target, cancel_handle, options, cb) {
+function inl_copy_symlink(path, target, options, cb) {
+	if (options.is_cancel) return;
 
-	if ( !options.replace ) {
-
-		fs.exists(target, function(ok){
-			if ( ok ) {
-				cb(); // cancel copy
-			} else {
-				inl_copy_file(path, target, cancel_handle, { replace:true }, cb);
-			}
-		});
-		
-		return;
-	}
-
-	if (cancel_handle.is_cancel) {
-		return;
-	}
-
-	var read = exports.createReadStream(path);
-	var write = exports.createWriteStream(target);
-
-	function error(e) {
-		read.destroy();
-		write.destroy();
-		console.error(e);
-		cb(e);
-	}
-	
-	read.on('data', function (buff) {
-		if (cancel_handle.is_cancel) {
-			read.destroy();
-			write.destroy();
+	fs.lstat(target, function(err, stat) {
+		if (err) return cp();
+		if (stat.isSymbolicLink() || !stat.isDirectory()) {
+			fs.unlink(target, e=>e?cb(e):cp()); // rm
 		} else {
-			write.write(buff);
+			inl_rm(options, target, e=>e?cb(e):cp()); // rm
 		}
 	});
-	read.on('end', function () {
-		if (!cancel_handle.is_cancel) {
-			write.end();
-			cb();
-		}
-	});
-	read.on('error', error);
-	write.on('error', error);
+
+	function cp() {
+		fs.readlink(path, function(err, path) {
+			if (err) {
+				cb(err);
+			} else {
+				fs.symlink(path, target, cb);
+			}
+		})
+	}
 }
 
-function inl_copy_dir(path, target, cancel_handle, options, cb) {
-	if (cancel_handle.is_cancel) return;
-	var list = null;
-	
-	function shift(err) {
-		if (err) { return cb (err) }
-		if (!list.length) { return cb() } // 完成
-		
-		var name = list.shift();
-		if (options.ignore_hide && name[0] == '.')
-			return shift(); // 忽略隐藏
+function inl_copy_file(path, target, options, cb) {
+	if (options.is_cancel) return;
 
-		var path2 = path + '/' + name;
-		var target2 = target + '/' + name;
-		
-		fs.lstat(path2, function(err, stat) {
-			if (err) return cb(err);
-			
-			if (stat.isSymbolicLink()) {
-				if (fs.lstatSync(target2).isSymbolicLink()) {
-					// TODO sync ?
-					fs.unlinkSync(target2);
-				}
-				fs.readlink(path2, (e,p)=>{
-					if (e) 
-						return cb(err);
-					fs.symlink(target2, p, e=>{
-						if (e)
-							console.error(e);
-						shift();
-					});
-				});
-			}
-			else if (stat.isFile()) {
-				inl_copy_file(path2, target2, cancel_handle, options, shift);
-			} 
-			else if (stat.isDirectory()) {
-				inl_copy_dir(path2, target2, cancel_handle, options, shift);
+	fs.lstat(target, function(err, stat) {
+		if (err) return cp();
+		if (stat.isSymbolicLink()) {
+			fs.unlink(target, e=>e?cb(e):cp()); // rm
+		} else if (!stat.isFile()) {
+			inl_rm(options, target, e=>e?cb(e):cp()); // rm
+		} else {
+			if ( !options.replace ) { // 不替换
+				return cb(); // 结束
 			} else {
-				shift();
+				cp();
+			}
+		}
+	});
+
+	function cp() {
+		var read = exports.createReadStream(path);
+		var write = exports.createWriteStream(target);
+
+		function error(e) {
+			read.destroy();
+			write.destroy();
+			console.error(e);
+			cb(e);
+		}
+		
+		read.on('data', function (buff) {
+			if (options.is_cancel) {
+				read.destroy();
+				write.destroy();
+			} else {
+				write.write(buff);
 			}
 		});
+		read.on('end', function () {
+			if (!options.is_cancel) {
+				write.end();
+				cb();
+			}
+		});
+		read.on('error', error);
+		write.on('error', error);
 	}
+}
+
+function inl_copy_dir(path, target, options, cb) {
+	if (options.is_cancel) return;
+
+	fs.lstat(target, function(err, stat) {
+		if (err) return cp();
+		if (stat) {
+			if (stat.isSymbolicLink() || !stat.isDirectory()) {
+				fs.unlink(target, e=>e?cb(e):fs.mkdir(target, cp)); // rm
+			}
+		} else {
+			fs.mkdir(target, cp);
+		}
+	});
+
+	var list = null;
 	
-	function readdir(err) {
+	function cp(err) {
 		if (err) 
-			return cb(err);
-		fs.readdir(path, function (err, ls) {
+			return cb (err);
+		fs.readdir(path, function(err, ls) {
 			if (err) 
 				return cb (err);
 			list = ls;
 			shift();
 		});
 	}
-	
-	fs.exists(target, function(exists) { // 创建目录
-		if (exists) {
-			readdir();
-		} else {
-			fs.mkdir(target, readdir);
-		}
-	});
+
+	function shift(err) {
+		if (err) return cb(err);
+		if (!list.length) return cb(); // 完成
+
+		var name = list.shift();
+		if (options.ignore_hide && name[0] == '.')
+			return shift(); // 忽略隐藏
+
+		var path1 = path + '/' + name;
+		var target1 = target + '/' + name;
+		
+		fs.lstat(path1, function(err, stat) {
+			if (err) return cb(err);
+
+			if (stat.isSymbolicLink() && options.symlink) { // copy symlink
+				inl_copy_symlink(path1, target1, options, shift);
+			} else if (stat.isFile()) {
+				inl_copy_file(path1, target1, options, shift);
+			} else if (stat.isDirectory()) {
+				inl_copy_dir(path1, target1, options, shift);
+			} else {
+				console.warn('ignore cp', path1, 'to', target1);
+				shift();
+			}
+		});
+	}
 }
 
-function inl_copy_file_sync(path, target, options, check) {
+function inl_copy_symlink_sync(path, target, options, check) {
+	if (check(path, target)) ; // 取消
 
-	if ( !options.replace ) { // 如果存在不替换
-		if ( fs.existsSync(target) ) {
-			return; // 结束
+	try {
+		var stat = fs.lstatSync(target);
+	} catch(e) {}
+
+	if (stat) {
+		if (stat.isSymbolicLink() || !stat.isDirectory()) {
+			fs.unlinkSync(target); // rm
+		} else {
+			inl_rm_sync(target); // rm
 		}
 	}
 
+	fs.symlinkSync(fs.readlinkSync(path), target);
+}
+
+function inl_copy_file_sync(path, target, options, check) {
 	if (!check(path, target)) return; // 取消
+
+	try {
+		var stat = fs.lstatSync(target);
+	} catch(e) {}
+
+	if (stat) {
+		if (stat.isSymbolicLink()) {
+			fs.unlinkSync(target); // rm
+		} else if (!stat.isFile()) {
+			inl_rm_sync(target); // rm
+		} else {
+			if ( !options.replace ) { // 不替换
+				return; // 结束
+			}
+		}
+	}
 
 	var rfd = fs.openSync(path, 'r');
 	var wfd = fs.openSync(target, 'w');
@@ -180,8 +222,17 @@ function inl_copy_file_sync(path, target, options, check) {
 function inl_copy_dir_sync(path, target, options, check) {
 	if (!check(path, target)) 
 		return; // 取消
-	
-	if (!fs.existsSync(target)) { // 创建目录
+
+	try {
+		var stat = fs.lstatSync(target);
+	} catch(e) {}
+
+	if (stat) {
+		if (stat.isSymbolicLink() || !stat.isDirectory()) {
+			fs.unlinkSync(target); // rm
+			fs.mkdirSync(target);
+		}
+	} else {
 		fs.mkdirSync(target);
 	}
 	
@@ -192,23 +243,18 @@ function inl_copy_dir_sync(path, target, options, check) {
 		if (options.ignore_hide && name[0] == '.')
 			continue; // 忽略隐藏
 			
-		var path2 = path + '/' + name;
-		var target2 = target + '/' + name;
-		var stat = fs.lstatSync(path2);
-		
-		if (stat.isSymbolicLink()) {
-			try {
-				if (fs.lstatSync(target2).isSymbolicLink()) {
-					fs.unlinkSync(target2);
-				}
-				fs.symlinkSync(fs.readlinkSync(path2), target2);
-			} catch(err) { console.error(err); }
-		}
-		else if (stat.isFile()) {
-			inl_copy_file_sync(path2, target2, options, check);
-		}
-		else if (stat.isDirectory()) {
-			inl_copy_dir_sync(path2, target2, options, check);
+		var path1 = path + '/' + name;
+		var target1 = target + '/' + name;
+		var stat = fs.lstatSync(path1);
+
+		if (stat.isSymbolicLink() && options.symlink) { // copy symlink
+			inl_copy_symlink_sync(path1, target1, options, check);
+		} else if (stat.isFile()) {
+			inl_copy_file_sync(path1, target1, options, check);
+		} else if (stat.isDirectory()) {
+			inl_copy_dir_sync(path1, target1, options, check);
+		} else {
+			console.warn('ignore cp', path1, 'to', target1);
 		}
 	}
 }
@@ -233,16 +279,14 @@ function inl_rm_sync(path) {
 
 function inl_rm(handle, path, cb) {
 
-	cb = util.cb(cb);
-
-	exports.lstat(path, function (err, stat) {
+	fs.lstat(path, function (err, stat) {
 		if (err) {
 			return cb(err);
 		}
 		
 		if (stat.isFile() || stat.isSymbolicLink()) {
 			if (!handle.is_cancel) { // 没有取消
-				exports.unlink(path, cb);
+				fs.unlink(path, cb);
 			}
 			return;
 		}
@@ -257,13 +301,13 @@ function inl_rm(handle, path, cb) {
 				return cb(err);
 			}
 			if (!ls.length) {
-				return exports.rmdir(path, cb);
+				return fs.rmdir(path, cb);
 			}
 			inl_rm(handle, path + '/' + ls.shift(), shift);
 		}
 
 		//dir
-		exports.readdir(path, function (err, data) {
+		fs.readdir(path, function (err, data) {
 			ls = data;
 			shift(err);
 		});
@@ -393,7 +437,18 @@ exports.rm_r = function (path, cb) {
 	cb = cb || function (err) { 
 		if (err) throw util.err(err);
 	};
-	inl_rm(handle, path, cb);
+	fs.lstat(path, function(err, stat) {
+		if (err) {
+			return cb();	
+		}
+		if (stat.isFile() || stat.isSymbolicLink()) {
+			if (!handle.is_cancel) { // 没有取消
+				fs.unlink(path, cb);
+			}
+		} else {
+			inl_rm(handle, path, cb);
+		}
+	});
 	return {
 		cancel: function () {// 取消delete
 			handle.is_cancel = true; 
@@ -413,7 +468,14 @@ exports.rm_sync = function (path) {
  * 删除文件与文件夹
  */
 exports.rm_r_sync = function (path) {
-	if ( fs.existsSync(path) ) {
+	try {
+		var stat = fs.lstatSync(path);
+	} catch(err) {
+		return;
+	}
+	if (stat.isFile() || stat.isSymbolicLink()) {
+		fs.unlinkSync(path);
+	} else {
 		inl_rm_sync(path);
 	}
 };
@@ -426,9 +488,6 @@ exports.rm_r_sync = function (path) {
  * @param {Function} cb   (Optional)
  */
 exports.cp = function (path, target, options, cb) {
-	var cancel_handle = {
-		is_cancel: false,
-	};
 	path = Path.resolve(path);
 	target = Path.resolve(target);
 	
@@ -439,6 +498,8 @@ exports.cp = function (path, target, options, cb) {
 	options = util.assign({ 
 		ignore_hide: false, // 忽略隐藏
 		replace: true, // 如果存在替换目标
+		symlink: true, // copy symlink
+		is_cancel: false,
 	}, options);
 	
 	cb = cb || function (err) { 
@@ -448,24 +509,27 @@ exports.cp = function (path, target, options, cb) {
 	if (options.ignore_hide && Path.basename(path)[0] == '.')
 		return cb(); // 忽略隐藏
 	
-	fs.stat(path, function (err, stat) {
+	fs.lstat(path, function (err, stat) {
 		if (err) {
-			return cb (err);
+			return cb(err);
 		}
-		if (stat.isFile()) {
-			inl_copy_file(path, target, cancel_handle, options, cb);
-		} 
-		else if (stat.isDirectory()) {
-			inl_copy_dir(path, target, cancel_handle, options, cb);
-		} 
-		else {
-			cb ();
-		}
+		exports.mkdir_p(Path.dirname(target), function() {
+			if (stat.isSymbolicLink() && options.symlink) { // copy symlink
+				inl_copy_symlink(path, target, options, cb);
+			} else if (stat.isFile()) {
+				inl_copy_file(path, target, options, cb);
+			} else if (stat.isDirectory()) {
+				inl_copy_dir(path, target, options, cb);
+			} else {
+				console.warn('ignore cp', path, 'to', target);
+				cb();
+			}
+		});
 	});
 	
 	return {
 		cancel: function () {  // 取消cp
-			cancel_handle.is_cancel = true;
+			options.is_cancel = true;
 			cb(null, null, true);
 		}
 	};
@@ -484,6 +548,7 @@ exports.cp_sync = function (path, target, options) {
 	options = util.assign({ 
 		ignore_hide: false, // 忽略隐藏
 		replace: true, // 如果存在替换目标
+		symlink: true, // copy symlink
 		check: function() { return true; },
 	}, options);
 	
@@ -492,15 +557,18 @@ exports.cp_sync = function (path, target, options) {
 	if (options.ignore_hide && Path.basename(path)[0] == '.')
 		return; // 忽略隐藏
 		
-	var stat = fs.statSync(path);
+	var stat = fs.lstatSync(path);
 	
 	exports.mkdir_p_sync(Path.dirname(target));
-	
-	if (stat.isFile()) {
+
+	if (stat.isSymbolicLink() && options.symlink) { // copy symlink
+		inl_copy_symlink_sync(path, target, options, check);
+	} else if (stat.isFile()) {
 		inl_copy_file_sync(path, target, options, check);
-	} 
-	else if (stat.isDirectory()) {
+	} else if (stat.isDirectory()) {
 		inl_copy_dir_sync(path, target, options, check);
+	} else {
+		console.warn('ignore cp', path, 'to', target);
 	}
 };
 
