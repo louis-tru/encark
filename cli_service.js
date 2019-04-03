@@ -72,23 +72,13 @@ async function call_func(self, msg) {
 		return callback(Error.new('"{0}" no defined function'.format(action)));
 	}
 
-	var cb2 = function(data) { callback(null, data) }.catch(callback);
-	
-	if (util.isAsync(fn)) {
-		var r;
-		try {
-			r = await self[action](data);
-		} catch(err) {
-			return callback(err);
-		}
-		callback(null, r)
-	} else {
-		try {
-			fn.call(self, data, cb2);
-		} catch(err) {
-			callback(err);
-		}
+	var err, r;
+	try {
+		var r = await self[action](data);
+	} catch(e) {
+		err = e;
 	}
+	callback(err, r);
 }
 
 /**

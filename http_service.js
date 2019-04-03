@@ -58,9 +58,9 @@ function returnJSON(self, data) {
 }
 
 async function action_multiple_calls(self, calls, index, cb) {
-	var funcs = { };
-	var result = { };
-	var count = 0; var done_count = 0;
+	var funcs = {};
+	var result = {};
+	var count = 0, done_count = 0;
 	var done = 0;
 
 	for ( var action in calls ) {
@@ -71,14 +71,11 @@ async function action_multiple_calls(self, calls, index, cb) {
 		}
 		if ( typeof func != 'function' ) {
 			return cb(Error.new('could not find function ' + action).toJSON(), index);
-		}		
+		}
 		funcs[action] = func;
 	}
 
 	function cb2(name, err, data) {
-		if ( result[name] ) {
-			throw new Error('Already completed callback');
-		}
 		if ( done ) { // Already end
 			return;
 		}
@@ -99,7 +96,6 @@ async function action_multiple_calls(self, calls, index, cb) {
 		} else {
 			result[name] = data;
 		}
-
 		if ( done_count == count ) {
 			done = true;
 			cb( { data: result }, index ); // done
@@ -109,38 +105,25 @@ async function action_multiple_calls(self, calls, index, cb) {
 	for ( let name in calls ) {
 		let fn = funcs[name];
 		let data = calls[name];
-		let cb =function(data) {
-			cb2(name, null, data);
-		}.catch(function(err) { 
-			cb2(name, err);
-		});
-		if (util.isAsync(fn)) {
-			var r, e;
-			try {
-				r = await self[name](data);
-			} catch(err) {
-				e = err;
-			}
-			if (e) {
-				cb2(name, e);
-			} else {
-				cb2(name, null, r);
-			}
+		var r, e;
+		try {
+			r = await self[name](data);
+		} catch(err) {
+			e = err;
+		}
+		if (e) {
+			cb2(name, e);
 		} else {
-			try {
-				self[name](data, cb);
-			} catch(err) {
-				cb2(name, err);
-			}
+			cb2(name, null, r);
 		}
 	}
 }
 
 function action_multiple(self, info) {
-	
+
 	var post_buffs = [];
 	var post_total = 0;
-	
+
 	if ( self.request.method == 'POST' ) {
 		self.request.on('data', function(buff) {
 			post_buffs.push(buff);
@@ -151,7 +134,7 @@ function action_multiple(self, info) {
 	self.request.on('end', async function() {
 		var auth = false;
 		try {
-			auth = util.isAsync(self.auth) ? (await self.auth(info)): self.auth(info);
+			auth = await self.auth(info);
 		} catch(e) {
 			console.error(e);
 		}
@@ -290,29 +273,10 @@ var HttpService = util.class('HttpService', StaticService, {
 		if (!fn || typeof fn != 'function') {
 			return StaticService_action.call(this);
 		}
-
-		var has_callback = false;
-		
-		var callback = function(err, data) {
-			if (self.m_ok) return;
-			if (has_callback) {
-				throw new Error('callback has been completed');
-			}
-			has_callback = true;
-			if (err) {
-				if (self.server.printLog) {
-					console.error(err);
-				}
-				self.returnError(err);
-			} else {
-				self.returnJSON(data);
-			}
-		};
 		
 		var ok = async function() {
-			var auth;
 			try {
-				auth = util.isAsync(self.auth) ? (await self.auth(info)): self.auth(info);
+				var auth = await self.auth(info);
 			} catch(e) {
 				console.error(e);
 			}
@@ -322,20 +286,20 @@ var HttpService = util.class('HttpService', StaticService, {
 			}
 
 			var data = util.assign({}, self.params, self.data, info);
-			var cb = function(data) { callback(null, data) }.catch(callback);
-			if (util.isAsync(fn)) {
-				var r;
-				try {
-					r = await self[action](data);
-				} catch(err) {
-					return callback(err);
-				}
-				callback(null, r);
-			} else {
-				try {
-					fn.call(self, data, cb);
-				} catch(err) {
-					callback(err);
+			var err, r;
+			try {
+				r = await self[action](data);
+			} catch(e) {
+				err = e;
+			}
+			if (!self.m_ok) {
+				if (err) {
+					if (self.server.printLog) {
+						console.error(err);
+					}
+					self.returnError(err);
+				} else {
+					self.returnJSON(r);
 				}
 			}
 		};
