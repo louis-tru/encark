@@ -401,7 +401,7 @@ extend(Error, {
 		} else {
 			return { message: 'unknown error', code: 0, name: '', description: '' };
 		}
-		return r;
+		return err;
 	},
 	
 	new: function(e, code) {
