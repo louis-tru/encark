@@ -37,6 +37,7 @@ const options = {};  // start options
 var ignore_local_package, ignore_all_local_package;
 var config = null;
 var _pkgutil = exports;
+var _require = module.require;
 
 if (haveQgr) {
 	var _pkg = requireNative('_pkg');
@@ -47,7 +48,7 @@ if (haveQgr) {
 	var chdir = _path.chdir;
 } else if (haveNode) {
 	var win32 = process.platform == 'win32';
-	var _path = require('path');
+	var _path = _require('path');
 	var cwd = process.cwd;
 	var _cwd = win32 ? function() {
 		return PREFIX + cwd().replace(/\\/g, '/');
@@ -204,9 +205,9 @@ function extendObject(obj, extd) {
 }
 
 if (haveNode && !haveQgr) {
-	var fs = require('fs');
+	var fs = _require('fs');
 	var _keys = require('./_keys');
-	require('module').Module._extensions['.keys'] = function(module, filename) {
+	_require('module').Module._extensions['.keys'] = function(module, filename) {
 		var content = fs.readFileSync(filename, 'utf8');
 		try {
 			module.exports = _keys.parse(stripBOM(content));
@@ -297,7 +298,7 @@ function Packages_require_parse_argv(self) {
 
 function inl_require_without_err(pathname) {
 	try {
-		return require(pathname);
+		return _require(pathname);
 	} catch(e) {}
 }
 
