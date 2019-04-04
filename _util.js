@@ -85,8 +85,10 @@ else if (haveWeb) {
  * defined class members func
  */
 function def_class_members(klass, base, members) {
-	if (base)
+	if (base) {
 		members.__proto__ = base.prototype;
+		klass.__proto__ = base;
+	}
 	klass.prototype = members;
 }
 

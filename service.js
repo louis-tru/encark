@@ -172,6 +172,8 @@ var Service = util.class('Service', {
 	// @end
 });
 
+Service.type = 'service';
+
 module.exports = {
 
 	Service: Service,
@@ -193,19 +195,20 @@ module.exports = {
 	 */
 	getServiceDescriptors: function() {
 		var r = {};
-		Object.entries(service_cls).forEach(([key, value])=>{
+		Object.entries(service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|HttpHeartbeatProxy)$/.test(key)) {
 
 				var type = 0;
 				var methods = [], events = [];
-				var item = { type: item, methods, events, };
-				var self = value.prototype;
+				var item = { type: service.type, methods, events };
+				var self = service.prototype;
 
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
 					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/.test(k)) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
+							item.type |= 1;
 							events.push(k.substr(2));
-						} else {
+						} else { // methods
 							if (typeof v.value == 'function') {
 								methods.push(k);
 							}

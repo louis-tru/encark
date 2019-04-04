@@ -155,4 +155,6 @@ util.extendClass(ClientService, Notification, {
 	},
 });
 
+ClientService.type = 'event';
+
 exports.ClientService = ClientService;
