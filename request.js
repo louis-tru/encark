@@ -486,7 +486,11 @@ class Request {
 	}
 	
 	call(name, params, options) {
-		return this.post(name, params, options);
+		if (params) {
+			return this.post(name, params, options);
+		} else {
+			return this.get(name, params, options);
+		}
 	}
 }
 
