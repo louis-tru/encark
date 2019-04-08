@@ -50,7 +50,7 @@ else if (haveNode) {
 }
 else if (haveWeb) {
 	var platform = 'web';
-	var argv = [];
+	var argv = location.search.substr(1).split('&');
 
 	var flags = function() {
 		var USER_AGENT = navigator.userAgent;
