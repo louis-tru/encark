@@ -37,7 +37,13 @@ const options = {};  // start options
 var ignore_local_package, ignore_all_local_package;
 var config = null;
 var _pkgutil = exports;
-var _require = module.require;
+var _require = typeof require == 'function' ? require:
+	typeof __webpack_require__ == 'function' ? 
+	__webpack_require__: function() {
+	var e = new Error("Cannot find module \".\"");
+	e.code = 'MODULE_NOT_FOUND';
+	throw e;
+};
 
 if (haveQgr) {
 	var _pkg = requireNative('_pkg');
