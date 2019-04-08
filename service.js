@@ -206,7 +206,6 @@ module.exports = {
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
 					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/.test(k)) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
-							item.type |= 1;
 							events.push(k.substr(2));
 						} else { // methods
 							if (typeof v.value == 'function') {
