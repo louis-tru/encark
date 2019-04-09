@@ -103,7 +103,7 @@ function tryReturnDirectory(self, filename) {
 		}
 		for (var i = 0, name; (name = def[i]); i++) {
 			if (files.indexOf(name) != -1)
-				return self.returnFile(filename.replace(/\/?$/, '/') + name);
+				return returnFile(self, filename.replace(/\/?$/, '/') + name);
 		}
 		result(self, filename);
 	});
@@ -306,7 +306,7 @@ function returnErrorStatus(self, statusCode, html) {
 				if (util.dev && html) {
 					resultError(self, statusCode, html);
 				} else {
-					self.returnFile(filename);
+					returnFile(self, filename);
 				}
 			}
 		});
