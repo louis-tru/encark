@@ -76,36 +76,98 @@ function isGzip(self, filename) {
 }
 
 //返回目录
-function _returnDirectory(self, filename) {
-	if(self.server.autoIndex) {
-		self.returnDirectory(filename);
-	} else {
-		self.returnStatus(403);
-	}
-}
-
-//返回目录
-function returnDirectory(self, filename) {
+function tryReturnDirectory(self, filename) {
 
 	//读取目录
 	if (!filename.match(/\/$/))  // 目录不正确,重定向
-		return self.redirect(self.pathname + '/');
+		return returnRedirect(self, self.pathname + '/');
+
+	//返回目录
+	function result(self, filename) {
+		if(self.server.autoIndex) {
+			return returnDirectory(self, filename);
+		} else {
+			return returnErrorStatus(self, 403);
+		}
+	}
 
 	var def = self.server.defaults;
 	if (!def.length) { //默认页
-		return _returnDirectory(self, filename);
+		return result(self, filename);
 	}
 
 	fs.readdir(filename, function (err, files) {
 		if (err) {
 			console.log(err);
-			return self.returnStatus(404);
+			return returnErrorStatus(self, 404);
 		}
 		for (var i = 0, name; (name = def[i]); i++) {
 			if (files.indexOf(name) != -1)
 				return self.returnFile(filename.replace(/\/?$/, '/') + name);
 		}
-		_returnDirectory(self, filename);
+		result(self, filename);
+	});
+}
+
+function returnRedirect(self, path) {
+	self.response.setHeader('Location', path);
+	self.response.writeHead(302);
+	self.response.end();
+}
+
+function returnDirectory(self, filename) {
+	var res = self.response;
+	var req = self.request;
+
+	//读取目录
+	if (!filename.match(/\/$/)){  //目录不正确,重定向
+		return returnRedirect(self, self.pathname + '/');
+	}
+
+	fs.ls(filename, function (err, files) {
+		if (err) {
+			return returnErrorStatus(self, 404);
+		}
+		var	dir = filename.replace(self.m_root, '');
+		var html =
+			'<!DOCTYPE html><html><head><title>Index of {0}</title>'.format(dir) +
+			'<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />' +
+			'<style type="text/css">*{font-family:Courier New}div,span{line-height:20px;height:20px;}\
+			span{display:block;float:right;width:220px}</style>' +
+			'</head><body bgcolor="white">' +
+			'<h1>Index of {0}</h1><hr/><pre><div><a href="{1}">../</a></div>'.format(dir, dir ? '../' : 'javascript:')
+
+		var ls1 = [];
+		var ls2 = [];
+
+		for (var i = 0, stat; (stat = files[i]); i++) {
+			var name = stat.name;
+			if (name.slice(0, 1) == '.'){
+				continue;
+			}
+
+			var link = name;
+			var size = (stat.size / 1024).toFixed(2) + ' KB';
+			var isdir = stat.isDirectory();
+
+			if (isdir) {
+				link += '/';
+				size = '-';
+			}
+			
+			var s =
+				'<div><a href="{0}">{0}</a><span>{2}</span><span>{1}</span></div>'
+						.format(link, stat.ctime.toString('yyyy-MM-dd hh:mm:ss'), size);
+			isdir ? ls1.push(s) : ls2.push(s);
+		}
+
+		html += ls1.join('') + ls2.join('') + '</pre><hr/></body></html>';
+		setHeader(self);
+
+		// var type = self.server.getMime('html');
+		
+		res.writeHead(200);
+		res.end(html);
 	});
 }
 
@@ -148,7 +210,7 @@ function result_data(self, filename, type, time, gzip, err, data) {
 	
 	if (err) {
 		delete g_static_cache[filename];
-		return self.returnStatus(404);
+		return returnErrorStatus(self, 404);
 	}
 
 	var res = self.response;
@@ -223,13 +285,122 @@ function resultFileData(self, filename, type, size, start_range, end_range) {
 function resultError(self, statusCode, html) {
 	var res = self.response;
 	var type = self.server.getMime('html');
-	
+
 	setHeader(self);
 	res.setHeader('Content-Type', getContentType(self, type));
 	res.writeHead(statusCode);
 	res.end('<!DOCTYPE html><html><body><h3>' +
 		statusCode + ': ' + (http.STATUS_CODES[statusCode] || '') +
 		'</h3><br/>' + (html || '') + '</body></html>');
+}
+
+function returnErrorStatus(self, statusCode, html) {
+	var filename = self.server.errorStatus[statusCode];
+	
+	if (filename) {
+		filename = self.m_root + filename;
+		fs.stat(filename, function (err) {
+			if (err) {
+				resultError(self, statusCode, html);
+			} else {
+				if (util.dev && html) {
+					resultError(self, statusCode, html);
+				} else {
+					self.returnFile(filename);
+				}
+			}
+		});
+	} else {
+		resultError(self, statusCode, html);
+	}
+}
+
+function returnFile(self, filename) {
+		
+	var req = self.request;
+	var res = self.response;
+	
+	if (!util.dev && return_cache(self, filename)) {  //high speed Cache
+		return;
+	}
+	
+	fs.stat(filename, function (err, stat) {
+		
+		if (err) {
+			return returnErrorStatus(self, 404);
+		}
+		
+		if (stat.isDirectory()) {  //dir
+			return tryReturnDirectory(self, filename);
+		}
+		
+		if (!stat.isFile()) {
+			return returnErrorStatus(self, 404);
+		}
+		
+		//for file
+		if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
+			return returnErrorStatus(self, 403);
+		}
+		
+		var mtime = stat.mtime;
+		var ims = req.headers['if-modified-since'];
+		var range = req.headers['range'];
+		var type = self.server.getMime(filename);
+		var gzip = isGzip(self, filename);
+		
+		setHeader(self);
+		res.setHeader('Last-Modified', mtime.toUTCString());
+		res.setHeader('Accept-Ranges', 'bytes');
+
+		if (range) { // return Range
+			if (range.substr(0, 6) == 'bytes=') {
+				range = range.substr(6).split('-');
+				var start_range = range[0] ? Number(range[0]) : 0;
+				var end_range = range[1] ? Number(range[1]) : stat.size - 1;
+				if (isNaN(start_range) || isNaN(end_range)) {
+					return returnErrorStatus(self, 400);
+				}
+				if (!range[0]) { // 选择文件最后100字节  bytes=-100
+					start_range = Math.max(0, stat.size - end_range);
+					end_range = stat.size - 1;
+				}
+				end_range++;
+				end_range = Math.min(stat.size, end_range);
+				start_range = Math.min(start_range, end_range);
+				// var ir = req.headers['if-range'];
+				// if (ir && Math.abs(new Date(ims) - mtime) < 1000) {
+				// }
+				return resultFileData(self, filename, type, stat.size, start_range, end_range);
+			}
+		}
+
+		if (ims && Math.abs(new Date(ims) - mtime) < 1000) { //use 304 cache
+			res.setHeader('Content-Type', getContentType(self, type));
+			res.writeHead(304);
+			res.end();
+			return;
+		}
+		
+		if (stat.size > 5 * 1024 * 1024) { // 数据大于5MB使用这个函数处理
+			return resultFileData(self, filename, type, stat.size, -1, -1);
+		}
+		else if ( ! gzip ) { //no use gzip format
+			return fs.readFile(filename, function(err, data) {
+				result_data(self, filename, type, mtime, false, err, data);
+			});
+		}
+		
+		fs.readFile(filename, function(err, data) {
+			if (err) {
+				console.err(err);
+				return returnErrorStatus(self, 404);
+			}
+			zlib.gzip(data, function (err, data) {        		//gzip
+				result_data(self, filename, type, mtime, true, err, data);
+			});
+		});
+	});
 }
 
 /**
@@ -280,74 +451,60 @@ var StaticService = util.class('StaticService', Service, {
 				if (index === 0) {
 					filename = filename.substr(virtual.length);
 				} else {
-					return this.returnStatus(404);
+					return this.returnErrorStatus(404);
 				}
 			}
 			if (this.server.disable.test(filename)) {  //禁止访问的路径
-				return this.returnStatus(403);
+				return this.returnErrorStatus(403);
 			}
 			this.returnFile(this.m_root + filename);
 		} else {
-			this.returnStatus(405);
+			this.returnErrorStatus(405);
 		}
 	},
 
 	/**
-	 * redirect
-	 * @param {String} path
+	 * @func markResponseOk
 	 */
-	redirect: function (path) {
-		var res = this.response;
-		res.setHeader('Location', path);
-		res.writeHead(302);
-		res.end();
-	},
-	
-	returnStatus: function (statusCode, message) {
-		this.returnErrorStatus(statusCode, message);
+	markResponseOk() {
+		if (this._response_ok)
+			throw new Error('request has been completed');
+		this._response_ok = true;
 	},
 
+	/**
+	 * returnRedirect
+	 * @param {String} path
+	 */
+	returnRedirect: function(path) {
+		this.markResponseOk();
+		returnRedirect(this, path);
+	},
+	
 	/**
 	 * return the state to the browser
 	 * @param {Number} statusCode
 	 * @param {String} text (Optional)  not default status ,return text
 	 */
 	returnErrorStatus: function(statusCode, html) {
-		var self = this;
-		var filename = this.server.errorStatus[statusCode];
-		
-		if (filename) {
-			filename = self.m_root + filename;
-			fs.stat(filename, function (err) {
-				if (err) {
-					resultError(self, statusCode, html);
-				} else {
-					if (util.dev && html) {
-						resultError(self, statusCode, html);
-					} else {
-						self.returnFile(filename);
-					}
-				}
-			});
-		} else {
-			resultError(self, statusCode, html);
-		}
+		this.markResponseOk();
+		returnErrorStatus(this, statusCode, message);
 	},
 	
 	/**
 	 * 返回站点文件
 	 */
 	returnSiteFile: function (name) {
-		this.returnFile(this.server.root + '/' + name);
+		this.markResponseOk();
+		return returnFile(this, this.server.root + '/' + name);
 	},
 
 	isAcceptGzip: function(filename) {
-		if (!this.server.gzip) {
-			return false;
+		if (this.server.gzip) {
+			var ae = this.request.headers['accept-encoding'];
+			return !!(ae && ae.match(/gzip/i));
 		}
-		var ae = this.request.headers['accept-encoding'];
-
-		return !!(ae && ae.match(/gzip/i));
+		return false;
 	},
 
 	isGzip(filename) {
@@ -369,92 +526,8 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String}       filename
 	 */	
 	returnFile: function (filename) {
-		
-		var self = this;
-		var req = this.request;
-		var res = this.response;
-		
-		if (!util.dev && return_cache(this, filename)) {  //high speed Cache
-			return;
-		}
-		
-		fs.stat(filename, function (err, stat) {
-			
-			if (err) {
-				return self.returnStatus(404);
-			}
-			
-			if (stat.isDirectory()) {  //dir
-				return returnDirectory(self, filename);
-			}
-			
-			if (!stat.isFile()) {
-				return self.returnStatus(404);
-			}
-			
-			//for file
-			if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
-				return self.returnStatus(403);
-			}
-			
-			var mtime = stat.mtime;
-			var ims = req.headers['if-modified-since'];
-			var range = req.headers['range'];
-			var type = self.server.getMime(filename);
-			var gzip = isGzip(self, filename);
-			
-			setHeader(self);
-			res.setHeader('Last-Modified', mtime.toUTCString());
-			res.setHeader('Accept-Ranges', 'bytes');
-
-			if (range) { // return Range
-				if (range.substr(0, 6) == 'bytes=') {
-					range = range.substr(6).split('-');
-					var start_range = range[0] ? Number(range[0]) : 0;
-					var end_range = range[1] ? Number(range[1]) : stat.size - 1;
-					if (isNaN(start_range) || isNaN(end_range)) {
-						return this.returnStatus(400);
-					}
-					if (!range[0]) { // 选择文件最后100字节  bytes=-100
-						start_range = Math.max(0, stat.size - end_range);
-						end_range = stat.size - 1;
-					}
-					end_range++;
-					end_range = Math.min(stat.size, end_range);
-					start_range = Math.min(start_range, end_range);
-					// var ir = req.headers['if-range'];
-					// if (ir && Math.abs(new Date(ims) - mtime) < 1000) {
-					// }
-					return resultFileData(self, filename, type, stat.size, start_range, end_range);
-				}
-			}
-
-			if (ims && Math.abs(new Date(ims) - mtime) < 1000) { //use 304 cache
-				res.setHeader('Content-Type', getContentType(self, type));
-				res.writeHead(304);
-				res.end();
-				return;
-			}
-			
-			if (stat.size > 5 * 1024 * 1024) { // 数据大于5MB使用这个函数处理
-				return resultFileData(self, filename, type, stat.size, -1, -1);
-			}
-			else if ( ! gzip ) { //no use gzip format
-				return fs.readFile(filename, function(err, data) {
-					result_data(self, filename, type, mtime, false, err, data);
-				});
-			}
-			
-			fs.readFile(filename, function(err, data) {
-				if (err) {
-					console.err(err);
-					return self.returnStatus(404);
-				}
-				zlib.gzip(data, function (err, data) {        		//gzip
-					result_data(self, filename, type, mtime, true, err, data);
-				});
-			});
-		});
+		this.markResponseOk();
+		return returnFile(this, filename);
 	},
 	
 	/**
@@ -462,61 +535,10 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String}       filename
 	 */
 	returnDirectory: function (filename) {
-		var self = this;
-		var res = this.response;
-		var req = this.request;
-
-		//读取目录
-		if (!filename.match(/\/$/)){  //目录不正确,重定向
-			return self.redirect(self.pathname + '/');
-		}
-
-		fs.ls(filename, function (err, files) {
-			if (err) {
-				return self.returnStatus(404);
-			}
-			var	dir = filename.replace(self.m_root, '');
-			var html =
-				'<!DOCTYPE html><html><head><title>Index of {0}</title>'.format(dir) +
-				'<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />' +
-				'<style type="text/css">*{font-family:Courier New}div,span{line-height:20px;height:20px;}\
-				span{display:block;float:right;width:220px}</style>' +
-				'</head><body bgcolor="white">' +
-				'<h1>Index of {0}</h1><hr/><pre><div><a href="{1}">../</a></div>'.format(dir, dir ? '../' : 'javascript:')
-
-			var ls1 = [];
-			var ls2 = [];
-
-			for (var i = 0, stat; (stat = files[i]); i++) {
-				var name = stat.name;
-				if (name.slice(0, 1) == '.'){
-					continue;
-				}
-
-				var link = name;
-				var size = (stat.size / 1024).toFixed(2) + ' KB';
-				var isdir = stat.isDirectory();
-
-				if (isdir) {
-					link += '/';
-					size = '-';
-				}
-				
-				var s =
-					'<div><a href="{0}">{0}</a><span>{2}</span><span>{1}</span></div>'
-							.format(link, stat.ctime.toString('yyyy-MM-dd hh:mm:ss'), size);
-				isdir ? ls1.push(s) : ls2.push(s);
-			}
-
-			html += ls1.join('') + ls2.join('') + '</pre><hr/></body></html>';
-			setHeader(self);
-
-			// var type = self.server.getMime('html');
-			
-			res.writeHead(200);
-			res.end(html);
-		});
+		this.markResponseOk();
+		return returnDirectory(this, filename);
 	},
+
 	// @end
 });
 

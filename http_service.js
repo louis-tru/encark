@@ -54,7 +54,7 @@ function returnJSON(self, data) {
 	if (self.jsonpCallback) {
 		data = self.jsonpCallback + '(' + rev + ')';
 	}
-	self.returnString(type , rev);
+	return self.returnString(type , rev);
 }
 
 async function action_multiple_calls(self, calls, index, cb) {
@@ -292,7 +292,7 @@ var HttpService = util.class('HttpService', StaticService, {
 			} catch(e) {
 				err = e;
 			}
-			if (!self.m_ok) {
+			if (!self._response_ok) {
 				if (err) {
 					if (self.server.printLog) {
 						console.error(err);
@@ -349,15 +349,15 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg data {Object} #    data
 	 */
 	returnData: function(type, data) {
-		if (this.m_ok) throw new Error('request has been completed');
+		this.markResponseOk();
 
+		var self = this;
 		var res = this.response;
 		var ae = this.request.headers['accept-encoding'];
-		this.m_ok = true;
-		
+
 		this.setDefaultHeader();
 		res.setHeader('Content-Type', type);
-		
+
 		if (typeof data == 'string' && 
 				this.server.agzip && ae && ae.match(/gzip/i)) {
 			zlib.gzip(data, function (err, data) {
@@ -377,7 +377,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg str {String}
 	 */
 	returnString: function(type, str) {
-		this.returnData(type + ';charset=utf-8', str);
+		return this.returnData(type + ';charset=utf-8', str);
 	},
 	
 	/**
@@ -386,7 +386,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 */
 	returnHtml: function(html) {
 		var type = this.server.getMime('html');
-		this.returnString(type, html);
+		return this.returnString(type, html);
 	},
 	
 	/**
@@ -395,7 +395,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 */
 	returnJSON: function(data) {
 		this.setNoCache();
-		returnJSON(this, { data: data, code: 0, st: new Date().valueOf() });
+		return returnJSON(this, { data: data, code: 0, st: new Date().valueOf() });
 	},
 
 	/**
@@ -406,9 +406,9 @@ var HttpService = util.class('HttpService', StaticService, {
 		this.setNoCache();
 		var accept = this.request.headers.accept || '';
 		if (/text\/html|application\/xhtml/.test(accept)) {
-			this.returnHtmlError(err);
+			return this.returnHtmlError(err);
 		} else {
-			this.returnJSONError(err);
+			return this.returnJSONError(err);
 		}
 	},
 
@@ -422,7 +422,7 @@ var HttpService = util.class('HttpService', StaticService, {
 			err.code = -1;
 		}
 		err.st = new Date().valueOf();
-		returnJSON(this, err);
+		return returnJSON(this, err);
 	},
 
 	/**
@@ -441,7 +441,7 @@ var HttpService = util.class('HttpService', StaticService, {
 			text += '<br/><h4>Description:</h4><br/>';
 			text += err.description;
 		}
-		this.returnStatus(500, text);
+		return this.returnErrorStatus(500, text);
 	},
 
 	// @end
