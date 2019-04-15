@@ -30,6 +30,7 @@
 
 var util = require('./util');
 var child_process = require('child_process');
+var stream = require('stream');
 var { moreLog } = util.config;
 
 function syscall(cmd) {
@@ -72,28 +73,27 @@ function spawnSync(cmd, args = []) {
 }
 
 function on_data(e, ch) {
+	if (moreLog)
+		process.stdout.write(e);
 	var log = e.toString('utf8');
-	if (moreLog) 
-		console.log(log);
 	return log;
 }
 
 function on_error(e, ch) {
+	if (moreLog)
+		process.stderr.write(e);
 	var log = e.toString('utf8');
-	if (moreLog) 
-		console.error(log);
 	return log;
 }
 
-
-function exec(cmd, onData = on_data, onError = on_error) {
-	return spawn('sh', ['-c', cmd], onData, onError);
+function exec(cmd, ...args) {
+	return spawn('sh', ['-c', cmd], ...args);
 }
 
-function spawn(cmd, args = [], onData = on_data, onError = on_error) {
+function spawn(cmd, cmd_args = [], { onData = on_data, onError = on_error, ...args } = {}) {
 	// var ls = cmd.split(/\s+/);
 	// var ch = child_process.spawn(ls.shift(), ls);
-	var ch = child_process.spawn(cmd, args);
+	var ch = child_process.spawn(cmd, cmd_args);
 	var error;
 	var stdout = [];
 	var stderr = [];
@@ -101,6 +101,7 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 	var completed = false, data, err;
 	var prev_stdout_n = true;
 	var prev_stderr_n = true;
+	var stdin = args.stdin instanceof stream.Stream ? args.stdin: null;
 
 	var resolve = function(e) {
 		completed = true;
@@ -112,12 +113,9 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 		err = e;
 	};
 
-	ch.on('error', function(err) {
-		error = Error.new(err);
-		reject(error);
-	});
-
 	ch.stdout.on('data', function(e) {
+		if (args.stdout)
+			args.stdout.write(e);
 		var log = onData(e, ch);
 		if (log) {
 			var ls = log.split('\n');
@@ -128,6 +126,8 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 	});
 
 	ch.stderr.on('error', function(e) {
+		if (args.stderr)
+			args.stderr.write(e);
 		var log = onError(e, ch);
 		if (log) {
 			var ls = log.split('\n');
@@ -137,8 +137,28 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 		}
 	});
 
+	function on_stdin(e) {
+		if (ch) {
+			ch.stdin.write(e);
+		}
+	}
+
+	function on_end() {
+		if (stdin) {
+			stdin.removeListener('data', on_stdin);
+		}
+		ch = null;
+	}
+
+	ch.on('error', function(err) {
+		on_end();
+		error = Error.new(err);
+		reject(error);
+	});
+
 	ch.on('exit', function(code) {
 		if (!error) {
+			on_end();
 			resolve({ code, stdout, stderr });
 		}
 	});
@@ -151,6 +171,10 @@ function spawn(cmd, args = [], onData = on_data, onError = on_error) {
 				_resolve(data);
 			}
 		} else {
+			if (stdin) {
+				stdin.addListener('data', on_stdin);
+				ch.stdin.resume();
+			}
 			resolve = _resolve;
 			reject = _reject;
 		}
