@@ -488,7 +488,7 @@ var StaticService = util.class('StaticService', Service, {
 	 */
 	returnErrorStatus: function(statusCode, html) {
 		this.markResponseOk();
-		returnErrorStatus(this, statusCode, message);
+		returnErrorStatus(this, statusCode, html);
 	},
 	
 	/**

@@ -124,7 +124,7 @@ class ViewController extends HttpService {
 			var str = func(data);
 			self.returnHtml(str);
 		} catch(err) {
-			self.returnStatus(500, '<pre>' + err.message + '\n' + err.stack + '</pre>');
+			self.returnErrorStatus(500, '<pre>' + err.message + '\n' + err.stack + '</pre>');
 		}
 	}
 }
