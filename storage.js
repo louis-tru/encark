@@ -68,7 +68,7 @@ function commit(self) {
  */
 class Storage {
 
-	constructor(path = util.cwd() + '/' + '.storage') {
+	constructor(path = url.cwd() + '/' + '.storage') {
 		this.m_path = url.fallbackPath(path);
 		this.m_prefix = '';
 		this.m_change = false;
@@ -141,7 +141,7 @@ class Storage {
 
 }
 
-module.exports = {
+module.exports = exports = {
 
 	Storage: Storage,
 
@@ -157,27 +157,27 @@ module.exports = {
 	},
 
 	get: function(key, defaultValue) {
-		return shared.get(key, defaultValue);
+		return exports.shared.get(key, defaultValue);
 	},
 
 	has: function(key) {
-		return shared.has(key);
+		return exports.shared.has(key);
 	},
 
 	set: function(key, value) {
-		return shared.set(key, value);
+		return exports.shared.set(key, value);
 	},
 
 	del: function(key) {
-		return shared.del(key);
+		return exports.shared.del(key);
 	},
 
 	clear: function() {
-		return shared.clear();
+		return exports.shared.clear();
 	},
 
 	save: function() {
-		shared.save();
+		exports.shared.save();
 	},
 
 };
