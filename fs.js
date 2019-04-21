@@ -166,7 +166,7 @@ function inl_copy_dir(path, target, options, cb) {
 }
 
 function inl_copy_symlink_sync(path, target, options, check) {
-	if (check(path, target)) ; // 取消
+	if (check(path, target)) return; // 取消
 
 	try {
 		var stat = fs.lstatSync(target);
@@ -220,8 +220,7 @@ function inl_copy_file_sync(path, target, options, check) {
 }
 
 function inl_copy_dir_sync(path, target, options, check) {
-	if (!check(path, target)) 
-		return; // 取消
+	if (!check(path, target)) return; // 取消
 
 	try {
 		var stat = fs.lstatSync(target);
