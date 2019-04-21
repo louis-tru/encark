@@ -313,29 +313,10 @@ function inl_rm(handle, path, cb) {
 	});
 }
 
-function inl_ls_sync(origin, path, depth, cb) {
-	var ls = fs.readdirSync(origin + '/' + path);
-	var rev = [];
-	
-	for (var i = 0; i < ls.length; i++) {
-		var name = ls[i];
-		var pathname = path ? path + '/' + name : name;
-		var stat = fs.statSync(origin + '/' + pathname);
-		stat.name = name;
-
-		cb(stat, pathname);
-		
-		if (stat.isFile()) {
-			rev.push(stat);
-		} else if (stat.isDirectory()) {
-			if (depth) { // 
-				stat.children = inl_ls_sync(origin, pathname, depth, cb);
-			}
-			rev.push(stat);
-		}
-
-	}
-	return rev;
+function async_call(func, ...args) {
+	return new Promise(function(resolve, reject) {
+		func(...args, (e,args)=>e?reject(e):resolve(args));
+	});
 }
 
 /**
@@ -634,76 +615,107 @@ exports.mkdir_p_sync = function (path, mode){
 };
 
 /**
+ * @func inl_ls_sync
+ */
+function inl_ls_sync(origin, path, depth, each_cb) {
+	var ls = fs.readdirSync(`${origin}/${path}`);
+	var rev = [];
+	
+	for (var i = 0; i < ls.length; i++) {
+		var name = ls[i];
+		var pathname = path ? `${path}/${name}` : name;
+		var stat = fs.statSync(`${origin}/${pathname}`);
+		stat.name = name;
+		each_cb(stat, pathname);
+		
+		if (stat.isDirectory() && depth) {
+			stat.children = inl_ls_sync(origin, pathname, depth, each_cb);
+		}
+		rev.push(stat);
+	}
+
+	return rev;
+}
+
+async function inl_ls(origin, path, depth, each_cb) {
+	var ls = await async_call(fs.readdir, `${origin}/${path}`);
+	var rev = [];
+	
+	for (var i = 0; i < ls.length; i++) {
+		var name = ls[i];
+		var pathname = path ? `${path}/${name}` : name;
+		var stat = await async_call(fs.stat, `${origin}/${pathname}`);
+		stat.name = name;
+		each_cb(stat, pathname);
+		
+		if (stat.isDirectory() && depth) {
+			stat.children = await inl_ls(origin, pathname, depth, each_cb);
+		}
+		rev.push(stat);
+	}
+
+	return rev;
+}
+
+/**
 	* get all info
 	* @param {String}   path
 	* @param {Boolean}  depth
 	* @param {Function} cb
 	*/
-exports.ls = function (path, depth, cb) {
+exports.ls = function (path, depth, cb, each_cb) {
 
 	path = Path.resolve(path);
-	
+
 	if (typeof depth == 'function') {
+		if (typeof cb == 'function') {
+			each_cb = cb;
+		}
 		cb = depth;
 		depth = false;
 	}
-	
+
 	cb = cb || function (err) {
 		if (err) throw util.err(err);
 	}
-	
-	function shift (path, _depth, _cb, stat) {
 
-		if (!stat.isDirectory() || !_depth){
-			return _cb(null, stat);
-		}
-		
-		var cls = stat.children = [];
-		
-		function shift2 (err, ls) {
-			if (err) {
-				return cb (err);
-			}
-			
-			if(!ls.length){
-				return _cb(null, stat);
-			}
-			
-			var name = ls.shift();
-			var path2 =  path + '/' + name;
-			
-			fs.stat(path2, function (err, stat) {
-				if (err) { return cb(err) }
-				shift(path2, depth, function (err, stat) {
-					stat.name = name;
-					cls.push(stat);
-					shift2(null, ls);
-				}, stat);
-			});
-		}
-		
-		fs.readdir(path, shift2);
-	}
+	each_cb = util.cb(each_cb);
 	
 	fs.stat(path, function (err, stat) {
-		if (err) { return cb(err) }
-		shift(path, true, function (err, stat) { 
-			cb(err, stat.children || null);
-		}, stat);
+		if (err)
+			return cb(err);
+
+		stat.name = Path.basename(path);
+		each_cb(stat, '');
+
+		if (stat.isDirectory()) {
+			inl_ls(path, '', depth, each_cb).then(e=>cb(null, e)).catch(cb)
+		} else {
+			cb(null, null);
+		}
 	});
 };
 
 /**
 	* get dir info
 	*/
-exports.ls_sync = function(path, depth, cb) {
+exports.ls_sync = function(path, depth, each_cb) {
 	path = Path.resolve(path);
+
+	if (typeof depth == 'function') {
+		each_cb = depth;
+		depth = false;
+	} else {
+		each_cb = util.cb(each_cb)
+	}
 	
 	var rev = null;
 	var stat = fs.statSync(path);
-	
+	stat.name = Path.basename(path);
+	each_cb(stat, '');
+
 	if (stat.isDirectory()) {
-		rev = inl_ls_sync(path, '', !!depth, util.cb(cb));
+		rev = inl_ls_sync(path, '', depth, each_cb);
 	}
 	return rev;
 };
