@@ -54,7 +54,7 @@ function returnJSON(self, data) {
 	if (self.jsonpCallback) {
 		data = self.jsonpCallback + '(' + rev + ')';
 	}
-	return self.returnString(type , rev);
+	return self.returnString(rev, type);
 }
 
 async function action_multiple_calls(self, calls, index, cb) {
@@ -376,7 +376,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg type {String} #    MIME type
 	 * @arg str {String}
 	 */
-	returnString: function(type, str) {
+	returnString: function(str, type = 'text/plain') {
 		return this.returnData(type + ';charset=utf-8', str);
 	},
 	
@@ -386,7 +386,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 */
 	returnHtml: function(html) {
 		var type = this.server.getMime('html');
-		return this.returnString(type, html);
+		return this.returnString(html, type);
 	},
 	
 	/**
