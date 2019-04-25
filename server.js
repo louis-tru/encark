@@ -155,6 +155,7 @@ function config_server(self, config) {
 		'maxUploadFileSize',
 		'textEncoding',
 		'defaults',
+		'formHash',
 	]));
 	
 	var disable   = config.disable;
@@ -226,6 +227,11 @@ var Server = util.class('Server', http.Server, {
 	 * @type {Number}
 	 */
 	session: 15,
+
+	/**
+	 * @type {String}
+	 */
+	formHash: 'md5',
 	
 	/**
 	 * 站点根目录

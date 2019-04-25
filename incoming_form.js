@@ -603,7 +603,7 @@ var IncomingForm = util.class('IncomingForm', {
 		event.initEvents(this,
 			'aborted', 'progress', 'field', 'fileBegin', 'file', 'error', 'end');
 
-		this.hash = crypto.createHash('md5');
+		this.hash = crypto.createHash(service.server.formHash || 'md5');
 		this.uploadDir = service.server.temp;
 		this._service = service;
 		this.fields = { };

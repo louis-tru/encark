@@ -38,7 +38,6 @@ var errno = require('./errno');
 
 // 绑定服务
 function bind_services(self, services, cb) {
-	
 	if (!services.length) {
 		cb(true);
 		return;
@@ -58,24 +57,22 @@ function bind_services(self, services, cb) {
 		cb(false);
 		return;
 	}
-	
-	var ser = new cls(self);
+
+	try {
+		var ser = new cls(self);
+	} catch(err) {
+		cb(err); return;
+	}
 	ser.name = name;
 	self.m_services[name] = ser;
 
-	function auth_done(is) { // 认证合法性
-		if (is) {
+	(async function() { // auth
+		if ( await ser.requestAuth(null) ) {
 			bind_services(self, services, cb); // 继续绑定
 		} else {
 			cb(false);
 		}
-	}
-	
-	if (util.isAsync(ser.requestAuth)) {
-		ser.requestAuth(null).then(auth_done);
-	} else {
-		auth_done(ser.requestAuth(null));
-	}
+	})().catch(e=>cb(false));
 }
 
 //Init

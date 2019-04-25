@@ -30,7 +30,7 @@
 
 var util = require('./util');
 var event = require('./event');
-var { userAgent } = require('./request');
+var { userAgent, querystringStringify } = require('./request');
 var { Notification } = require('./event');
 var url = require('./url');
 var errno = require('./errno');
@@ -182,7 +182,7 @@ var Conversation = util.class('Conversation', {
 	 * @fun init # init conversation
 	 */
 	initialize: function() {},
-	
+
 	/**
 	 * @fun close # close conversation connection
 	 */
@@ -235,6 +235,23 @@ var WSConversationBasic = util.class('WSConversationBasic', Conversation, {
 		path = url.resolve(path);
 		this.m_url = new url.URL(path.replace(/^http/, 'ws'));
 		this.m_message = [];
+		this.m_signer = null;
+	},
+
+	get signer() {
+		return this.m_signer;
+	},
+
+	set signer(value) {
+		this.m_signer = value;
+	},
+
+	/**
+	 * @rewrite
+	 * @func getRequestHeaders
+	 */
+	getRequestHeaders: function() {
+		return null;
 	},
 
 });
@@ -295,19 +312,25 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		var origin = '127.0.0.1:' + port;
 		var key = Date.now();
 
+		var headers = Object.assign({}, this.getRequestHeaders(), {
+			'User-Agent': userAgent,
+			'Connection': 'Upgrade',
+			'Upgrade': 'websocket',
+			'Origin': origin,
+			'Sec-Websocket-Origin': origin,
+			'Sec-Websocket-Version': 13,
+			'Sec-Websocket-Key': key,
+		});
+
+		if (this.m_signer) {
+			Object.assign(headers, this.m_signer.sign(path));
+		}
+
 		var options = {
 			hostname: url.hostname,
 			port: port,
 			path: path,
-			headers: {
-				'User-Agent': userAgent,
-				'Connection': 'Upgrade',
-				'Upgrade': 'websocket',
-				'Origin': origin,
-				'Sec-Websocket-Origin': origin,
-				'Sec-Websocket-Version': 13,
-				'Sec-Websocket-Key': key,
-			},
+			headers: headers,
 			rejectUnauthorized: false,
 		};
 
@@ -444,7 +467,17 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		var self = this;
 		var url = this.m_url;
 		var bind_client_services = Object.keys(this.clients).join(',');
+		var headers = this.getRequestHeaders();
 
+		for (var i in headers) {
+			url.setParam(i, headers[i]);
+		}
+		if (this.m_signer) {
+			var sign = this.m_signer.sign(url.path);
+			for (var i in sign) {
+				url.setParam(i, sign[i]);
+			}
+		}
 		url.setParam('bind_client_services', bind_client_services);
 
 		var req = this.m_req = new WebSocket(url.href);

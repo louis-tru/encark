@@ -247,11 +247,27 @@ haveQgr ? function(options, soptions, resolve, reject, is_https, method, post_da
 : util.unrealized;
 
 /**
+ * @class Signer
+ */
+class Signer {
+
+	constructor(host) {
+		this.m_host = host
+	}
+
+	get host() {
+		return this.m_host;
+	}
+
+	sign(path, data_str = null) { /* subclass rewrite */ }
+}
+
+/**
  * @func request
  */
 function request(pathname, options) {
 	options = Object.assign({}, defaultOptions, options);
-	var { params, method, timeout, headers = {} } = options;
+	var { params, method, timeout, headers = {}, signer } = options;
 
 	if (util.dev) {
 		var data = [];
@@ -277,7 +293,8 @@ function request(pathname, options) {
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
 		var port = Number(uri.port) || (is_https ? 443: 80);
-		var path = uri.path;
+		var raw_path = uri.path;
+		var path = raw_path;
 
 		var headers = {
 			'User-Agent': options.user_agent,
@@ -296,6 +313,7 @@ function request(pathname, options) {
 				hostname = proxy.hostname;
 				port = Number(proxy.port) || (is_https ? 443: 80);
 				path = pathname;
+				// set headers
 				headers.host = uri.hostname;
 				if (uri.port) {
 					headers.host += ':' + uri.port;
@@ -319,6 +337,10 @@ function request(pathname, options) {
 			if (params) {
 				path += (uri.search ? '&' : '?') + querystring_stringify(params);
 			}
+		}
+
+		if (signer) {
+			Object.assign(headers, signer.sign(raw_path, post_data));
 		}
 
 		timeout = parseInt(timeout);
@@ -392,6 +414,7 @@ class Request {
 		this.m_enable_strict_response_data = true;
 		this.m_cache = new Cache();
 		this.m_timeout = defaultOptions.timeout;
+		this.m_signer = null;
 
 		if (!this.m_server_url) {
 			if (haveWeb) {
@@ -417,6 +440,21 @@ class Request {
 	get timeout() { return this.m_timeout }
 	set timeout(value) { this.m_timeout = value }
 
+	get signer() {
+		return this.m_signer;
+	}
+
+	set signer(value) {
+		this.m_signer = value;
+	}
+
+	/**
+	 * @func getRequestHeaders
+	 */
+	getRequestHeaders() {
+		return null;
+	}
+
 	parseResponseData(buf) {
 		var json = buf.toString('utf8');
 		var res = JSON.parse(json);
@@ -435,8 +473,11 @@ class Request {
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
 			return { data: Object.create(this.m_mock[name]) };
 		} else {
-			var { headers, timeout } = options || {};
+			var { headers, timeout, signer = this.m_signer } = options || {};
 			var url = this.m_server_url + '/' + name;
+
+			headers = Object.assign({}, this.getRequestHeaders(), headers);
+
 			var result = await request(url, {
 				method,
 				params,
@@ -444,6 +485,7 @@ class Request {
 				timeout: timeout || this.m_timeout,
 				urlencoded: this.m_urlencoded,
 				user_agent: this.m_user_agent,
+				signer: signer,
 			});
 			try {
 				result.data = this.parseResponseData(result.data);
@@ -495,7 +537,9 @@ class Request {
 }
 
 module.exports = {
-	
+
+	Signer: Signer,
+
 	Request: Request,
 
 	/**
