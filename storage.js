@@ -33,35 +33,59 @@ var url = require('./url');
 var DelayCall = require('./delay_call').DelayCall;
 var { haveNode, haveQgr, haveWeb } = util;
 
-if (haveQgr) {
-	var fs = requireNative('_fs');
-} else if (haveNode) {
-	var fs = require('fs');
+if (haveWeb) {
+
+	var sync_local = util.noop;
+	var commit = util.noop;
+
+	var format_key = function(self, key) {
+		return self.m_prefix + key
+	};
+
+	var stringify_val = function(val) {
+		return JSON.stringify(val);
+	};
+
+	var paese_value = function(val) {
+		try { 
+			return JSON.parse(val);
+		} catch(e) { console.warn(e) }
+		return null;
+	};
+
+} else {
+	if (haveQgr) {
+		var fs = requireNative('_fs');
+	} else if (haveNode) {
+		var fs = require('fs');
+	}
+
+	var sync_local = function(self) {
+		if (self.m_change) {
+			fs.writeFileSync(self.m_path, JSON.stringify(self.m_value, null, 2));
+			self.m_change = false;
+		}
+	};
+
+	var commit = function(self) {
+		self.m_change = true;
+		self.m_sync.notice();
+	};
+
+	var format_key = function(self, key) {
+		return key
+	};
+
+	var stringify_val = function(val) {
+		return val;
+	};
+
+	var paese_value = function(val) {
+		return val;
+	};
 }
 
 var shared = null;
-
-function sync_local(self) {
-	if (!haveWeb && self.m_change) {
-		fs.writeFileSync(self.m_path, JSON.stringify(self.m_value, null, 2));
-		self.m_change = false;
-	}
-}
-
-function format_key(self, key) {
-	if (haveWeb) {
-		return self.m_prefix + key;
-	} else {
-		return key;
-	}
-}
-
-function commit(self) {
-	if (!haveWeb) {
-		self.m_change = true;
-		self.m_sync.notice();
-	}
-}
 
 /**
  * @class Storage
@@ -91,10 +115,10 @@ class Storage {
 	get(key, defaultValue) {
 		key = format_key(this, key);
 		if (key in this.m_value) {
-			return this.m_value[key];
+			return paese_value(this.m_value[key]);
 		} else {
 			if (defaultValue !== undefined) {
-				this.m_value[key] = defaultValue;
+				this.m_value[key] = stringify_val(defaultValue);
 				commit(this);
 				return defaultValue;
 			}
@@ -108,7 +132,7 @@ class Storage {
 
 	set(key, value) {
 		key = format_key(this, key);
-		this.m_value[key] = value;
+		this.m_value[key] = stringify_val(value);
 		commit(this);
 	}
 
