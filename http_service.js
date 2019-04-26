@@ -238,9 +238,14 @@ var HttpService = util.class('HttpService', StaticService, {
 
 		if (self.request.method == 'OPTIONS') {
 			if (self.server.allowOrigin == '*') {
+				var access_headers = '';
+				//'Content-Type,Access-Control-Allow-Headers,Authorization,X-Requested-With';
+				var access_headers_req = self.request.headers['access-control-request-headers'];
+				if (access_headers_req) {
+					access_headers += access_headers_req;
+				}
 				self.response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-				self.response.setHeader('Access-Control-Allow-Headers', 
-					'Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With');
+				self.response.setHeader('Access-Control-Allow-Headers', access_headers);
 			}
 			self.setDefaultHeader();
 			self.response.writeHead(200);
@@ -281,7 +286,7 @@ var HttpService = util.class('HttpService', StaticService, {
 				console.error(e);
 			}
 			if (!auth) {
-				callback(Error.new(errno.ERR_ILLEGAL_ACCESS));
+				self.returnError(Error.new(errno.ERR_ILLEGAL_ACCESS));
 				return;
 			}
 
