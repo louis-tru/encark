@@ -24,7 +24,7 @@ var target = `${options.u}@${options.h}:${options.t}`;
 
 console.log(`watch ${root} ${target}`);
 
-var ignore = ['.git', '.svn', 'out', 'node/deps', 'tools/android-toolchain', 'node_modules'];
+var ignore = ['.git', '.svn', 'out', 'node/deps', 'tools/android-toolchain', 'node_modules', '.o', '.a', '.d'];
 var count = 1;
 
 if (options.i) {
@@ -75,7 +75,8 @@ fs.watch(root, (type, filename)=>sync(type, '.', filename));
 each_directory(root, '', function(pathname, name, ext, is_dir) {
 	if (is_dir) {
 		if (ignore.indexOf(name) >= 0 || 
-				ignore.indexOf(pathname) >= 0
+				ignore.indexOf(pathname) >= 0 ||
+				ignore.indexOf(ext) >= 0
 		) {
 			// console.log(pathname);
 			return false;
