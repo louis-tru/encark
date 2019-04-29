@@ -64,6 +64,11 @@ var private$transaction = util.class('private$transaction', {
 		this.map = host;
 		this.db = get_db(host);
 		this.db.transaction(); // start transaction
+		this.dao = { $: this };
+
+		for (var {name,methods} of host.m_shortcuts) {
+			this.dao[name] = new Shortcuts(this, name, methods);
+		}
 	},
 
 	/**
@@ -123,13 +128,19 @@ function read_original_handles(self, original_path) {
 	}
 	ns = ns.item(0).childNodes;
 
+	var result = {};
+
 	for (var i = 0; i < ns.length; i++) {
 		var node = ns.item(i);
 		if (node.nodeType === xml.ELEMENT_NODE) {
-			original_handles[original_path + '/' + node.tagName] = parseMapEl(self, node);
+			var handle = parseMapEl(self, node);
+			result[node.tagName] = handle;
+			original_handles[original_path + '/' + node.tagName] = handle;
 		}
 	}
 	original_files[original_path] = fs.statSync(original_path + '.xml').mtime;
+
+	return result;
 }
 
 function get_original_handle(self, name) {
@@ -151,7 +162,8 @@ function get_original_handle(self, name) {
 		read_original_handles(self, original_path);
 	}
 
-	self.m_original_handles[name] = handle = original_handles[original_path + '/' + handle_name];
+	self.m_original_handles[name] = handle = 
+		original_handles[original_path + '/' + handle_name];
 	if (!handle) {
 		throw new Error(name + ' : can not find the map');
 	}
@@ -205,34 +217,15 @@ function parseMapEl(self, el) {
 	return obj;
 }
 
-//compilation sql
-function compilation(self, exp, param) {
-
-	var variable = {};
-
-	exp = exp.replace(REG, function (all, name) {
-		variable[name] = param[name];
-		return name;
-	});
-
-	var code = ['(function (){'];
-
-	for (var i in variable) {
-		var item = variable[i];
-		var value = item instanceof Date ?
-			'new Date({0})'.format(item.valueOf()) : JSON.stringify(item);
-		code.push('var {0} = {1};'.format(i, value));
-	}
-
-	code.push('return !!(' + exp + ')');
-	code.push('}())');
-	return util._eval(code.join(''));
+// exec script
+function exec(self, exp, param) {
+	return util._eval(`(function (ctx){with(ctx){return(${exp})}})`)(param);
 }
 
 //format sql
 function format(self, sql, param) {
-	return sql.replace(REG, function (all, name) {
-		return db.escape(param[name]);
+	return sql.replace(REG, function (all, exp) {
+		return db.escape(exec(self, exp, param));
 	});
 }
 
@@ -261,17 +254,16 @@ function ifMap(self, item, param) {
 	var prepend = item.prepend;
 
 	if (exp) {
-		if (!compilation(self, exp, param)) {
+		if (!exec(self, exp, param)) {
 			return null;
 		}
 	}
 	else if (name) {
 		if (name[0] == '!') {
-			name = name.substr(1);
-			if (name in param) {
+			if (param[name.substr(1)] !== undefined) {
 				return null;
 			}
-		} else if (!(name in param)) {
+		} else if (param[name] === undefined) {
 			return null;
 		}
 	}
@@ -479,6 +471,25 @@ var funcs = {
 
 };
 
+/**
+ * @class Shortcuts
+ */
+class Shortcuts {
+	constructor(host, name, methods) { // handles
+		this.m_host = host;
+		this.m_name = name;
+
+		for (let [method,type] of methods) {
+			let fullname = name + '/' + method;
+			this[method] = (param, options)=>host[type](fullname, param, options);
+			this[method].query = (param, options)=>host.query(fullname, param, options);
+			if (type == 'gets') {
+				this[method].get = (param, options)=>host.get(fullname, param, options);
+			}
+		}
+	}
+};
+
 var SqlMap = util.class('SqlMap', {
 
 	//private:
@@ -529,6 +540,25 @@ var SqlMap = util.class('SqlMap', {
 			// on event
 			throw new Error('use center server config');
 		}
+
+		this.m_shortcuts = [];
+		this.dao = { $: this };
+
+		fs.readdirSync(this.original).forEach(e=>{
+			if (path.extname(e) == '.xml') {
+				var name = path.basename(e);
+				name = name.substr(0, name.length - 4);
+				var handles = read_original_handles(this, this.original + '/' + name);
+				var methods = [];
+				for (let [method,{type}] of Object.entries(handles)) {
+					type = type || method.indexOf('select') >= 0 ? 'get': 'post';
+					type = type == 'get'? 'gets': 'post';
+					methods.push([method, type]);
+				}
+				this.dao[name] = new Shortcuts(this, name, methods);
+				this.m_shortcuts.push({name, methods});
+			}
+		});
 	},
 
 	/**
@@ -569,7 +599,7 @@ var SqlMap = util.class('SqlMap', {
 
 		var tr = new private$transaction(this);
 
-		return cb(tr).then(e=>{
+		return cb(tr, tr.dao).then(e=>{
 			tr.commit();
 			return e;
 		}).catch(e=>{
