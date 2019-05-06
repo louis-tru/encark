@@ -42,8 +42,9 @@ function syscall(cmd) {
 		if (ch.stdout.length) {
 			console.log(ch.stdout.toString('utf8'));
 		}
-		console.log('status != 0 exit process')
-		process.exit(ch.status);
+		// console.log('status != 0 exit process');
+		// process.exit(ch.status);
+		throw Error.new('status != 0 exit process', ch.status);
 	} else {
 		return {
 			code: ch.status,

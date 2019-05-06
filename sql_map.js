@@ -344,7 +344,11 @@ function select_cb(param, cb) {
 
 //query
 function query(self, db, is_transaction, type, name, cb, param, options) {
-	param = { ...param };
+
+	param = new Proxy(Object.assign(Object.create(global), param), {
+		get:(target, name)=>target[name],
+		has:()=>1,
+	});
 
 	try {
 		var map = Object.assign(getMap(self, name, param), options);
