@@ -457,7 +457,13 @@ class Request {
 
 	parseResponseData(buf) {
 		var json = buf.toString('utf8');
-		var res = JSON.parse(json);
+		var res = JSON.parse(json, function(key, value) {
+			// 2019-05-09T00:00:00.000Z
+			if (typeof value == 'string' && value[10] == 'T' && value[23] == 'Z') {
+				return new Date(value);
+			}
+			return value;
+		});
 		if (this.m_enable_strict_response_data) {
 			if (res.code === 0) {
 				return res.data;
