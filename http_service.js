@@ -37,6 +37,7 @@ var session = require('./session');
 var zlib = require('zlib');
 var Buffer = require('buffer').Buffer;
 var errno = require('./errno');
+var {parseJSON} = require('./request');
 
 var StaticService_action = StaticService.prototype.action;
 
@@ -151,7 +152,7 @@ function action_multiple(self, info) {
 
 		if ( data ) {
 			try {
-				data = JSON.parse(data);
+				data = parseJSON(data);
 				if ( !Array.isArray(data) ) {
 					self.returnJSONError(new Error('multiple call data error')); return;
 				}

@@ -37,6 +37,7 @@ var WriteStream = require('fs').WriteStream;
 var querystring = require('querystring');
 var Buffer = require('buffer').Buffer;
 var crypto = require('crypto');
+var {parseJSON} = require('./request');
 
 // This is a buffering parser, not quite as nice as the multipart one.
 // If I find time I'll rewrite this to be fully streaming as well
@@ -68,7 +69,7 @@ var QuerystringParser = util.class('QuerystringParser', {
 			buffer = buffer.trim();
 			if (buffer) {
 				try {
-					data = JSON.parse(buffer);
+					data = parseJSON(buffer);
 				} catch(err) {
 					console.error(buffer, err);
 				}
