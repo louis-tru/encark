@@ -31,9 +31,9 @@
 var util = require('./util');
 
 /**
- * @class Model
+ * @class ModelBasic
  */
-class Model {
+class ModelBasic {
 
 	get value() {
 		return this.m_value;
@@ -43,7 +43,7 @@ class Model {
 		return this.m_table;
 	}
 
-	constructor(value = null, {dao = null, table = null} = {}) {
+	constructor(value = null, {dao,table} = {}) {
 		this.m_value = value;
 		this.m_dao = dao;
 		this.m_table = table;
@@ -53,13 +53,22 @@ class Model {
 		return this.m_value;
 	}
 
+	fetch() {}
+	child() {}
+
+}
+
+/**
+ * @class Model
+ */
+class Model extends ModelBasic {
+
 	async fetch(table, param, { select='select', ...opts } = {}) {
 		var dao = this.m_dao;
 		var fk = dao.primaryKey(this.m_table);
 		var pk = dao.primaryKey(table);
 		var value = this.m_value;
 		var model = await dao[table][select].get({ [pk]: value[fk], ...param}, opts);
-		// var model = new Model(child, {dao,table});
 		this.m_value[table] = model;
 		return this;
 	}
@@ -70,7 +79,6 @@ class Model {
 		var pk = dao.primaryKey(this.m_table);
 		var value = this.m_value;
 		var collection = await dao[table][select]({ [fk]: value[pk], ...param}, opts);
-		// var collection = new Collection(value, {dao,table});
 		this.m_value[table] = collection;
 		return this;
 	}
@@ -81,20 +89,15 @@ class Model {
 /**
  * @class Collection
  */
-class Collection {
+class Collection extends ModelBasic {
 
-	get value() {
-		return this.m_value;
+	async fetch(table, param, { select='select', ...opts } = {}) {
+		return this;
 	}
 
-	constructor(value = [], dao = null) {
-		this.m_value = value;
+	async child(table, param, { select='select', ...opts } = {}) {
+		return this;
 	}
-
-	toJSON() {
-		return this.m_value;
-	}
-
 }
 
 
