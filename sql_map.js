@@ -417,6 +417,11 @@ function parseSql(self, name, param) {
 				result.group.push(result.sql.length);
 				result.sql.push(` ${param.group_str} `);
 			}
+			if (result.out.length) {
+				var index = result.out.last(0)[1];
+				result.sql[index] += ' ,count(*) as data_count ';
+				result.out.pop();
+			}
 		}
 	}
 
