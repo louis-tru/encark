@@ -35,6 +35,7 @@ var {Mysql} = require('./mysql');
 var db = require('./db');
 var memcached = require('./memcached');
 var fs = require('./fs');
+var model = require('./model');
 
 var local_cache = {};
 var original_handles = {};
@@ -45,7 +46,7 @@ var REG = /\{(.+?)\}/g;
  * @createTime 2012-01-18
  * @author xuewen.chu <louis.tru@gmail.com>
  */
-var private$transaction = util.class('private$transaction', {
+var Transaction = util.class('Transaction', {
 
 	/**
 	 * @field map {SqlMap}
@@ -65,44 +66,50 @@ var private$transaction = util.class('private$transaction', {
 		this.db = get_db(host);
 		this.db.transaction(); // start transaction
 		this.dao = { $: this };
+		this.m_on = 1;
 
 		for (var {name,methods} of host.m_shortcuts) {
 			this.dao[name] = new Shortcuts(this, name, methods);
 		}
 	},
 
+	primaryKey(table) {
+		return this.map.primaryKey(table);
+	},
+
 	/**
 	 * @func get(name, param)
 	 */
 	get: function(name, param, opts) {
-		return funcs.get(this.map, this.db, 1, name, param, opts);
+		return funcs.get(this.map, this.db, this.m_on, name, param, opts);
 	},
 
 	/**
 	 * @func gets(name, param)
 	 */
 	gets: function(name, param, opts) {
-		return funcs.gets(this.map, this.db, 1, name, param, opts);
+		return funcs.gets(this.map, this.db, this.m_on, name, param, opts);
 	},
 
 	/**
 	 * @func post(name, param)
 	 */
 	post: function(name, param, opts) {
-		return funcs.post(this.map, this.db, 1, name, param, opts);
+		return funcs.post(this.map, this.db, this.m_on, name, param, opts);
 	},
 
 	/**
 	 * @func query(name, param, cb)
 	 */
 	query: function(name, param, opts) {
-		return funcs.query(this.map, this.db, 1, name, param, opts);
+		return funcs.query(this.map, this.db, this.m_on, name, param, opts);
 	},
 
 	/**
 	 * commit transaction
 	 */
 	commit: function() {
+		this.m_on = 0;
 		this.db.commit();
 		this.db.close();
 	},
@@ -111,6 +118,7 @@ var private$transaction = util.class('private$transaction', {
 	 * rollback transaction
 	 */
 	rollback: function() {
+		this.m_on = 0;
 		this.db.rollback();
 		this.db.close();
 	},
@@ -121,7 +129,7 @@ var private$transaction = util.class('private$transaction', {
  * @createTime 2012-01-18
  * @author xuewen.chu <louis.tru@gmail.com>
  */
-function parseMapEl(self, el) {
+function parse_map_node(self, el) {
 	var ls = [];
 	var obj = { __t: el.tagName, __ls: ls };
 	var ns = el.attributes;
@@ -137,7 +145,7 @@ function parseMapEl(self, el) {
 		
 		switch (node.nodeType) {
 			case xml.ELEMENT_NODE:
-				ls.push(parseMapEl(self, node));
+				ls.push(parse_map_node(self, node));
 				break;
 			case xml.TEXT_NODE:
 			case xml.CDATA_SECTION_NODE:
@@ -148,7 +156,7 @@ function parseMapEl(self, el) {
 	return obj;
 }
 
-function read_original_handles(self, original_path) {
+function read_original_handles(self, original_path, table) {
 
 	var doc = new xml.Document();
 	doc.load(fs.readFileSync(original_path + '.xml').toString('utf8'));
@@ -157,26 +165,33 @@ function read_original_handles(self, original_path) {
 	if (!ns.length) {
 		throw new Error(name + ' : not map the root element');
 	}
-	ns = ns.item(0).childNodes;
 
-	var result = {};
+	var map = ns.item(0);
+	var attrs = {};
+	var handles = {};
+	var map_attrs = map.attributes;
+
+	for (var i = 0; i < map_attrs.length; i++) {
+		var attr = map_attrs.item(i);
+		attrs[attr.name] = attr.value;
+	}
+	attrs.primaryKey = (attrs.primaryKey || `${table}_id`);
+
+	ns = ns.item(0).childNodes;
 
 	for (var i = 0; i < ns.length; i++) {
 		var node = ns.item(i);
 		if (node.nodeType === xml.ELEMENT_NODE) {
-			var handle = parseMapEl(self, node);
-			if (handle.__t.indexOf('select') > -1) {
-				handle.__is_select = 1;
-			} else {
-				handle.__is_select = 0;
-			}
-			result[node.tagName] = handle;
+			var handle = parse_map_node(self, node);
+			handle.__is_select = (handle.__t.indexOf('select') > -1);
+			handle.__table = table;
+			handles[node.tagName] = handle;
 			original_handles[original_path + '/' + node.tagName] = handle;
 		}
 	}
 	original_files[original_path] = fs.statSync(original_path + '.xml').mtime;
 
-	return result;
+	return { attrs, handles };
 }
 
 function get_original_handle(self, name) {
@@ -186,20 +201,22 @@ function get_original_handle(self, name) {
 	}
 
 	var handle_name = path.basename(name);
-	var original_path = path.resolve(self.original, path.dirname(name));
+	var table_name = path.dirname(name);
+	var original_path = path.resolve(self.original, table_name);
 
 	if (original_path in original_files) {
 		if (util.dev) {
 			if (fs.statSync(original_path + '.xml').mtime != original_files[original_path]) {
-				read_original_handles(self, original_path);
+				read_original_handles(self, original_path, table_name);
 			}
 		}
 	} else {
-		read_original_handles(self, original_path);
+		read_original_handles(self, original_path, table_name);
 	}
 
-	self.m_original_handles[name] = handle = 
-		original_handles[original_path + '/' + handle_name];
+	handle = original_handles[original_path + '/' + handle_name];
+	self.m_original_handles[name] = handle;
+
 	if (!handle) {
 		throw new Error(name + ' : can not find the map');
 	}
@@ -274,10 +291,6 @@ function parse_if_sql(self, node, param, result, is_select) {
 	return {
 		prepend: node.prepend,
 	};
-}
-
-function parse_out_sql(self, node, param, result, is_select) {
-
 }
 
 // ls
@@ -387,10 +400,14 @@ function parseSql(self, name, param) {
 	var r = parse_if_sql(self, map, param, result, map.__is_select);
 
 	if (map.__is_select) {
+
+		// limit
 		if ( param.limit && !result.limit.length ) {
 			result.limit.push(result.sql.length);
 			result.sql.push(` limit ${param.limit}`);
 		}
+
+		// order
 		if ( param.order_str && !result.order.length ) {
 			if (result.limit.length) {
 				var index = result.limit.last(0);
@@ -402,6 +419,8 @@ function parseSql(self, name, param) {
 				result.sql.push(` ${param.order_str} `);
 			}
 		}
+
+		// group
 		if ( param.group_str && !result.group.length ) {
 			if (result.order.length) {
 				var index = result.order.last(0);
@@ -417,6 +436,7 @@ function parseSql(self, name, param) {
 				result.group.push(result.sql.length);
 				result.sql.push(` ${param.group_str} `);
 			}
+
 			if (result.out.length) {
 				var index = result.out.last(0)[1];
 				result.sql[index] += ' ,count(*) as data_count ';
@@ -679,22 +699,28 @@ var SqlMap = util.class('SqlMap', {
 
 		this.m_shortcuts = [];
 		this.dao = { $: this };
+		this.m_tables = {};
 
 		fs.readdirSync(this.original).forEach(e=>{
 			if (path.extname(e) == '.xml') {
 				var name = path.basename(e);
-				name = name.substr(0, name.length - 4);
-				var handles = read_original_handles(this, this.original + '/' + name);
+				var table = name.substr(0, name.length - 4);
+				var {attrs,handles} = read_original_handles(this, this.original + '/' + table_name, table);
 				var methods = [];
 				for (let [method,{type}] of Object.entries(handles)) {
 					type = type || method.indexOf('select') >= 0 ? 'get': 'post';
 					type = type == 'get'? 'gets': 'post';
 					methods.push([method, type]);
 				}
-				this.dao[name] = new Shortcuts(this, name, methods);
-				this.m_shortcuts.push({name, methods});
+				this.dao[table] = new Shortcuts(this, table, methods);
+				this.m_shortcuts.push({name:table, methods});
+				this.m_tables[table] = attrs;
 			}
 		});
+	},
+
+	primaryKey(table) {
+		return this.m_tables[table].attrs.primaryKey;
 	},
 
 	/**
@@ -727,13 +753,13 @@ var SqlMap = util.class('SqlMap', {
 
 	/**
 		* start transaction
-		* @return {private$transaction}
+		* @return {Transaction}
 		*/
 	transaction: function(cb) {
 		util.assert(cb);
 		util.assert(util.isAsync(cb));
 
-		var tr = new private$transaction(this);
+		var tr = new Transaction(this);
 
 		return cb(tr, tr.dao).then(e=>{
 			tr.commit();
