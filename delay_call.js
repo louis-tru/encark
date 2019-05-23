@@ -36,14 +36,14 @@ class DelayCall {
 		this.m_delay = delay;
 	}
 
-	notice() {
+	notice(...args) {
 		this.call();
 	}
 
-	call() {
+	call(...args) {
 		this.clear();
 		this.m_timeoutid = setTimeout(e=>{
-			this.m_onExecute();
+			this.m_onExecute(...args);
 		}, this.m_delay);
 	}
 

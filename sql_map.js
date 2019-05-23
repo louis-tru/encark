@@ -117,6 +117,37 @@ var private$transaction = util.class('private$transaction', {
 
 });
 
+/**
+ * @createTime 2012-01-18
+ * @author xuewen.chu <louis.tru@gmail.com>
+ */
+function parseMapEl(self, el) {
+	var ls = [];
+	var obj = { __t: el.tagName, __ls: ls };
+	var ns = el.attributes;
+
+	for (var i = 0, l = ns.length; i < l; i++) {
+		var n = ns.item(i);
+		obj[n.name] = n.value;
+	}
+
+	ns = el.childNodes;
+	for ( i = 0; i < ns.length; i++ ) {
+		var node = ns.item(i);
+		
+		switch (node.nodeType) {
+			case xml.ELEMENT_NODE:
+				ls.push(parseMapEl(self, node));
+				break;
+			case xml.TEXT_NODE:
+			case xml.CDATA_SECTION_NODE:
+				ls.push(node.nodeValue);
+				break;
+		}
+	}
+	return obj;
+}
+
 function read_original_handles(self, original_path) {
 
 	var doc = new xml.Document();
@@ -134,6 +165,11 @@ function read_original_handles(self, original_path) {
 		var node = ns.item(i);
 		if (node.nodeType === xml.ELEMENT_NODE) {
 			var handle = parseMapEl(self, node);
+			if (handle.__t.indexOf('select') > -1) {
+				handle.__is_select = 1;
+			} else {
+				handle.__is_select = 0;
+			}
 			result[node.tagName] = handle;
 			original_handles[original_path + '/' + node.tagName] = handle;
 		}
@@ -186,53 +222,22 @@ function get_db(self) {
 	return new db_class(self.config);
 }
 
-/**
- * @createTime 2012-01-18
- * @author xuewen.chu <louis.tru@gmail.com>
- */
-function parseMapEl(self, el) {
-	var ls = [];
-	var obj = { __t__: el.tagName, __ls__: ls };
-	var ns = el.attributes;
-
-	for (var i = 0, l = ns.length; i < l; i++) {
-		var n = ns.item(i);
-		obj[n.name] = n.value;
-	}
-
-	ns = el.childNodes;
-	for ( i = 0; i < ns.length; i++ ) {
-		var node = ns.item(i);
-		
-		switch (node.nodeType) {
-			case xml.ELEMENT_NODE:
-				ls.push(parseMapEl(self, node));
-				break;
-			case xml.TEXT_NODE:
-			case xml.CDATA_SECTION_NODE:
-				ls.push(node.nodeValue);
-				break;
-		}
-	}
-	return obj;
-}
-
 // exec script
 function exec(self, exp, param) {
 	return util._eval(`(function (ctx){with(ctx){return(${exp})}})`)(param);
 }
 
 //format sql
-function format(self, sql, param) {
+function format_sql(self, sql, param) {
 	return sql.replace(REG, function (all, exp) {
 		return db.escape(exec(self, exp, param));
 	});
 }
 
-//join map
-function joinMap(self, item, param) {
+// join map
+function parse_sql_join(self, item, param, result) {
 
-	var name = item.name;
+	var name = item.name || 'ids';
 	var value = param[name];
 
 	if (!value) {
@@ -243,22 +248,19 @@ function joinMap(self, item, param) {
 	for (var i = 0, l = ls.length; i < l; i++) {
 		ls[i] = db.escape(ls[i]);
 	}
-	return ls.join(item.value || '');
+	return result.sql.push(ls.join(item.value || ','));
 }
 
-//if map
-function ifMap(self, item, param) {
-
-	var exp = item.exp;
-	var name = item.name;
-	var prepend = item.prepend;
+// if
+function parse_if_sql(self, node, param, result, is_select) {
+	var exp = node.exp;
+	var name = node.name;
 
 	if (exp) {
 		if (!exec(self, exp, param)) {
 			return null;
 		}
-	}
-	else if (name) {
+	} else if (name) {
 		if (name[0] == '!') {
 			if (param[name.substr(1)] !== undefined) {
 				return null;
@@ -267,49 +269,160 @@ function ifMap(self, item, param) {
 			return null;
 		}
 	}
+	parse_sql_ls(self, node.__ls, param, result, is_select);
 
-	var sql = lsMap(self, item.__ls__, param);
-
-	return { prepend: prepend, sql: sql };
+	return {
+		prepend: node.prepend,
+	};
 }
 
-//ls map
-function lsMap(self, ls, param) {
+function parse_out_sql(self, node, param, result, is_select) {
 
-	var result = [];
+}
+
+// ls
+function parse_sql_ls(self, ls, param, result, is_select) {
+
+	var result_count = 0;
+
 	for (var i = 0, l = ls.length; i < l; i++) {
-		var item = ls[i];
-		var type = item.__t__;
+		var node = ls[i];
+		var tag = node.__t;
+		var end_pos = result.sql.length;
 
-		if (typeof item == 'string') {
-			item = format(self, item, param).trim();
-			if (item) {
-				result.push(' ' + item);
+		if (typeof node == 'string') {
+			var sql = format_sql(self, node, param).trim();
+			if (sql) {
+				result.sql.push(` ${sql} `);
 			}
-			continue;
+		} else {
+			if (tag == 'if') {
+				var r = parse_if_sql(self, node, param, result, is_select);
+				if (r && result.sql.length > end_pos) {
+					var prepend = result_count ? (r.prepend || '') + ' ' : '';
+					result.sql[end_pos] = ' ' + prepend + result.sql[end_pos];
+				}
+			} else if (tag == 'join') {
+				parse_sql_join(self, node, param, result);
+			} else if (is_select) {
+				if (tag == 'out') {
+					var value = ` ${node.value || '*'} `;
+					if (node.__ls.length) {
+						parse_sql_ls(self, node.__ls, param, result, is_select);
+						if (result.sql.length > end_pos) {
+							result.out.push([end_pos, result.sql.length - 1]);
+						} else {
+							result.sql.push(value);
+						}
+					} else {
+						result.sql.push(value);
+					}
+				} else if (tag == 'group') {
+					var value = param.group_str || node.default;
+					if (value) {
+						result.group.push(end_pos);
+						result.sql.push(` group by ${value} `);
+						if (result.out.length) {
+							var index = result.out.last(0)[1];
+							result.sql[index] += ' ,count(*) as data_count ';
+							result.out.pop();
+						}
+					}
+				} else if (tag == 'order') {
+					var value = param.order_str || node.default;
+					if (value) {
+						result.order.push(end_pos);
+						result.sql.push(` order by ${value} `);
+					}
+				} else if (tag == 'limit') {
+					var value = Number(param.limit) || Number(node.default);
+					if (value) {
+						result.limit.push(end_pos);
+						result.sql.push(` limit ${value} `);
+					}
+				} else {
+					//...
+				}
+			}
 		}
 
-		if (type == 'if') {
-			item = ifMap(self, item, param);
-			if (item && item.sql) {
-				var prepend = result.length ? (item.prepend || '') + ' ' : '';
-
-				result.push(' ' + prepend + item.sql);
-			}
-		}
-		else if (type == 'join') {
-			result.push(joinMap(self, item, param));
+		if (result.sql.length > end_pos) {
+			result_count++;
 		}
 	}
-	return result.join(' ');
 }
 
-//get map object
-function getMap(self, name, param) {
+// parse sql str
+function parseSql(self, name, param) {
 	var map = get_original_handle(self, name);
-	var i = ifMap(self, map, param);
+	var result = { sql: [], out: [], group: [], order: [], limit: [] };
 
-	map.sql = i ? '{0} {1}'.format(i.prepend || '', i.sql) : '';
+	if (map.__is_select) {
+		if (param.group) {
+			param.group_str = '';
+			if (typeof param.group == 'string') {
+				param.group_str = param.group;
+			} else if (Array.isArray(param.group)) {
+				param.group_str = param.group.join(',');
+			} else {
+				param.group_str = Object.entries(param.group).map((k,v)=>`${k} ${v}`).join(',');
+			}
+		}
+
+		if (param.order) {
+			param.order_str = '';
+			if (typeof param.order == 'string') {
+				param.order_str = param.order;
+			} else if (Array.isArray(param.order)) {
+				param.order_str = param.order.join(',');
+			} else {
+				param.order_str = Object.entries(param.order).map((k,v)=>`${k} ${v}`).join(',');
+			}
+		}
+
+		if (param.limit)
+			param.limit = Number(param.limit) || 0;
+	}
+
+	var r = parse_if_sql(self, map, param, result, map.__is_select);
+
+	if (map.__is_select) {
+		if ( param.limit && !result.limit.length ) {
+			result.limit.push(result.sql.length);
+			result.sql.push(` limit ${param.limit}`);
+		}
+		if ( param.order_str && !result.order.length ) {
+			if (result.limit.length) {
+				var index = result.limit.last(0);
+				var sql = result.sql[index];
+				result.sql[index] = ` ${param.order_str} ${sql} `;
+				result.order.push(index);
+			} else {
+				result.order.push(result.sql.length);
+				result.sql.push(` ${param.order_str} `);
+			}
+		}
+		if ( param.group_str && !result.group.length ) {
+			if (result.order.length) {
+				var index = result.order.last(0);
+				var sql = result.sql[index];
+				result.sql[index] = ` ${param.group_str} ${sql} `;
+				result.group.push(index);
+			} else if (result.limit.length) {
+				var index = result.limit.last(0);
+				var sql = result.sql[index];
+				result.sql[index] = ` ${param.group_str} ${sql} `;
+				result.group.push(index);
+			} else {
+				result.group.push(result.sql.length);
+				result.sql.push(` ${param.group_str} `);
+			}
+		}
+	}
+
+	var sql = result.sql.join('');
+	map.sql = r ? '{0} {1}'.format(r.prepend || '', sql) : '';
+
 	return map;
 }
 
@@ -345,16 +458,30 @@ function select_cb(param, cb) {
 //query
 function query(self, db, is_transaction, type, name, cb, param, options) {
 
-	param = new Proxy(Object.assign(Object.create(global), param), {
+	if (type == 'get') {
+		param = { limit: 1, ...param };
+	} else {
+		param = { ...param };
+	}
+
+	param = Object.assign(Object.create(global), param);
+	param = new Proxy(param, {
 		get:(target, name)=>target[name],
 		has:()=>1,
 	});
 
+	if (type == 'gets') {
+		type = 'get';
+	}
+
 	try {
-		var map = Object.assign(getMap(self, name, param), options);
+		var map = Object.assign(parseSql(self, name, param), options);
 		var cacheTime = parseInt(map.cacheTime) || 0;
-		var sql = map.sql;
-		var key;
+		var sql = map.sql, key;
+
+		if (util.dev) {
+			console.log(sql);
+		}
 
 		function handle(err, data) {
 			if (!is_transaction) {
@@ -438,7 +565,7 @@ var funcs = {
 
 	gets: function(map, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, db, is_t, 'get', name, function(err, data) {
+			query(map, db, is_t, 'gets', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
