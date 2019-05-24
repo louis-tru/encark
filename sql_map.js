@@ -35,7 +35,7 @@ var {Mysql} = require('./mysql');
 var db = require('./db');
 var memcached = require('./memcached');
 var fs = require('./fs');
-var model = require('./model');
+var {Model,Collection} = require('./model');
 
 var local_cache = {};
 var original_handles = {};
@@ -272,21 +272,34 @@ function parse_sql_join(self, item, param, result) {
 function parse_if_sql(self, node, param, result, is_select) {
 	var exp = node.exp;
 	var name = node.name;
+	var not = name && name[0] == '!';
+	if (not)
+		name = name.substr(1);
 
 	if (exp) {
 		if (!exec(self, exp, param)) {
 			return null;
 		}
 	} else if (name) {
-		if (name[0] == '!') {
-			if (param[name.substr(1)] !== undefined) {
+		if (not) {
+			if (param[name] !== undefined) {
 				return null;
 			}
 		} else if (param[name] === undefined) {
 			return null;
 		}
 	}
-	parse_sql_ls(self, node.__ls, param, result, is_select);
+
+	if (node.__ls.length) {
+		parse_sql_ls(self, node.__ls, param, result, is_select);
+	} else {
+		var val = param[name];
+		if (Array.isArray(val)) {
+			result.sql.push(` ${name} in (${val.map(e=>db.escape(e)).join(',')}) `);
+		} else {
+			result.sql.push(` ${name} = ${db.escape(val)} `);
+		}
+	}
 
 	return {
 		prepend: node.prepend,
@@ -325,9 +338,11 @@ function parse_sql_ls(self, ls, param, result, is_select) {
 						if (result.sql.length > end_pos) {
 							result.out.push([end_pos, result.sql.length - 1]);
 						} else {
+							result.out.push([end_pos, end_pos]);
 							result.sql.push(value);
 						}
 					} else {
+						result.out.push([end_pos, end_pos]);
 						result.sql.push(value);
 					}
 				} else if (tag == 'group') {
@@ -412,11 +427,11 @@ function parseSql(self, name, param) {
 			if (result.limit.length) {
 				var index = result.limit.last(0);
 				var sql = result.sql[index];
-				result.sql[index] = ` ${param.order_str} ${sql} `;
+				result.sql[index] = ` order by ${param.order_str} ${sql} `;
 				result.order.push(index);
 			} else {
 				result.order.push(result.sql.length);
-				result.sql.push(` ${param.order_str} `);
+				result.sql.push(` order by ${param.order_str} `);
 			}
 		}
 
@@ -425,16 +440,16 @@ function parseSql(self, name, param) {
 			if (result.order.length) {
 				var index = result.order.last(0);
 				var sql = result.sql[index];
-				result.sql[index] = ` ${param.group_str} ${sql} `;
+				result.sql[index] = ` group by ${param.group_str} ${sql} `;
 				result.group.push(index);
 			} else if (result.limit.length) {
 				var index = result.limit.last(0);
 				var sql = result.sql[index];
-				result.sql[index] = ` ${param.group_str} ${sql} `;
+				result.sql[index] = ` group by ${param.group_str} ${sql} `;
 				result.group.push(index);
 			} else {
 				result.group.push(result.sql.length);
-				result.sql.push(` ${param.group_str} `);
+				result.sql.push(` group by ${param.group_str} `);
 			}
 
 			if (result.out.length) {
@@ -503,6 +518,7 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 		var map = Object.assign(parseSql(self, name, param), options);
 		var cacheTime = parseInt(map.cacheTime) || 0;
 		var sql = map.sql, key;
+		var table = map.__table
 
 		if (util.dev) {
 			console.log(sql);
@@ -531,7 +547,7 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 						}
 					}
 				}
-				cb(null, data);
+				cb(null, data, table);
 			}
 		}
 
@@ -539,12 +555,12 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 			if (cacheTime > 0) {
 				key = util.hash('get:' + sql);
 				if (self.memcached) {
-					memcached.shared.get(key, function (err, data) {
+					memcached.shared.get(key, function(err, data) {
 						if (err) {
 							console.err(err);
 						}
 						if (data) {
-							cb(err, data);
+							cb(err, data, table);
 						} else {
 							db.query(sql, handle);
 						}
@@ -552,7 +568,7 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 				} else {
 					var c = local_cache[key];
 					if (c) {
-						cb(null, c.data);
+						cb(null, c.data, table);
 					} else {
 						db.query(sql, handle);
 					}
@@ -573,37 +589,62 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 	}
 }
 
+async function execAfterFetch(self, model, afterFetch) {
+	if (afterFetch) {
+		for (var args of afterFetch) {
+			if (!Array.isArray(args)) {
+				args = [args];
+			}
+			var table = args.shift();
+
+			if (table[0] == '@') {
+				await model.fetchChild(table.substr(1), ...args);
+			} else {
+				await model.fetch(table, ...args);
+			}
+		}
+	}
+	return model;
+}
+
 var funcs = {
 
-	get: function(map, db, is_t, name, param, opts) {
-		return new Promise((resolve, reject)=> {
-			query(map, db, is_t, 'get', name, function(err, data) {
+	get: async function(self, db, is_t, name, param, opts) {
+		var {afterFetch, ...param} = param || {};
+		var model = new Promise((resolve, reject)=> {
+			query(self, db, is_t, 'get', name, function(err, data, table) {
 				if (err) {
 					reject(err);
 				} else {
 					var [{rows}] = data;
-					resolve(rows ? (rows[0] || null) : null);
+					var value = rows ? (rows[0]||null) : null;
+					resolve( value ? new Model(value, {dao: self.dao,table}): null );
 				}
 			}, param, opts);
 		});
+		return await execAfterFetch(self, model, afterFetch);
 	},
 
-	gets: function(map, db, is_t, name, param, opts) {
-		return new Promise((resolve, reject)=> {
-			query(map, db, is_t, 'gets', name, function(err, data) {
+	gets: async function(self, db, is_t, name, param, opts) {
+		var {afterFetch, ...param} = param || {};
+		var model = await new Promise((resolve, reject)=> {
+			query(self, db, is_t, 'gets', name, function(err, data, table) {
 				if (err) {
 					reject(err);
 				} else {
-					var [{rows}] = data;
-					resolve(rows || null);
+					var [{rows=[]}] = data;
+					var dao = self.dao;
+					var value = rows.map(e=>new Model(e,{dao,table}));
+					resolve( new Collection(value, {dao,table}) );
 				}
 			}, param, opts);
 		});
+		return await execAfterFetch(self, model, afterFetch);
 	},
 
-	post: function(map, db, is_t, name, param, opts) {
+	post: function(self, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, db, is_t, 'post', name, function(err, data) {
+			query(self, db, is_t, 'post', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
@@ -613,9 +654,9 @@ var funcs = {
 		});
 	},
 
-	query: function(map, db, is_t, name, param, opts) {
+	query: function(self, db, is_t, name, param, opts) {
 		return new Promise((resolve, reject)=> {
-			query(map, db, is_t, 'query', name, function(err, data) {
+			query(self, db, is_t, 'query', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
@@ -705,7 +746,7 @@ var SqlMap = util.class('SqlMap', {
 			if (path.extname(e) == '.xml') {
 				var name = path.basename(e);
 				var table = name.substr(0, name.length - 4);
-				var {attrs,handles} = read_original_handles(this, this.original + '/' + table_name, table);
+				var {attrs,handles} = read_original_handles(this, this.original + '/' + table, table);
 				var methods = [];
 				for (let [method,{type}] of Object.entries(handles)) {
 					type = type || method.indexOf('select') >= 0 ? 'get': 'post';
@@ -720,7 +761,7 @@ var SqlMap = util.class('SqlMap', {
 	},
 
 	primaryKey(table) {
-		return this.m_tables[table].attrs.primaryKey;
+		return this.m_tables[table].primaryKey;
 	},
 
 	/**

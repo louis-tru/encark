@@ -42,7 +42,7 @@ if (haveNode) {
 	var https = require('https');
 	var Buffer = require('buffer').Buffer;
 	var crypto = require('crypto');
-	var { PacketParser, Hybi } = require('./hybi');
+	var { PacketParser,sendDataPacket,sendPingPacket } = require('./ws_parser');
 }
 else if (haveWeb) {
 	var WebSocket = global.WebSocket;
@@ -425,7 +425,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 	send: function(data) {
 		if (this.isOpen) {
 			if (this.m_socket) {
-				Hybi.sendDataPacket(this.m_socket, data);
+				sendDataPacket(this.m_socket, data);
 			} else {
 				console.error('cannot call function `this.m_socket`');
 			}
@@ -441,7 +441,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 	ping: function() {
 		if (this.isOpen) {
 			if (this.m_socket) {
-				Hybi.sendPingPacket(this.m_socket);
+				sendPingPacket(this.m_socket);
 			} else {
 				console.error('cannot find function `this.m_socket`');
 			}

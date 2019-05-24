@@ -291,7 +291,8 @@ var HttpService = util.class('HttpService', StaticService, {
 				return;
 			}
 
-			var data = util.assign({}, self.params, self.data, info);
+			var { service, action, ..._info } = info;
+			var data = util.assign({}, self.params, self.data, _info);
 			var err, r;
 			try {
 				r = await self[action](data);

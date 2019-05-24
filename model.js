@@ -63,41 +63,103 @@ class ModelBasic {
  */
 class Model extends ModelBasic {
 
-	async fetch(table, param, { select='select', ...opts } = {}) {
+	async fetch(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
-		var fk = dao.primaryKey(this.m_table);
-		var pk = dao.primaryKey(table);
+		var fk = key || dao.$.primaryKey(table);
 		var value = this.m_value;
-		var model = await dao[table][select].get({ [pk]: value[fk], ...param}, opts);
+		var model = await dao[table][select].get({ [fk]: value[fk], ...param}, opts);
 		this.m_value[table] = model;
 		return this;
 	}
 
-	async child(table, param, { select='select', ...opts } = {}) {
+	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
-		var fk = dao.primaryKey(table);
-		var pk = dao.primaryKey(this.m_table);
+		var pk = key || dao.$.primaryKey(this.m_table);
 		var value = this.m_value;
-		var collection = await dao[table][select]({ [fk]: value[pk], ...param}, opts);
+		var collection = await dao[table][select]({ [pk]: value[pk], ...param}, opts);
 		this.m_value[table] = collection;
 		return this;
 	}
 
 }
 
-
 /**
  * @class Collection
  */
 class Collection extends ModelBasic {
 
-	async fetch(table, param, { select='select', ...opts } = {}) {
+	constructor(value = [], opts = {}) {
+		super(value, opts);
+		this.m_map = {};
+		this.m_ids = [];
+		var pk = this.m_dao.$.primaryKey(this.m_table);
+
+		for (var m of this.m_value) {
+			var id = m.value[pk];
+			if (id) {
+				this.m_ids.push(id);
+				this.m_map[id] = m;
+			}
+		}
+	}
+
+	get(id) {
+		return this.m_map[id];
+	}
+
+	get ids() {
+		return this.m_ids;
+	}
+
+	async fetch(table, param, { key, select='select', ...opts } = {}) {
+		var dao = this.m_dao;
+		var pk0 = dao.$.primaryKey(table);
+		var fk = key || pk0;
+		var ids = this.m_value.map(e=>e.value[fk]).filter(e=>e);
+		if (ids.length) {
+			var collection = await dao[table][select]({ [fk]:ids, ...param}, opts);
+			var map = collection.m_map;
+			if (fk != pk0) {
+				map = {};
+				for (var m of collection.m_value) {
+					var id = m.value[fk];
+					if (id) {
+						map[id] = m;
+					}
+				}
+			}
+			this.m_value.forEach(({m_value})=>{
+				m_value[table] = map[m_value[fk]] || null;
+			});
+		}
 		return this;
 	}
 
-	async child(table, param, { select='select', ...opts } = {}) {
+	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
+		var dao = this.m_dao;
+		var pk0 = dao.$.primaryKey(this.m_table);
+		var pk = key || pk0;
+		var ids = this.m_value.map(e=>e.value[pk]).filter(e=>e);
+
+		if (ids.length) {
+			var collection = await dao[table][select]({ [pk]:ids, ...param}, opts);
+			var map = {};
+			for (var m of collection.m_value) {
+				var id = m.value[pk];
+				if (id) {
+					var ls = map[id];
+					if (!ls)
+						map[id] = ls = [];
+					ls.push(m);
+				}
+			}
+			this.m_value.forEach(({m_value})=>{
+				m_value[table] = map[m_value[pk]] || [];
+			});
+		}
 		return this;
 	}
+
 }
 
 

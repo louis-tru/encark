@@ -130,6 +130,7 @@ var Service = util.class('Service', {
 		if (!this.m_params) {
 			var mat = this.url.match(/\?(.+)/);
 			this.m_params = querystring.parse(mat ? mat[1] : '');
+			delete this.m_params._;
 		}
 		return this.m_params;
 	},
