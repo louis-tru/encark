@@ -58,6 +58,22 @@ class ModelBasic {
 
 }
 
+function value(self, keys) {
+	var r = self;
+	for (var key of keys) {
+		r = r.m_value[key];
+		if (!r) return r;
+	}
+	return r;
+}
+
+function parseKeys(key) {
+	var keys = key.split('.');
+	return [
+		keys.last(0), keys,
+	];
+}
+
 /**
  * @class Model
  */
@@ -65,18 +81,16 @@ class Model extends ModelBasic {
 
 	async fetch(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
-		var fk = key || dao.$.primaryKey(table);
-		var value = this.m_value;
-		var model = await dao[table][select].get({ [fk]: value[fk], ...param}, opts);
+		var [k,keys] = parseKeys(key || dao.$.primaryKey(table));
+		var model = await dao[table][select].get({ [k]: value(this,keys), ...param}, opts);
 		this.m_value[table] = model;
 		return this;
 	}
 
 	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
-		var pk = key || dao.$.primaryKey(this.m_table);
-		var value = this.m_value;
-		var collection = await dao[table][select]({ [pk]: value[pk], ...param}, opts);
+		var [k,keys] = parseKeys(key || dao.$.primaryKey(this.m_table));
+		var collection = await dao[table][select]({ [k]: value(this,keys), ...param}, opts);
 		this.m_value[table] = collection;
 		return this;
 	}
@@ -114,22 +128,23 @@ class Collection extends ModelBasic {
 	async fetch(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
 		var pk0 = dao.$.primaryKey(table);
-		var fk = key || pk0;
-		var ids = this.m_value.map(e=>e.value[fk]).filter(e=>e);
+		var [k,keys] = parseKeys(key || pk0);
+		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
+
 		if (ids.length) {
-			var collection = await dao[table][select]({ [fk]:ids, ...param}, opts);
+			var collection = await dao[table][select]({ [k]:ids, ...param}, opts);
 			var map = collection.m_map;
-			if (fk != pk0) {
+			if (k != pk0) {
 				map = {};
 				for (var m of collection.m_value) {
-					var id = m.value[fk];
+					var id = m.m_value[k];
 					if (id) {
 						map[id] = m;
 					}
 				}
 			}
-			this.m_value.forEach(({m_value})=>{
-				m_value[table] = map[m_value[fk]] || null;
+			this.m_value.forEach(e=>{
+				e.m_value[table] = map[value(e, keys)] || null;
 			});
 		}
 		return this;
@@ -138,23 +153,27 @@ class Collection extends ModelBasic {
 	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
 		var pk0 = dao.$.primaryKey(this.m_table);
-		var pk = key || pk0;
-		var ids = this.m_value.map(e=>e.value[pk]).filter(e=>e);
+		var [k,keys] = parseKeys(key || pk0);
+		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
 
 		if (ids.length) {
-			var collection = await dao[table][select]({ [pk]:ids, ...param}, opts);
+			var collection = await dao[table][select]({ [k]:ids, ...param}, opts);
 			var map = {};
 			for (var m of collection.m_value) {
-				var id = m.value[pk];
+				var id = m.m_value[k];
 				if (id) {
 					var ls = map[id];
-					if (!ls)
-						map[id] = ls = [];
+					if (ls) {
+						ls = ls.m_value;
+					} else {
+						ls = [];
+						map[id] = new Collection(ls,{table,dao});
+					}
 					ls.push(m);
 				}
 			}
-			this.m_value.forEach(({m_value})=>{
-				m_value[table] = map[m_value[pk]] || [];
+			this.m_value.forEach(e=>{
+				e.m_value[table] = map[value(e, keys)] || [];
 			});
 		}
 		return this;
