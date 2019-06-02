@@ -67,10 +67,11 @@ function value(self, keys) {
 	return r;
 }
 
-function parseKeys(key) {
+function parseKeys(mkey) {
+	var [key,key2] = mkey.split(',');
 	var keys = key.split('.');
 	return [
-		keys.last(0), keys,
+		key2||keys.last(0), keys,
 	];
 }
 
@@ -119,6 +120,10 @@ class Collection extends ModelBasic {
 
 	get(id) {
 		return this.m_map[id];
+	}
+
+	get length() {
+		return this.m_value.length;
 	}
 
 	get ids() {

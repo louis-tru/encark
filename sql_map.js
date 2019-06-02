@@ -611,7 +611,7 @@ var funcs = {
 
 	get: async function(self, db, is_t, name, param, opts) {
 		var {afterFetch, ...param} = param || {};
-		var model = new Promise((resolve, reject)=> {
+		var model = await new Promise((resolve, reject)=> {
 			query(self, db, is_t, 'get', name, function(err, data, table) {
 				if (err) {
 					reject(err);
