@@ -655,11 +655,18 @@ var IncomingForm = util.class('IncomingForm', {
 		this.hash.update(buffer);
 		
 		this.bytesReceived += buffer.length;
-		this.onprogress.trigger({ bytesReceived: this.bytesReceived, bytesExpected: this.bytesExpected });
+		this.onprogress.trigger({
+			bytesReceived: this.bytesReceived,
+			bytesExpected: this.bytesExpected,
+		});
 
 		var bytesParsed = this._parser.write(buffer);
 		if (bytesParsed !== buffer.length) {
-			this._error(new Error('parser error, ' + bytesParsed + ' of ' + buffer.length + ' bytes parsed'));
+			this._error(
+				new Error('parser error, ' + 
+				bytesParsed + ' of ' + 
+				buffer.length + ' bytes parsed')
+			);
 		}
 
 		return bytesParsed;
@@ -813,8 +820,16 @@ var IncomingForm = util.class('IncomingForm', {
 		}
 	},
 
-	_newParser: function () {
-		return new MultipartParser();
+	_fileName: function (headerValue) {
+		var m = headerValue.match(/filename="(.*?)"($|; )/i)
+		if (!m) return;
+
+		var filename = m[1].substr(m[1].lastIndexOf('\\') + 1);
+		filename = filename.replace(/%22/g, '"');
+		filename = filename.replace(/&#([\d]{4});/g, function (m, code) {
+			return String.fromCharCode(code);
+		});
+		return filename;
 	},
 
 	_initMultipart: function (boundary) {
@@ -878,18 +893,6 @@ var IncomingForm = util.class('IncomingForm', {
 		};
 
 		this._parser = parser;
-	},
-
-	_fileName: function (headerValue) {
-		var m = headerValue.match(/filename="(.*?)"($|; )/i)
-		if (!m) return;
-
-		var filename = m[1].substr(m[1].lastIndexOf('\\') + 1);
-		filename = filename.replace(/%22/g, '"');
-		filename = filename.replace(/&#([\d]{4});/g, function (m, code) {
-			return String.fromCharCode(code);
-		});
-		return filename;
 	},
 
 	_initUrlencodedOrJson: function(type) {
