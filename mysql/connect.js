@@ -106,7 +106,7 @@ function remove_connect(self) {
 	}
 }
 
-var private$connect = util.class('private$connect', {
+var Connect = util.class('Connect', {
 
 	//private:
 	_greeting: null,
@@ -150,7 +150,7 @@ var private$connect = util.class('private$connect', {
 		socket.setTimeout(8e7);
 		socket.setNoDelay(true);
 		socket.on('data', function(data) {
-			parser.write(data); 
+			parser.write(data);
 		});
 		socket.on('error', function (err) {
 			self.onerror.trigger(err);
@@ -286,7 +286,7 @@ exports.get = function (opt, cb) {
 
 	//is max connect
 	if (pool.length < exports.MAX_CONNECT_COUNT) {
-		return pool.push(new private$connect(opt, cb));
+		return pool.push(new Connect(opt, cb));
 	}
 
 	var req = {
