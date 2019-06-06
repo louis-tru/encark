@@ -408,8 +408,11 @@ function parseSql(self, name, param) {
 			}
 		}
 
-		if (param.limit)
-			param.limit = Number(param.limit) || 0;
+		if (param.limit === '0') {
+			param.limit = 0;
+		} else if (Array.isArray(param)) {
+			param.limit = param.join(',');
+		}
 	}
 
 	var r = parse_if_sql(self, map, param, result, map.__is_select);
@@ -499,7 +502,10 @@ function select_cb(param, cb) {
 function query(self, db, is_transaction, type, name, cb, param, options) {
 
 	if (type == 'get') {
-		param = { limit: 1, ...param };
+		param = { ...param, limit: 1 };
+	} else if (type == 'gets') {
+		type = 'get';
+		param = { limit: 10, ...param };
 	} else {
 		param = { ...param };
 	}
@@ -509,10 +515,6 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 		get:(target, name)=>target[name],
 		has:()=>1,
 	});
-
-	if (type == 'gets') {
-		type = 'get';
-	}
 
 	try {
 		var map = Object.assign(parseSql(self, name, param), options);

@@ -91,7 +91,7 @@ class Model extends ModelBasic {
 	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
 		var dao = this.m_dao;
 		var [k,keys] = parseKeys(key || dao.$.primaryKey(this.m_table));
-		var collection = await dao[table][select]({ [k]: value(this,keys), ...param}, opts);
+		var collection = await dao[table][select]({ [k]: value(this,keys), limit: 0, ...param}, opts);
 		this.m_value[table] = collection;
 		return this;
 	}
@@ -137,7 +137,7 @@ class Collection extends ModelBasic {
 		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
 
 		if (ids.length) {
-			var collection = await dao[table][select]({ [k]:ids, ...param}, opts);
+			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
 			var map = collection.m_map;
 			if (k != pk0) {
 				map = {};
@@ -162,7 +162,7 @@ class Collection extends ModelBasic {
 		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
 
 		if (ids.length) {
-			var collection = await dao[table][select]({ [k]:ids, ...param}, opts);
+			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
 			var map = {};
 			for (var m of collection.m_value) {
 				var id = m.m_value[k];
