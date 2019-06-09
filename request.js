@@ -69,7 +69,7 @@ var defaultOptions = {
 	method: 'GET',
 	params: '',
 	headers : {},
-	urlencoded : true,
+	dataType : 'json',
 	user_agent : user_agent,
 	timeout: 18e4,
 };
@@ -118,6 +118,25 @@ function querystring_stringify(obj, sep, eq) {
 		return fields;
 	}
 	return '';
+}
+
+function stringify_xml(obj) {
+
+	var result = ['<xml>'];
+
+	for (var [k,v] of Object.entries(obj)) {
+		result.push(`<${k}>`);
+		if (v && typeof v == 'object') {
+			result.push(`![CDATA[${v}]]`);
+		} else {
+			result.push(v);
+		}
+		result.push(`</${k}>`);
+	}
+
+	result.push('</xml>');
+
+	return result.join('');
 }
 
 var _request_platform = // request implementation
@@ -322,10 +341,19 @@ function request(pathname, options) {
 		}
 
 		if (method == 'POST') {
-			if (options.urlencoded) {
+			if (options.urlencoded || options.dataType == 'urlencoded') {
 				headers['Content-Type'] = 'application/x-www-form-urlencoded';
 				if (params) {
 					post_data = querystring_stringify(params);
+				}
+			} else if (options.dataType == 'xml') {
+				headers['Content-Type'] = 'application/xml';
+				if (params) {
+					if (typeof params == 'string') {
+						post_data = params;
+					} else {
+						post_data = stringify_xml(params);
+					}
 				}
 			} else {
 				headers['Content-Type'] = 'application/json';
@@ -422,7 +450,7 @@ class Request {
 		this.m_server_url = serverURL || util.config.web_service;
 		this.m_mock = mock || {};
 		this.m_mock_switch = mockSwitch;
-		this.m_urlencoded = true;
+		this.m_data_type = 'urlencoded';
 		this.m_enable_strict_response_data = true;
 		this.m_cache = new Cache();
 		this.m_timeout = defaultOptions.timeout;
@@ -439,8 +467,10 @@ class Request {
 
 	get userAgent() { return this.m_user_agent }
 	set userAgent(v) { this.m_user_agent = v }
-	get urlencoded() { return this.m_urlencoded }
-	set urlencoded(v) { this.m_urlencoded = v }
+	get urlencoded() { return this.m_data_type == 'urlencoded' }
+	set urlencoded(v) { this.m_data_type = v ? 'urlencoded': 'json' }
+	get dataType() { return this.m_data_type }
+	set dataType(v) { this.m_data_type = v }
 	get serverURL() { return this.m_server_url }
 	set serverURL(v) { this.m_server_url = v }
 	get mock() { return this.m_mock }
@@ -495,7 +525,7 @@ class Request {
 				params,
 				headers,
 				timeout: timeout || this.m_timeout,
-				urlencoded: this.m_urlencoded,
+				dataType: this.m_data_type,
 				user_agent: this.m_user_agent,
 				signer: signer,
 			});

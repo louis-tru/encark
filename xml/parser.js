@@ -248,7 +248,8 @@ function parseDCC(self, source) {//sure start with '<!'
 			var end = source.indexOf(']]>');
 			var lex = self.lexicalHandler;
 			lex && lex.startCDATA();
-			appendText(self, source.substring(9, end), 0, end - 9);
+			// appendText(self, source.substring(9, end), 0, end - 9);
+			appendText(self, source.substring(9, end), end - 9);
 			lex && lex.endCDATA()
 			return source.substring(end + 3);
 		}
