@@ -261,6 +261,35 @@ var Document = util.class('Document', node.Node, {
 		}
 		return r;
 	},
+
+	toJSON: function() {
+		var result = {};
+
+		var doc = this;
+		var first = doc.firstChild;
+
+		if (!first) return null;
+	
+		var ns = first.childNodes;
+	
+		for (var i = 0; i < ns.length; i++) {
+			var node = ns.item(i);
+			if (node.nodeType === node.ELEMENT_NODE) {
+				if (node.lastChild) {
+					if (node.lastChild.nodeType == 4) { // cdata
+						result[node.tagName] = node.lastChild.data;
+					} else {
+						result[node.tagName] = node.innerXml;
+					}
+				} else {
+					result[node.tagName] = '';
+				}
+				
+			}
+		}
+	
+		return result;
+	}
 });
 
 exports.Document = Document;

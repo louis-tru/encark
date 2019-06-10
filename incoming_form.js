@@ -38,6 +38,7 @@ var querystring = require('querystring');
 var Buffer = require('buffer').Buffer;
 var crypto = require('crypto');
 var {parseJSON} = require('./request');
+var xml = require('./xml');
 
 // This is a buffering parser, not quite as nice as the multipart one.
 // If I find time I'll rewrite this to be fully streaming as well
@@ -75,6 +76,10 @@ var QuerystringParser = util.class('QuerystringParser', {
 				}
 			}
 			this.onEnd(data);
+		} else if (this.type == 'xml') {
+			var doc = new xml.Document();
+			var r = doc.load(buffer+'');
+			this.onEnd({ body: doc });
 		} else {
 			var fields = querystring.parse(buffer);
 			for (var field in fields) {
@@ -794,9 +799,8 @@ var IncomingForm = util.class('IncomingForm', {
 			} else {
 				this._error(new Error('bad content-type header, no multipart boundary'));
 			}
-		}
-		else {
-			this._initUrlencodedOrJson(type);
+		} else {
+			this._initUrlencodedOrJsonOrXml(type);
 		}
 	},
 
@@ -895,9 +899,12 @@ var IncomingForm = util.class('IncomingForm', {
 		this._parser = parser;
 	},
 
-	_initUrlencodedOrJson: function(type) {
-		if (type && type.indexOf('application/json') >= 0) {
+	_initUrlencodedOrJsonOrXml: function(type) {
+
+		if (type && type.indexOf('json') >= 0) {
 			type = 'json';
+		} else if (type && type.indexOf('xml') >= 0) {
+			type = 'xml';
 		} else {
 			type = 'urlencoded';
 		}
@@ -906,7 +913,7 @@ var IncomingForm = util.class('IncomingForm', {
 		var parser = new QuerystringParser(type)
 		var self = this;
 		
-		if (type == 'json') {
+		if (type == 'json' || type == 'xml') {
 			parser.onField = function() {};
 			parser.onEnd = function(data) {
 				self.ended = true;
