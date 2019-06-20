@@ -111,6 +111,7 @@ extend(Array.prototype, {
 		if (i != -1) {
 			this.splice(i, 1);
 		}
+		return this;
 	},
 	
 	/**

@@ -120,6 +120,7 @@ function extendClass(cls, ...extds) {
 		}
 		extend(proto, extd);
 	}
+	return cls;
 }
 
 module.exports = exports = extend(extend(utils, _util), {

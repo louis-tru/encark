@@ -268,30 +268,37 @@ function parse_sql_join(self, item, param, result) {
 	return result.sql.push(ls.join(item.value || ','));
 }
 
-// if
-function parse_if_sql(self, node, param, result, is_select) {
+// if/where
+function parse_if_sql(self, node, param, options, result, is_select, is_total) {
 	var exp = node.exp;
 	var name = node.name;
 	var not = name && name[0] == '!';
-	if (not)
+
+	if (not) {
 		name = name.substr(1);
+	}
+
+	if (node.default) {
+		param = { [name]: node.default, ...param };
+	}
 
 	if (exp) {
 		if (!exec(self, exp, param)) {
 			return null;
 		}
 	} else if (name) {
+		var val = param[name];
 		if (not) {
-			if (param[name] !== undefined) {
+			if (val !== undefined && val !== null) {
 				return null;
 			}
-		} else if (param[name] === undefined) {
+		} else if (val === undefined || val === null) {
 			return null;
 		}
 	}
 
 	if (node.__ls.length) {
-		parse_sql_ls(self, node.__ls, param, result, is_select);
+		parse_sql_ls(self, node.__ls, param, options, result, is_select, is_total);
 	} else {
 		var val = param[name];
 		if (Array.isArray(val)) {
@@ -307,7 +314,7 @@ function parse_if_sql(self, node, param, result, is_select) {
 }
 
 // ls
-function parse_sql_ls(self, ls, param, result, is_select) {
+function parse_sql_ls(self, ls, param, options, result, is_select, is_total) {
 
 	var result_count = 0;
 
@@ -323,18 +330,30 @@ function parse_sql_ls(self, ls, param, result, is_select) {
 			}
 		} else {
 			if (tag == 'if') {
-				var r = parse_if_sql(self, node, param, result, is_select);
+				var r = parse_if_sql(self, node, param, options, result, is_select, is_total);
 				if (r && result.sql.length > end_pos) {
 					var prepend = result_count ? (r.prepend || '') + ' ' : '';
 					result.sql[end_pos] = ' ' + prepend + result.sql[end_pos];
 				}
-			} else if (tag == 'join') {
+			}
+			else if (tag == 'where') {
+				parse_sql_ls(self, node.__ls, param, options, result, is_select, is_total);
+				if (result.sql.length > end_pos) {
+					result.sql[end_pos] = ' where' + result.sql[end_pos];
+					if (options.where) {
+						result.sql[end_pos] += ' ' + options.where;
+					}
+				} else if (options.where) {
+					result.sql.push(' where ' + options.where);
+				}
+			}
+			else if (tag == 'join') {
 				parse_sql_join(self, node, param, result);
 			} else if (is_select) {
 				if (tag == 'out') {
 					var value = ` ${node.value || '*'} `;
 					if (node.__ls.length) {
-						parse_sql_ls(self, node.__ls, param, result, is_select);
+						parse_sql_ls(self, node.__ls, param, options, result, is_select, is_total);
 						if (result.sql.length > end_pos) {
 							result.out.push([end_pos, result.sql.length - 1]);
 						} else {
@@ -352,11 +371,11 @@ function parse_sql_ls(self, ls, param, result, is_select) {
 						result.sql.push(` group by ${value} `);
 						if (result.out.length) {
 							var index = result.out.last(0)[1];
-							result.sql[index] += ' ,count(*) as data_count ';
+							result.sql[index] += ' , count(*) as data_count ';
 							result.out.pop();
 						}
 					}
-				} else if (tag == 'order') {
+				} else if (tag == 'order' && !is_total) {
 					var value = param.order_str || node.default;
 					if (value) {
 						result.order.push(end_pos);
@@ -381,7 +400,7 @@ function parse_sql_ls(self, ls, param, result, is_select) {
 }
 
 // parse sql str
-function parseSql(self, name, param) {
+function parseSql(self, name, param, options, is_total) {
 	var map = get_original_handle(self, name);
 	var result = { sql: [], out: [], group: [], order: [], limit: [] };
 
@@ -410,12 +429,17 @@ function parseSql(self, name, param) {
 
 		if (param.limit === '0') {
 			param.limit = 0;
-		} else if (Array.isArray(param)) {
-			param.limit = param.join(',');
+		}/* else if (Array.isArray(param.limit)) {
+			param.limit = param.limit.join(',');
+		}*/
+
+		if (is_total) {
+			param.limit = 1;
+			param.order_str = '';
 		}
 	}
 
-	var r = parse_if_sql(self, map, param, result, map.__is_select);
+	var r = parse_if_sql(self, map, param, options, result, map.__is_select, is_total);
 
 	if (map.__is_select) {
 
@@ -457,10 +481,17 @@ function parseSql(self, name, param) {
 
 			if (result.out.length) {
 				var index = result.out.last(0)[1];
-				result.sql[index] += ' ,count(*) as data_count ';
+				result.sql[index] += ' , count(*) as data_count ';
+				result.out.pop();
+			}
+		} else if (is_total) {
+			if (result.out.length) {
+				var index = result.out.last(0)[1];
+				result.sql[index] += ' , count(*) as data_count ';
 				result.out.pop();
 			}
 		}
+
 	}
 
 	var sql = result.sql.join('');
@@ -499,7 +530,7 @@ function select_cb(param, cb) {
 }
 
 //query
-function query(self, db, is_transaction, type, name, cb, param, options) {
+function query(self, db, is_transaction, type, name, cb, param, options, is_total) {
 
 	if (type == 'get') {
 		param = { ...param, limit: 1 };
@@ -517,7 +548,7 @@ function query(self, db, is_transaction, type, name, cb, param, options) {
 	});
 
 	try {
-		var map = Object.assign(parseSql(self, name, param), options);
+		var map = Object.assign(parseSql(self, name, param, options||{}, is_total), options);
 		var cacheTime = parseInt(map.cacheTime) || 0;
 		var sql = map.sql, key;
 		var table = map.__table
@@ -612,7 +643,8 @@ async function execAfterFetch(self, model, afterFetch) {
 var funcs = {
 
 	get: async function(self, db, is_t, name, param, opts) {
-		var {afterFetch, ...param} = param || {};
+
+		var {afterFetch, fetchTotal, onlyFetchTotal, ...param} = param || {};
 		var model = await new Promise((resolve, reject)=> {
 			query(self, db, is_t, 'get', name, function(err, data, table) {
 				if (err) {
@@ -624,11 +656,37 @@ var funcs = {
 				}
 			}, param, opts);
 		});
-		return await execAfterFetch(self, model, afterFetch);
+
+		if (model) {
+			return await execAfterFetch(self, model, afterFetch);
+		} else {
+			return model;
+		}
 	},
 
 	gets: async function(self, db, is_t, name, param, opts) {
-		var {afterFetch, ...param} = param || {};
+
+		var {afterFetch, fetchTotal, onlyFetchTotal, ...param} = param || {};
+
+		if (fetchTotal || onlyFetchTotal) {
+			var table, total = await new Promise((resolve, reject)=> {
+				query(self, db, is_t, 'get', name, function(err, data, t) {
+					if (err) {
+						reject(err);
+					} else {
+						table = t;
+						var [{rows}] = data;
+						var value = rows ? (rows[0]||null) : null;
+						resolve( value ? value.data_count: 0 );
+					}
+				}, param, opts, true);
+			});
+
+			if (!total || onlyFetchTotal) {
+				return Object.assign(new Collection([], {dao: self.dao, table}), { total });
+			}
+		}
+
 		var model = await new Promise((resolve, reject)=> {
 			query(self, db, is_t, 'gets', name, function(err, data, table) {
 				if (err) {
@@ -641,7 +699,20 @@ var funcs = {
 				}
 			}, param, opts);
 		});
-		return await execAfterFetch(self, model, afterFetch);
+
+		if (Array.isArray(param.limit) && param.limit.length > 1) {
+			model.index = Number(param.limit[0]) || 0;
+		}
+
+		if (total) {
+			model.total = total;
+		}
+
+		if (model.length) {
+			return await execAfterFetch(self, model, afterFetch);
+		} else {
+			return model;
+		}
 	},
 
 	post: function(self, db, is_t, name, param, opts) {

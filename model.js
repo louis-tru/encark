@@ -43,10 +43,15 @@ class ModelBasic {
 		return this.m_table;
 	}
 
-	constructor(value = null, {dao,table} = {}) {
+	get parent() {
+		return this.m_parent;
+	}
+
+	constructor(value = null, {dao,table,parent} = {}) {
 		this.m_value = value;
 		this.m_dao = dao;
 		this.m_table = table;
+		this.m_parent = parent||null;
 	}
 
 	toJSON() {
@@ -80,19 +85,22 @@ function parseKeys(mkey) {
  */
 class Model extends ModelBasic {
 
-	async fetch(table, param, { key, select='select', ...opts } = {}) {
+	async fetch(name, param, { key, table, select='select', ...opts } = {}) {
+		table = table || name;
 		var dao = this.m_dao;
 		var [k,keys] = parseKeys(key || dao.$.primaryKey(table));
 		var model = await dao[table][select].get({ [k]: value(this,keys), ...param}, opts);
-		this.m_value[table] = model;
+		this.m_value[name] = model;
 		return this;
 	}
 
-	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
+	async fetchChild(name, param, { key, table, select='select', ...opts } = {}) {
+		table = table || name;
 		var dao = this.m_dao;
 		var [k,keys] = parseKeys(key || dao.$.primaryKey(this.m_table));
 		var collection = await dao[table][select]({ [k]: value(this,keys), limit: 0, ...param}, opts);
-		this.m_value[table] = collection;
+		collection.m_parent = this;
+		this.m_value[name] = collection;
 		return this;
 	}
 
@@ -107,6 +115,8 @@ class Collection extends ModelBasic {
 		super(value, opts);
 		this.m_map = {};
 		this.m_ids = [];
+		this.m_total = 0;
+		this.m_index = 0;
 		var pk = this.m_dao.$.primaryKey(this.m_table);
 
 		for (var m of this.m_value) {
@@ -122,6 +132,22 @@ class Collection extends ModelBasic {
 		return this.m_map[id];
 	}
 
+	get total() {
+		return this.m_total || this.m_value.length;
+	}
+
+	set total(value) {
+		this.m_total = Number(value) || 0;
+	}
+
+	get index() {
+		return this.m_index;
+	}
+
+	set index(value) {
+		this.m_index = Number(value) || 0;
+	}
+
 	get length() {
 		return this.m_value.length;
 	}
@@ -130,11 +156,13 @@ class Collection extends ModelBasic {
 		return this.m_ids;
 	}
 
-	async fetch(table, param, { key, select='select', ...opts } = {}) {
+	async fetch(name, param, { key, table, select='select', ...opts } = {}) {
+		table = table || name;
 		var dao = this.m_dao;
 		var pk0 = dao.$.primaryKey(table);
 		var [k,keys] = parseKeys(key || pk0);
-		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
+		var ids_set = {};
+		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>(!e||ids_set[e]?0:(ids_set[e]=1,e)));
 
 		if (ids.length) {
 			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
@@ -149,17 +177,19 @@ class Collection extends ModelBasic {
 				}
 			}
 			this.m_value.forEach(e=>{
-				e.m_value[table] = map[value(e, keys)] || null;
+				e.m_value[name] = map[value(e, keys)] || null;
 			});
 		}
 		return this;
 	}
 
-	async fetchChild(table, param, { key, select='select', ...opts } = {}) {
+	async fetchChild(name, param, { key, table, select='select', ...opts } = {}) {
+		table = table || name;
 		var dao = this.m_dao;
 		var pk0 = dao.$.primaryKey(this.m_table);
 		var [k,keys] = parseKeys(key || pk0);
-		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>e);
+		var ids_set = {};
+		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>(!e||ids_set[e]?0:(ids_set[e]=1,e)));
 
 		if (ids.length) {
 			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
@@ -178,10 +208,24 @@ class Collection extends ModelBasic {
 				}
 			}
 			this.m_value.forEach(e=>{
-				e.m_value[table] = map[value(e, keys)] || [];
+				e.m_value[name] = map[value(e, keys)] || new Collection([],{table,dao});
+				e.m_value[name].m_parent = e;
 			});
 		}
 		return this;
+	}
+
+	toJSON() {
+		if (this.m_parent) {
+			return this.m_value;
+		} else {
+			return {
+				index: this.m_index,
+				total: this.total,
+				length: this.m_value.length,
+				value: this.m_value,
+			};
+		}
 	}
 
 }
