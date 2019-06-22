@@ -268,7 +268,7 @@ function parse_sql_join(self, item, param, result) {
 	return result.sql.push(ls.join(item.value || ','));
 }
 
-// if/where
+// if
 function parse_if_sql(self, node, param, options, result, is_select, is_total) {
 	var exp = node.exp;
 	var name = node.name;
@@ -344,7 +344,7 @@ function parse_sql_ls(self, ls, param, options, result, is_select, is_total) {
 						result.sql[end_pos] += ' ' + options.where;
 					}
 				} else if (options.where) {
-					result.sql.push(' where ' + options.where);
+					result.sql.push(' where ' + options.where.replace(/^.*?(and|or)/i, ''));
 				}
 			}
 			else if (tag == 'join') {
