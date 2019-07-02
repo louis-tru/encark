@@ -304,7 +304,12 @@ function parse_if_sql(self, node, param, options, result, is_select, is_total) {
 		if (Array.isArray(val)) {
 			result.sql.push(` ${name} in (${val.map(e=>db.escape(e)).join(',')}) `);
 		} else {
-			result.sql.push(` ${name} = ${db.escape(val)} `);
+			val = db.escape(val);
+			if (val == "'NULL'" || val == "NULL") {
+				result.sql.push(` ${name} is NULL `);
+			} else {
+				result.sql.push(` ${name} = ${val} `);
+			}
 		}
 	}
 
