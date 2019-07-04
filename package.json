@@ -1,12 +1,12 @@
 {
-	"name": "qkit",
+	"name": "langoukit",
 	"version": "0.8.47",
 	"description": "A GUI typesetting display engine and cross platform GUI application development framework based on NodeJS/OpenGL",
 	"main": "util.js",
 	"author": {
 		"name": "xuewen.chu",
 		"email": "louistru@hotmail.com",
-		"url": "http://quickgr.org/"
+		"url": "http://langou.org/"
 	},
 	"keywords": [
 		"jsx",
@@ -30,8 +30,8 @@
 	],
 	"license": "BSD-2-Clause",
 	"bugs": {
-		"url": "https://github.com/louis-tru/qgr/issues",
+		"url": "https://github.com/louis-tru/langou/issues",
 		"email": "louistru@hotmail.com"
 	},
-	"homepage": "http://quickgr.org/"
+	"homepage": "http://langou.org/"
 }

@@ -1,4 +1,4 @@
-Qgr
+Langou
 ===============
 
 A GUI typesetting display engine and cross platform GUI application development framework based on NodeJS/OpenGL

@@ -34,7 +34,7 @@ var { userAgent, querystringStringify } = require('./request');
 var { Notification } = require('./event');
 var url = require('./url');
 var errno = require('./errno');
-var { haveQgr, haveNode, haveWeb } = util;
+var { haveLangou, haveNode, haveWeb } = util;
 
 if (haveNode) {
 	var net = require('net');
