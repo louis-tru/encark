@@ -36,16 +36,16 @@ var url = require('./url');
 var errno = require('./errno');
 var { haveLangou, haveNode, haveWeb } = util;
 
-if (haveNode) {
+if (haveWeb) {
+	var WebSocket = global.WebSocket;
+}
+else if (haveNode) {
 	var net = require('net');
 	var http = require('http');
 	var https = require('https');
 	var Buffer = require('buffer').Buffer;
 	var crypto = require('crypto');
 	var { PacketParser,sendDataPacket,sendPingPacket } = require('./ws_parser');
-}
-else if (haveWeb) {
-	var WebSocket = global.WebSocket;
 }
 else {
 	throw 'Unimplementation';
@@ -273,6 +273,109 @@ function handshakes(res, key) {
  */
 var WSConversation = 
 
+// Web implementation
+haveWeb ? util.class('WSConversation', WSConversationBasic, {
+
+	m_req: null,
+	m_message: null,
+
+	/**
+	 * @ovrewrite 
+	 */
+	initialize: function() {
+		util.assert(!this.m_req, 'No need to repeat open');
+
+		var self = this;
+		var url = this.m_url;
+		var bind_client_services = Object.keys(this.clients).join(',');
+		var headers = this.getRequestHeaders();
+
+		for (var i in headers) {
+			url.setParam(i, headers[i]);
+		}
+		if (this.m_signer) {
+			var sign = this.m_signer.sign(url.path);
+			for (var i in sign) {
+				url.setParam(i, sign[i]);
+			}
+		}
+		url.setParam('bind_client_services', bind_client_services);
+
+		var req = this.m_req = new WebSocket(url.href);
+
+		req.onopen = function(e) {
+			if (!self.m_connect) {
+				self.m_req.close();
+				self.close(); return;
+			}
+			// self.m_token = res.headers['session-token'] || '';
+
+			req.onmessage = function(e) {
+				var data = e.data;
+				if (data instanceof ArrayBuffer) {
+					self.handlePacket(1, data);
+				} else { // string
+					self.handlePacket(0, data);
+				}
+			};
+
+			req.onclose = function(e) {
+				self.close();
+			};
+
+			var message = self.m_message;
+			self.m_message = [];
+			self._open();
+
+			message.forEach(e=>e.cancel||self.send(e));
+		};
+
+		req.onerror = function(e) {
+			self._error(e);
+			self.close();
+		};
+	},
+
+	/**
+	 * @ovrewrite 
+	 */
+	close: function() {
+		this.m_req = null;
+		Conversation.members.close.call(this);
+	},
+
+	/**
+	 * @ovrewrite 
+	 */
+	send: function(data) {
+		if (this.isOpen) {
+			if (data instanceof ArrayBuffer) {
+				this.m_req.send(data);
+			} else if (data && data.buffer instanceof ArrayBuffer) {
+				this.m_req.send(data.buffer);
+			} else { // send json string message
+				data = '\ufffe' + JSON.stringify(data);
+				this.m_req.send(data);
+			}
+		} else {
+			this.m_message.push(data);
+			this.connect(); // 尝试连接
+		}
+	},
+
+	/**
+	 * @ovrewrite 
+	 */
+	ping: function() {
+		if (this.isOpen) {
+			this.m_req.send('\ufffe');
+		} else {
+			this.connect(); // 尝试连接
+		}
+	},
+
+}):
+
 // Node implementation
 haveNode ? util.class('WSConversation', WSConversationBasic, {
 
@@ -452,108 +555,6 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 	
 })
 
-// Web implementation
-: haveWeb ? util.class('WSConversation', WSConversationBasic, {
-
-	m_req: null,
-	m_message: null,
-
-	/**
-	 * @ovrewrite 
-	 */
-	initialize: function() {
-		util.assert(!this.m_req, 'No need to repeat open');
-
-		var self = this;
-		var url = this.m_url;
-		var bind_client_services = Object.keys(this.clients).join(',');
-		var headers = this.getRequestHeaders();
-
-		for (var i in headers) {
-			url.setParam(i, headers[i]);
-		}
-		if (this.m_signer) {
-			var sign = this.m_signer.sign(url.path);
-			for (var i in sign) {
-				url.setParam(i, sign[i]);
-			}
-		}
-		url.setParam('bind_client_services', bind_client_services);
-
-		var req = this.m_req = new WebSocket(url.href);
-
-		req.onopen = function(e) {
-			if (!self.m_connect) {
-				self.m_req.close();
-				self.close(); return;
-			}
-			// self.m_token = res.headers['session-token'] || '';
-
-			req.onmessage = function(e) {
-				var data = e.data;
-				if (data instanceof ArrayBuffer) {
-					self.handlePacket(1, data);
-				} else { // string
-					self.handlePacket(0, data);
-				}
-			};
-
-			req.onclose = function(e) {
-				self.close();
-			};
-
-			var message = self.m_message;
-			self.m_message = [];
-			self._open();
-
-			message.forEach(e=>e.cancel||self.send(e));
-		};
-
-		req.onerror = function(e) {
-			self._error(e);
-			self.close();
-		};
-	},
-
-	/**
-	 * @ovrewrite 
-	 */
-	close: function() {
-		this.m_req = null;
-		Conversation.members.close.call(this);
-	},
-
-	/**
-	 * @ovrewrite 
-	 */
-	send: function(data) {
-		if (this.isOpen) {
-			if (data instanceof ArrayBuffer) {
-				this.m_req.send(data);
-			} else if (data && data.buffer instanceof ArrayBuffer) {
-				this.m_req.send(data.buffer);
-			} else { // send json string message
-				data = '\ufffe' + JSON.stringify(data);
-				this.m_req.send(data);
-			}
-		} else {
-			this.m_message.push(data);
-			this.connect(); // 尝试连接
-		}
-	},
-
-	/**
-	 * @ovrewrite 
-	 */
-	ping: function() {
-		if (this.isOpen) {
-			this.m_req.send('\ufffe');
-		} else {
-			this.connect(); // 尝试连接
-		}
-	},
-
-})
 : util.unrealized;
 
 /**
