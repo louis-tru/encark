@@ -52,14 +52,24 @@ function extend(obj, extd) {
 	}
 }
 
+extend(Object.prototype, {
+	hashCode: function() {
+		// TODO ...
+	}
+});
+
 extend(Function.prototype, {
 	
+	hashCode: function() {
+		
+	},
+
 	catch: function(catch_func) {
 		this.throw = catch_func;
 		this.catch = illegal_operation;
 		return this;
 	},
-	
+
 	/**
 	 * @fun err # 捕获回调异常
 	 * @arg cb {Function}
@@ -90,7 +100,7 @@ extend(Function.prototype, {
 			self.apply(null, args);
 		}, time);
 	},
-	
+
 });
 
 extend(Array, {
@@ -99,8 +109,17 @@ extend(Array, {
 	},
 });
 
-
 extend(Array.prototype, {
+
+	hashCode: function() {
+		var _hash = 5381;
+		for (var item of this) {
+			if (item) {
+				_hash += (_hash << 5) + item.hashCode();
+			}
+		}
+		return _hash;
+	},
 
 	/**
 	 * @func deleteValue(val) 移除指定值元素
@@ -172,6 +191,15 @@ extend(String, {
 });
 
 extend(String.prototype, {
+
+	hashCode: function() {
+		var _hash = 5381;
+		var len = data.length;
+		while (len--) 
+			_hash += (_hash << 5) + data.charCodeAt(len);
+		return _hash;
+	},
+
 	/**
 	 * var str = 'xxxxxx{0}xxxxx{1}xxxx{2},xxx{0}xxxxx{2}';
 	 * var newStr = str.format('A', 'B', 'C');
@@ -186,6 +214,11 @@ extend(String.prototype, {
 });
 
 extend(Number.prototype, {
+
+	hashCode: function() {
+		return this;
+	},
+
 	/**
 	* 转换为前后固定位数的字符串
 	* @arg before {Number}  小数点前固定位数
@@ -319,6 +352,10 @@ extend(Date, {
 
 extend(Date.prototype, {
 
+	hashCode: function() {
+		return this.valueOf();
+	},
+
 	/**
 	 * @func addMs 给当前Date时间追加毫秒,改变时间值
 	 * @arg ms {Number}  要添追加的毫秒值
@@ -441,6 +478,10 @@ extend(Error, {
 });
 
 extend(Error.prototype, {
+
+	hashCode: function() {
+		// TODO ...
+	},
 
 	toJSON: function() {
 		return Error.toJSON(this);
