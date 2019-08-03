@@ -35,7 +35,9 @@ if (typeof window == 'object') { // web
 }
 
 var currentTimezone = new Date().getTimezoneOffset() / -60;
-var slice = Array.prototype.slice;
+var G_slice = Array.prototype.slice;
+var G_hash_code_id = 1;
+var G_hash_code_map = new WeakMap();
 
 function illegal_operation() {
 	throw new Error('Illegal operation');
@@ -53,15 +55,36 @@ function extend(obj, extd) {
 }
 
 extend(Object.prototype, {
+
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
-		// TODO ...
-	}
+		if (G_hash_code_map.has(this)) 
+			return 0;
+		G_hash_code_map.set(this);
+		var _hash = 5381;
+		for (var key in this) {
+			_hash += (_hash << 5) + (key.hashCode() + this[key].hashCode());
+		}
+		G_hash_code_map.delete(this);
+		return _hash;
+	},
+
 });
 
 extend(Function.prototype, {
 	
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
-		
+		if (!this.M_hashCode) {
+			Object.defineProperty(this, 'M_hashCode', { 
+				enumerable: false, configurable: false, writable: false, value: G_hash_code_id++
+			});
+		}
+		return this.M_hashCode;
 	},
 
 	catch: function(catch_func) {
@@ -95,7 +118,7 @@ extend(Function.prototype, {
 		*/
 	setTimeout: function(time/*, ...args*/) {
 		var self = this;
-		var args = slice.call(arguments, 1);
+		var args = G_slice.call(arguments, 1);
 		return setTimeout(function() {
 			self.apply(null, args);
 		}, time);
@@ -105,19 +128,26 @@ extend(Function.prototype, {
 
 extend(Array, {
 	toArray: function (obj, index, end) {
-		return slice.call(obj, index, end);
+		return G_slice.call(obj, index, end);
 	},
 });
 
 extend(Array.prototype, {
 
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
+		if (G_hash_code_map.has(this)) 
+			return 0;
+		G_hash_code_map.set(this);
 		var _hash = 5381;
 		for (var item of this) {
 			if (item) {
 				_hash += (_hash << 5) + item.hashCode();
 			}
 		}
+		G_hash_code_map.delete(this);
 		return _hash;
 	},
 
@@ -132,48 +162,6 @@ extend(Array.prototype, {
 		}
 		return this;
 	},
-	
-	/**
-	 * 查询数组元素指定属性名称的值是否与val相等,如果查询不匹配返回-1
-	 * @func indexOfProperty(property,value)
-	 * @arg property {String}   数组元素的属性名
-	 * @arg value {Object}      需要查询的值
-	 * @ret {Number}            返回数组索引值
-	 */
-	indexOfProperty: function(property, value, from_index) {
-		var len = this.length;
-		if (!len) {
-			return -1;
-		}
-		var i = from_index ? ((from_index % len) + len) % len: 0;
-		for ( ;i < len; i++) {
-			if (this[i][property] == value) {
-				return i;
-			}
-		}
-		return -1;
-	},
-
-	/**
-	 * 从后面开始查询数组元素指定属性名称的值是否与val相等,如果查询不匹配返回-1
-	 * @func lastIndexOfProperty(property,value)
-	 * @arg property {String} 数组元素的属性名
-	 * @arg value {Object}  需要查询的值
-	 * @ret {Number}        返回数组索引值
-	 */
-	lastIndexOfProperty(property, value, from_index) {
-		var len = this.length;
-		if (!len) {
-			return -1;
-		}
-		var i = from_index ? ((from_index % len) + len) % len: 0;
-		for ( ;i > -1; i--) {
-			if (this[i][property] === value) {
-				return i;
-			}
-		}
-		return -1;
-	},
 
 	/**
 	 * 倒叙索引数组元素
@@ -186,7 +174,7 @@ extend(Array.prototype, {
 
 extend(String, {
 	format: function(str) {
-		return String.prototype.format.apply(str, slice.call(arguments, 1));
+		return String.prototype.format.apply(str, G_slice.call(arguments, 1));
 	}
 });
 
@@ -194,9 +182,9 @@ extend(String.prototype, {
 
 	hashCode: function() {
 		var _hash = 5381;
-		var len = data.length;
+		var len = this.length;
 		while (len--) 
-			_hash += (_hash << 5) + data.charCodeAt(len);
+			_hash += (_hash << 5) + this.charCodeAt(len);
 		return _hash;
 	},
 
@@ -215,6 +203,9 @@ extend(String.prototype, {
 
 extend(Number.prototype, {
 
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
 		return this;
 	},
@@ -239,7 +230,6 @@ extend(Number.prototype, {
 	}
 
 });
-
 
 // index of
 function index_of(str, str1) {
@@ -352,6 +342,9 @@ extend(Date, {
 
 extend(Date.prototype, {
 
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
 		return this.valueOf();
 	},
@@ -479,8 +472,13 @@ extend(Error, {
 
 extend(Error.prototype, {
 
+	/**
+	 * @func hashCode()
+	 */
 	hashCode: function() {
-		// TODO ...
+		var _hash = Object.prototype.hashCode.call(this);
+		_hash += (_hash << 5) + this.message.hashCode();
+		return _hash;
 	},
 
 	toJSON: function() {
