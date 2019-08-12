@@ -35,20 +35,6 @@ var errno = require('./errno');
 
 var KEEP_ALIVE_TIME = 5e4;
 
-/*
- * Unpacks a buffer to a number.
- *
- * @api public
- */
-
-function _unpack(buffer) {
-	var n = 0;
-	for (var i = 0; i < buffer.length; ++i) {
-		n = (i == 0) ? buffer[i] : (n * 256) + buffer[i];
-	}
-	return n;
-}
-
 /**
  * @class Hybi
  */

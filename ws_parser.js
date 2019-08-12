@@ -31,6 +31,20 @@
 var event = require('./event');
 var { Buffer } = require('buffer');
 
+/*
+ * Unpacks a buffer to a number.
+ *
+ * @api public
+ */
+
+function _unpack(buffer) {
+	var n = 0;
+	for (var i = 0; i < buffer.length; ++i) {
+		n = (i == 0) ? buffer[i] : (n * 256) + buffer[i];
+	}
+	return n;
+}
+
 /**
  * @class PacketParser
  */
