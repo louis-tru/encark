@@ -185,14 +185,14 @@ function resolve() {
  * @func is_absolute # 是否为绝对路径
  */
 function isAbsolute(path) {
-	return matchs.is_absolute.test(path);
+	return matchs.isAbsolute.test(path);
 }
 
 /**
  * @func is_local # 是否为本地路径
  */
 function isLocal(path) {
-	return matchs.is_local.test(path);
+	return matchs.isLocal.test(path);
 }
 
 function isLocalZip(path) {
