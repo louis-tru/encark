@@ -205,7 +205,7 @@ module.exports = {
 				var self = service.prototype;
 
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/.test(k)) {
+					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
 							events.push(k.substr(2));
 						} else { // methods

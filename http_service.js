@@ -67,7 +67,7 @@ async function action_multiple_calls(self, calls, index, cb) {
 	for ( var action in calls ) {
 		count++;
 		var func = self[action];
-		if (action in ClientService.prototype) {
+		if (action in HttpService.prototype) {
 			return cb(Error.new(errno.ERR_FORBIDDEN_ACCESS).toJSON(), index);
 		}
 		if ( typeof func != 'function' ) {

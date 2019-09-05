@@ -89,13 +89,13 @@ var ClientService = util.class('ClientService', Service, {
 	
 	// @private:
 	m_conv: null,
-	
+
 	// @public:
 	/**
 	 * @event onerror
 	 */
 	onError: null,
-	
+
 	/**
 	 * conv
 	 * @type {conv}
@@ -103,13 +103,13 @@ var ClientService = util.class('ClientService', Service, {
 	get conv() {
 		return this.m_conv;
 	},
-	
+
 	/**
 	 * site session
 	 * @type {Session}
 	 */
 	session: null,
-	
+
 	/**
 	 * @arg conv {Conversation}
 	 * @constructor
@@ -130,7 +130,7 @@ var ClientService = util.class('ClientService', Service, {
 			call_func(this, data);
 		}
 	},
-	
+
 	/**
 	 * @fun error # trigger error event
 	 * @arg err {Error} 
@@ -138,7 +138,7 @@ var ClientService = util.class('ClientService', Service, {
 	error: function(err) {
 		this.trigger('Error', Error.new(err));
 	},
-	
+
 	// @end
 });
 
