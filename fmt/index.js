@@ -29,5 +29,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 var utils = require('../util');
+var {ClientService} = require('../cli_service');
 
-
+// Fast Message Transfer Center
