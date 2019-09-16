@@ -32,9 +32,9 @@ var utils = require('./util');
 var path = require('./path');
 var { Notification } = require('./event');
 var { log, error, dir, warn } = console;
-var { haveNode, haveLangou, haveWeb } = utils;
+var { haveNode, haveNgui, haveWeb } = utils;
 
-if (haveLangou) {
+if (haveNgui) {
 	var fs = requireNative('_fs');
 } else if (haveNode) {
 	var fs = require('./fs');

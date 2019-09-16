@@ -31,9 +31,9 @@
 var util = require('./util');
 var reader = require('fs');
 var parse_keys = require('./_keys').parse;
-var { haveLangou, haveNode, haveWeb } = util;
+var { haveNgui, haveNode, haveWeb } = util;
 
-if (haveLangou) {
+if (haveNgui) {
 	var reader = requireNative('_reader');
 } else if (haveNode) {
 	var reader = require('fs');

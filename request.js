@@ -29,13 +29,13 @@
  * ***** END LICENSE BLOCK ***** */
 
 var util = require('./util');
-var { haveLangou, haveNode, haveWeb } = util;
+var { haveNgui, haveNode, haveWeb } = util;
 var url = require('./url');
 var errno = require('./errno');
 var default_user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 
-if (haveLangou) {
+if (haveNgui) {
 	var user_agent = default_user_agent;
 	var http = requireNative('_http');
 } 
@@ -141,8 +141,8 @@ function stringify_xml(obj) {
 
 var _request_platform = // request implementation
 
-// Langou implementation
-haveLangou ? function(options, soptions, resolve, reject, is_https, method, post_data) {
+// Ngui implementation
+haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_data) {
 	var url = is_https ? 'https://': 'http://';
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';

@@ -42,7 +42,7 @@ var g_static_cache = { };
 //set util
 function setHeader(self, expires) {
 	var res = self.response;
-	res.setHeader('Server', 'Langou utils');
+	res.setHeader('Server', 'Ngui utils');
 	res.setHeader('Date', new Date().toUTCString());
 	if (self.request.method == 'GET') {
 		expires = expires === undefined ? self.server.expires : expires;

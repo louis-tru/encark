@@ -28,18 +28,18 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-if (typeof requireNative != 'function') { // langou
+if (typeof requireNative != 'function') { // ngui
 	require('./_ext');
 }
 
 const haveNode = !!global.process;
-const haveLangou = !!global.requireNative;
+const haveNgui = !!global.requireNative;
 const haveWeb = !!global.location;
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 const assign = Object.assign;
 
-if (haveLangou) {
+if (haveNgui) {
 	var _util = requireNative('_util');
 	var platform = _util.platform;
 	var argv = _util.argv;
@@ -157,7 +157,7 @@ function unrealized() {
 var nextTick = haveNode ? process.nextTick: function(cb, ...args) {
 	if (typeof cb != 'function')
 		throw new Error('callback must be a function');
-	if (haveLangou) {
+	if (haveNgui) {
 		_util.nextTick(e=>cb(...args));
 	} else {
 		setTimeout(e=>cb(...args), 1);
@@ -180,7 +180,7 @@ module.exports = {
 	nextTick: nextTick,
 	platform: platform,
 	haveNode: haveNode,
-	haveLangou: haveLangou,
+	haveNgui: haveNgui,
 	haveWeb: haveWeb,
 	argv: argv,
 	flags: flags || {},

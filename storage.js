@@ -31,7 +31,7 @@
 var util = require('./util');
 var url = require('./url');
 var DelayCall = require('./delay_call').DelayCall;
-var { haveNode, haveLangou, haveWeb } = util;
+var { haveNode, haveNgui, haveWeb } = util;
 
 if (haveWeb) {
 
@@ -54,7 +54,7 @@ if (haveWeb) {
 	};
 
 } else {
-	if (haveLangou) {
+	if (haveNgui) {
 		var fs = requireNative('_fs');
 	} else if (haveNode) {
 		var fs = require('fs');

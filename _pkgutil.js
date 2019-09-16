@@ -30,7 +30,7 @@
 
 const keys = require('./_keys');
 const _util = require('./_util');
-const {haveNode, haveLangou, haveWeb} = _util;
+const {haveNode, haveNgui, haveWeb} = _util;
 const PREFIX = 'file:///';
 const options = {};  // start options
 
@@ -45,7 +45,7 @@ var _require = typeof require == 'function' ? require:
 	throw e;
 };
 
-if (haveLangou) {
+if (haveNgui) {
 	var _pkg = requireNative('_pkg');
 	var win32 = requireNative('_util').platform == 'win32';
 	var _path = requireNative('_path');
@@ -210,7 +210,7 @@ function extendObject(obj, extd) {
 	return obj;
 }
 
-if (haveNode && !haveLangou) {
+if (haveNode && !haveNgui) {
 	var fs = _require('fs');
 	var _keys = require('./_keys');
 	_require('module').Module._extensions['.keys'] = function(module, filename) {
@@ -309,7 +309,7 @@ function inl_require_without_err(pathname) {
 }
 
 function get_config() {
-	if (haveLangou) {
+	if (haveNgui) {
 		return _pkg.config;
 	}
 	if (!config) {

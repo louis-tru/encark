@@ -166,7 +166,7 @@ class URL {
 		this._value = path;
 	}
 	
-	// href: "http://xxxx.xxx:81/v1.1.0/langou/path.js?sasasas&asasasa#sdsdsd"
+	// href: "http://xxxx.xxx:81/v1.1.0/ngui/path.js?sasasas&asasasa#sdsdsd"
 	get href() {
 		parse_path(this);
 		return this._origin + this._filename + this._search + this._hash;
@@ -209,19 +209,19 @@ class URL {
 		return this._hash;
 	}
 	
-	// host: "langou.org:81"
+	// host: "ngui.fun:81"
 	get host() {
 		parse_path(this);
 		return this._hostname + (this._port ? ':' + this._port : '');
 	}
 	
-	// hostname: "langou.org"
+	// hostname: "ngui.fun"
 	get hostname() {
 		parse_path(this);
 		return this._hostname;
 	}
 	
-	// origin: "http://langou.org:81"
+	// origin: "http://ngui.fun:81"
 	get origin() {
 		parse_path(this);
 		return this._origin;

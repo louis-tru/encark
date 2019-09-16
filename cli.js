@@ -34,7 +34,7 @@ var { userAgent, querystringStringify } = require('./request');
 var { Notification } = require('./event');
 var url = require('./url');
 var errno = require('./errno');
-var { haveLangou, haveNode, haveWeb } = util;
+var { haveNgui, haveNode, haveWeb } = util;
 
 if (haveWeb) {
 	var WebSocket = global.WebSocket;

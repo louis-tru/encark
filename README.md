@@ -1,4 +1,4 @@
-Langou
+Ngui
 ===============
 
 A GUI typesetting display engine and cross platform GUI application development framework based on NodeJS/OpenGL
@@ -9,6 +9,6 @@ Goal: developing GUI applications on this basis can take into account both the s
 
 目标：在此基础上开发GUI应用程序可拥有开发WEB应用般简单与速度同时兼顾Native应用程序的性能与体验
 
-Qkit
+nkit
 ===============
 This is a collection of tools, independent of any other libraries

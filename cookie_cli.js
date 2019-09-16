@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var util = require('./util');
-var { haveNode, haveLangou, haveWeb } = util;
+var { haveNode, haveNgui, haveWeb } = util;
 
 if (haveWeb)
 
