@@ -137,38 +137,41 @@ class Console extends Notification {
 
 	time(tag = '') {
 		var date = new Date();
-		var time = { date: date, tag, timelines: [{ date: date, tag }] };
+		var time = { date, tag, timelines: [{ date, tag }] };
 		this.m_timeStack.push(time);
-		this.dlog(timeSpace(this), 'Time    ', formatTime(time.date), tag);
+		this.dlog(timeSpace(this), 'Time    ', formatTime(time.date), ' ', tag);
 	}
 
 	timeline(tag = '') {
+		this._timeline(tag, 'TimeLine');
+	}
+
+	_timeline(tag, prefix) {
 		if (!this.m_timeStack.length) return;
 		// utils.assert(this.m_timeStack.length);
 		var time = this.m_timeStack.last(0);
 		var privline = time.timelines.last(0);
 		var line = { tag, date: new Date() };
 		time.timelines.push(line);
-		this.dlog(timeSpace(this), 'TimeLine', 
+		this.dlog(timeSpace(this), prefix, 
 			formatTime(line.date), line.date - privline.date, tag);
 	}
 
-	timeEnd(tag = '') {
+	timeEnd(tag) {
 		if (!this.m_timeStack.length) return;
-		this.timeline(tag);
-		var { tag: tag2, timelines } = this.m_timeStack.last(0);
-		this.dlog(timeSpace(this), 'TimeEnd ', tag2, '--------------');
+		var { tag: tag1, timelines } = this.m_timeStack.last(0);
+		this._timeline(tag, 'TimeEnd ');
+		this.dlog(timeSpace(this), 'Finish  ', formatTime(timelines[0].date), tag1);
 		timelines.forEach((e, j)=>{
-			if (j == 0) {
-				this.dlog(timeSpace(this), '---->   ', 
-					formatTime(e.date), e.tag);
-			} else {
+			if (j) {
 				this.dlog(timeSpace(this), '---->   ', 
 					formatTime(e.date), e.date - timelines[j-1].date, e.tag);
+			} else {
+				// this.dlog(timeSpace(this), '---->   ', formatTime(e.date), ' ' ,e.tag);
 			}
 		});
-		this.dlog(timeSpace(this), 'TimeEnd ', tag2, 
-			timelines.last(0).date - timelines[0].date, '--------------');
+		this.dlog(timeSpace(this), 'Total   ', '--------------------', tag1, 
+			timelines.last(0).date - timelines[0].date, '--------------------');
 		this.m_timeStack.pop();
 	}
 
