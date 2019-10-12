@@ -33,10 +33,10 @@ var {ClientService} = require('../cli_service');
 
 // Fast Message Transfer Center, 快速消息传输中心
 
-// class FastMessageTransferCenter extends ClientService {
-// 	constructor(conv) {
-// 		super(conv);
-// 	}
-// }
+class FastMessageTransferCenter extends ClientService {
+	constructor(conv) {
+		super(conv);
+	}
+}
 
-// exports.FastMessageTransferCenter = FastMessageTransferCenter;
+exports.FastMessageTransferCenter = FastMessageTransferCenter;
