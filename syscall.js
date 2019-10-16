@@ -65,125 +65,133 @@ function spawnSync(cmd, args = []) {
 	if (ch.error) {
 		throw ch.error;
 	} else {
+		var stdout = ch.stdout.length ? ch.stdout.toString().split('\n'): [];
+		var stderr = ch.stderr.length ? ch.stderr.toString().split('\n'): [];
 		return {
 			code: ch.status,
-			stdout: ch.stdout.length ? ch.stdout.toString().split('\n'): [],
-			stderr: ch.stderr.length ? ch.stderr.toString().split('\n'): [],
+			first: stdout[0],
+			stdout, stderr,
 		};
 	}
 }
 
-function on_data(e, ch) {
-	if (moreLog)
-		process.stdout.write(e);
-	var log = e.toString('utf8');
-	return log;
+function on_data_default(data) {
+	if (moreLog) {
+		process.stdout.write(data);
+		process.stdout.write('\n');
+	}
+	return data.toString('utf8');
 }
 
-function on_error(e, ch) {
-	if (moreLog)
-		process.stderr.write(e);
-	var log = e.toString('utf8');
-	return log;
+function on_error_default(data) {
+	if (moreLog) {
+		process.stderr.write(data);
+		process.stderr.write('\n');
+	}
+	return data.toString('utf8');
 }
 
 function exec(cmd, ...args) {
 	return spawn('sh', ['-c', cmd], ...args);
 }
 
-function spawn(cmd, cmd_args = [], { onData = on_data, onError = on_error, ...args } = {}) {
-	// var ls = cmd.split(/\s+/);
-	// var ch = child_process.spawn(ls.shift(), ls);
-	var ch = child_process.spawn(cmd, cmd_args);
-	var error;
-	var stdout = [];
-	var stderr = [];
-	var _resolve, _reject;
-	var completed = false, data, err;
-	var prev_stdout_n = true;
-	var prev_stderr_n = true;
-	var stdin = args.stdin instanceof stream.Stream ? args.stdin: null;
+function spawn(cmd, cmd_args = [], _args = {}) {
+	var {
+		onData = on_data_default,
+		onError = on_error_default,
+		stdout, stderr, stdin } = _args;
+	stdout = stdout instanceof stream.Stream ? stdout: null;
+	stderr = stderr instanceof stream.Stream ? stderr: null;
+	stdin = stdin instanceof stream.Stream ? stdin: null;
+	var ch;
 
-	var resolve = function(e) {
-		completed = true;
-		data = e;
-	};
+	var promise = new Promise(function(resolve, reject) {
+		var on_stdin;
+		var r_stdout = [];
+		var r_stderr = [];
+		var empty = new Buffer(0);
 
-	var reject = function(e) {
-		completed = true;
-		err = e;
-	};
+		var data_tmp = {
+			stdout: empty,
+			stderr: empty,
+		};
 
-	ch.stdout.on('data', function(e) {
-		if (args.stdout)
-			args.stdout.write(e);
-		var log = onData(e, ch);
-		if (log) {
-			var ls = log.split('\n');
-			if (stdout.length)
-				ls[0] = stdout.pop() + ls[0];
-			stdout.push(...ls);
+		function on_data(data) {
+			var r = onData.call(ch, data);
+			if (r)
+				r_stdout.push(r);
 		}
-	});
 
-	ch.stderr.on('error', function(e) {
-		if (args.stderr)
-			args.stderr.write(e);
-		var log = onError(e, ch);
-		if (log) {
-			var ls = log.split('\n');
-			if (stderr.length)
-				ls[0] = stderr.pop() + ls[0];
-			stderr.push(...ls);
+		function on_error(data) {
+			var r = onError.call(ch, data);
+			if (r)
+				r_stderr.push(r);
 		}
-	});
 
-	function on_stdin(e) {
-		if (ch) {
-			ch.stdin.write(e);
+		function parse_data(data, name) {
+			var output = data_tmp[name];
+			var index, prev = 0;
+			var handle = name == 'stdout' ? on_data: on_error;
+
+			while ( (index = data.indexOf('\n', prev)) != -1 ) {
+				handle(Buffer.concat([output, data.slice(prev, index)]));
+				prev = index + 1;
+				output = empty;
+			}
+			data_tmp[name] = Buffer.concat([output, data.slice(prev)]);
 		}
-	}
 
-	function on_end() {
+		function on_end(err, code) {
+			if (ch) {
+				ch = null;
+				if (stdin) {
+					stdin.removeListener('data', on_stdin);
+				}
+				if (err) {
+					reject(Error.new(err));
+				} else {
+					if (data_tmp.stdout.length) {
+						on_data(data_tmp.stdout);
+					}
+					if (data_tmp.stderr.length) {
+						on_error(data_tmp.stderr);
+					}
+					resolve({ code, first: r_stdout[0], stdout: r_stdout, stderr: r_stderr });
+				}
+			}
+		}
+
+		ch = child_process.spawn(cmd, cmd_args);
+
+		ch.stdout.on('data', function(e) {
+			if (stdout)
+				stdout.write(e);
+			parse_data(e, 'stdout');
+		});
+	
+		ch.stderr.on('error', function(e) {
+			if (stderr)
+				stderr.write(e);
+			parse_data(e, 'stderr');
+		});
+
+		ch.on('error', e=>on_end(e));
+		ch.on('exit', e=>on_end(null, e));
+
 		if (stdin) {
-			stdin.removeListener('data', on_stdin);
+			stdin.addListener('data', on_stdin = function(e) {
+				if (ch) {
+					ch.stdin.write(e);
+				}
+			});
+			ch.stdin.resume();
 		}
-		ch = null;
-	}
 
-	ch.on('error', function(err) {
-		on_end();
-		error = Error.new(err);
-		reject(error);
 	});
 
-	ch.on('exit', function(code) {
-		if (!error) {
-			on_end();
-			resolve({ code, stdout, stderr });
-		}
-	});
+	promise.process = ch;
 
-	var p = new Promise((_resolve, _reject)=>{
-		if (completed) {
-			if (err) {
-				_reject(err);
-			} else {
-				_resolve(data);
-			}
-		} else {
-			if (stdin) {
-				stdin.addListener('data', on_stdin);
-				ch.stdin.resume();
-			}
-			resolve = _resolve;
-			reject = _reject;
-		}
-	});
-
-	p.process = ch;
-
-	return p;
+	return promise;
 }
 
 exports.syscall = syscall;

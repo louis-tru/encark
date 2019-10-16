@@ -32,6 +32,7 @@
 
 var _util = require('./_util');
 var _pkg = require('./_pkgutil');
+var List = require('./_event').List;
 
 var next_tick = _util.nextTick;
 var utils = {};
@@ -44,6 +45,7 @@ var id = 10;
 var extendObject = _pkg.extendObject;
 var assign = Object.assign;
 var AsyncFunctionConstructor = (async function() {}).constructor;
+var scopeLockQueue = new Map();
 
 function is_async(func) {
 	return func && func.constructor === AsyncFunctionConstructor;
@@ -121,6 +123,31 @@ function extendClass(cls, ...extds) {
 		extend(proto, extd);
 	}
 	return cls;
+}
+
+async function scopeLockDequeue(mutex) {
+	var item, queue = scopeLockQueue.get(mutex);
+	while( item = queue.shift() ) {
+		try {
+			item.resolve(await item.cb());
+		} catch(err) {
+			item.reject(err);
+		}
+	}
+	scopeLockQueue.delete(mutex);
+}
+
+function scopeLock(mutex, cb) {
+	exports.assert(mutex, 'Bad argument');
+	exports.assert(typeof cb == 'funciton', 'Bad argument');
+	return new Promise((resolve, reject)=>{
+		if (scopeLockQueue.has(mutex)) {
+			scopeLockQueue.get(mutex).push({resolve, reject, cb});
+		} else {
+			scopeLockQueue.set(mutex, new List().push({resolve, reject, cb}).host);
+			scopeLockDequeue(); // dequeue
+		}
+	})
 }
 
 module.exports = exports = extend(extend(utils, _util), {
@@ -468,6 +495,11 @@ module.exports = exports = extend(extend(utils, _util), {
 	sleep: function(time, defaultValue) {
 		return new Promise((ok, err)=>setTimeout(e=>ok(defaultValue), time));
 	},
+
+	/**
+	 * @func scopeLock(mutex, cb)
+	 */
+	scopeLock: scopeLock,
 	
 	// @end
 });

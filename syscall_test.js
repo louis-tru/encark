@@ -30,10 +30,16 @@
 
 var syscall = require('./syscall');
 
-syscall.exec('ls').then(e=>{
+syscall.exec('ls -la').then(e=>{
 	console.log(e);
 }).catch(e=>{
 	console.error(e);
 });
+
+// syscall.exec('tail -f -n 0 ' + __filename, {
+// 	onData: e=>{
+// 		console.log(e+'');
+// 	}
+// });
 
 console.log(syscall.execSync('ls -la'));
