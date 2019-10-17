@@ -46,6 +46,10 @@ class NotificationCenter extends Notification {
 		return this.m_topic;
 	}
 
+	get mqtt() {
+		return this.m_mqtt;
+	}
+
 	constructor(url = 'mqtt://127.0.0.1:1883', topic = 'default', options = {}) {
 		super();
 		var msg = `${url}/${topic}`;

@@ -139,7 +139,7 @@ async function scopeLockDequeue(mutex) {
 
 function scopeLock(mutex, cb) {
 	exports.assert(mutex, 'Bad argument');
-	exports.assert(typeof cb == 'funciton', 'Bad argument');
+	exports.assert(typeof cb == 'function', 'Bad argument');
 	return new Promise((resolve, reject)=>{
 		if (scopeLockQueue.has(mutex)) {
 			scopeLockQueue.get(mutex).push({resolve, reject, cb});
@@ -500,6 +500,23 @@ module.exports = exports = extend(extend(utils, _util), {
 	 * @func scopeLock(mutex, cb)
 	 */
 	scopeLock: scopeLock,
-	
+
+	/**
+	 * @func promise(cb)
+	 */
+	promise: function(cb) {
+		return new Promise(function(resolve, reject) {
+			if (is_async(cb)) {
+				cb(resolve, reject).catch(reject);
+			} else {
+				try{
+					cb(resolve, reject);
+				} catch(err) {
+					reject(err);
+				}
+			}
+		});
+	},
+
 	// @end
 });
