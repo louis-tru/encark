@@ -145,7 +145,7 @@ function scopeLock(mutex, cb) {
 			scopeLockQueue.get(mutex).push({resolve, reject, cb});
 		} else {
 			scopeLockQueue.set(mutex, new List().push({resolve, reject, cb}).host);
-			scopeLockDequeue(); // dequeue
+			scopeLockDequeue(mutex); // dequeue
 		}
 	})
 }
