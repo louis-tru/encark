@@ -39,16 +39,9 @@ if (haveNgui) {
 	var user_agent = default_user_agent;
 	var http = requireNative('_http');
 } 
-else if (haveNode) {
-	var user_agent = default_user_agent;
-	var http = require('http');
-	var https = require('https');
-	var Buffer = require('buffer').Buffer;
-} 
 else if (haveWeb) {
 	var user_agent = navigator.userAgent;
 	var XMLHttpRequest = global.XMLHttpRequest;
-
 	var Buffer = class Buffer {
 		constructor(arraybuffer, text = '') {
 			this.buffer = arraybuffer;
@@ -58,6 +51,11 @@ else if (haveWeb) {
 			return this.text;
 		}
 	};
+} else if (haveNode) {
+	var user_agent = default_user_agent;
+	var http = require('http');
+	var https = require('https');
+	var Buffer = require('buffer').Buffer;
 } else {
 	throw 'Unimplementation';
 }
