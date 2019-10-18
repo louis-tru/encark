@@ -170,6 +170,44 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 	}));
 }
 
+: haveWeb ? function(options, soptions, resolve, reject, is_https, method, post_data) {
+	var url = is_https ? 'https://': 'http://';
+	url += soptions.hostname;
+	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
+	url += soptions.path;
+	url += `${soptions.path.indexOf('?')==-1?'?':'&'}_=${__id++}`;
+
+	var xhr = new XMLHttpRequest();
+	xhr.open(method, url, true);
+	//xhr.responseType = 'arraybuffer';
+	xhr.responseType = 'text';
+	xhr.timeout = soptions.timeout;
+
+	delete soptions.headers['User-Agent'];
+
+	for (var key in soptions.headers) {
+		xhr.setRequestHeader(key, soptions.headers[key]);
+	}
+	xhr.onload = ()=>{
+		resolve({
+			data: new Buffer(/*xhr.response*/null, xhr.responseText),
+			headers: xhr.getAllResponseHeaders(),
+			statusCode: xhr.status,
+			httpVersion: '1.1',
+			requestHeaders: soptions.headers,
+			requestData: options.params,
+		});
+	};
+	xhr.onerror = (e)=>{
+		var err = Error.new(e.message);
+		reject(err);
+	};
+	xhr.ontimeout = e=>{
+		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
+	};
+	xhr.send(post_data);
+}
+
 // Node implementation
 : haveNode ? function(options, soptions, resolve, reject, is_https, method, post_data) {
 
@@ -226,43 +264,6 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 }
 
 // Web implementation
-: haveWeb ? function(options, soptions, resolve, reject, is_https, method, post_data) {
-	var url = is_https ? 'https://': 'http://';
-	url += soptions.hostname;
-	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
-	url += soptions.path;
-	url += `${soptions.path.indexOf('?')==-1?'?':'&'}_=${__id++}`;
-
-	var xhr = new XMLHttpRequest();
-	xhr.open(method, url, true);
-	//xhr.responseType = 'arraybuffer';
-	xhr.responseType = 'text';
-	xhr.timeout = soptions.timeout;
-
-	delete soptions.headers['User-Agent'];
-
-	for (var key in soptions.headers) {
-		xhr.setRequestHeader(key, soptions.headers[key]);
-	}
-	xhr.onload = ()=>{
-		resolve({
-			data: new Buffer(/*xhr.response*/null, xhr.responseText),
-			headers: xhr.getAllResponseHeaders(),
-			statusCode: xhr.status,
-			httpVersion: '1.1',
-			requestHeaders: soptions.headers,
-			requestData: options.params,
-		});
-	};
-	xhr.onerror = (e)=>{
-		var err = Error.new(e.message);
-		reject(err);
-	};
-	xhr.ontimeout = e=>{
-		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
-	};
-	xhr.send(post_data);
-}
 : util.unrealized;
 
 /**
