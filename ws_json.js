@@ -28,12 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var JSON_MARK = '\ufffe\ufffa';
+var JSON_MARK = '\ufffe';
 
 function isJSON(type, data) {
 	if (type === 0) {
-		if (data[0] == JSON_MARK[0] && data[1] == JSON_MARK[1]) {
-			return data.length == 2 ? 2/*ping*/: 1/*json data*/;
+		if (data[0] == JSON_MARK[0]) {
+			return data.length == 1 ? 2/*ping*/: 1/*json data*/;
 		}
 	}
 	return 0;
