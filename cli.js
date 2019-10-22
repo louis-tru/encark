@@ -289,14 +289,14 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 
 		var self = this;
 		var url = this.m_url;
-		var bind_client_services = Object.keys(this.clients).join(',');
+		var bind_services = Object.keys(this.clients).join(',');
 		var headers = this.getRequestHeaders() || {};
 
 		if (this.m_signer) {
 			Object.assign(headers, this.m_signer.sign(url.path));
 		}
 		url.setParam('_headers', JSON.stringify(headers));
-		url.setParam('bind_client_services', bind_client_services);
+		url.setParam('bind_services', bind_services);
 
 		var req = this.m_req = new WebSocket(url.href);
 
@@ -400,9 +400,9 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 
 		var self = this;
 		var url = this.m_url;
-		var bind_client_services = Object.keys(this.clients).join(',');
+		var bind_services = Object.keys(this.clients).join(',');
 
-		url.setParam('bind_services', bind_client_services);
+		url.setParam('bind_services', bind_services);
 
 		var isSSL = url.protocol == 'wss:';
 		var port = url.port || (isSSL ? 443: 80);

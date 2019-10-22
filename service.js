@@ -197,7 +197,7 @@ module.exports = {
 	getServiceDescriptors: function() {
 		var r = {};
 		Object.entries(service_cls).forEach(([key, service])=>{
-			if (!/^(StaticService|HttpHeartbeatProxy)$/.test(key)) {
+			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
 
 				var type = 0;
 				var methods = [], events = [];

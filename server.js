@@ -39,7 +39,6 @@ var incoming_form = require('./incoming_form');
 var http = require('http');
 
 require('./http_service');
-require('./fmt');
 
 var shared = null;
 var mimeTypes = {};

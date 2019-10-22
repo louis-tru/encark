@@ -78,7 +78,7 @@ class FMTClient extends event.Notification {
 				s += '//' + url.host + url.path;
 		this.m_id = id;
 		this.m_url = url;
-		this.m_cli = new Client('fmt', new WSConversation(s));
+		// this.m_cli = new Client('fmt', new WSConversation(s));
 	}
 
 }
