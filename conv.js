@@ -33,8 +33,10 @@ var event = require('./event');
 var ClientService = require('./cli_service').ClientService;
 var url = require('url');
 var service = require('./service');
-var { Buffer } = require('buffer');
+var {Buffer} = require('buffer');
+var {isJSON,JSON_MARK} = require('./ws_json');
 var errno = require('./errno');
+var JSON_MARK_LENGTH = JSON_MARK.length;
 
 // 绑定服务
 function bind_services(self, services, cb) {
@@ -42,7 +44,7 @@ function bind_services(self, services, cb) {
 		cb(true);
 		return;
 	}
-	
+
 	var name = services.shift();
 	var cls = service.get(name);
 	
@@ -61,8 +63,10 @@ function bind_services(self, services, cb) {
 	try {
 		var ser = new cls(self);
 	} catch(err) {
-		cb(err); return;
+		cb(err);
+		return;
 	}
+
 	ser.name = name;
 	self.m_services[name] = ser;
 
@@ -140,43 +144,43 @@ var Conversation = util.class('Conversation', {
 	 * @field socket 
 	 */
 	socket: null,
-	
+
 	/**
 	 * @field token {Number}
 	 */
 	token: '',
-	
+
 	// @event:
 	onError: null,
 	onMessage: null,
 	onPing: null,
 	onClose: null,
 	onOpen: null,
-	
+
 	/**
 	 * @param {http.ServerRequest}   req
-	 * @param {String}   bind_services_name
+	 * @param {String}   bind_services
 	 * @constructor
 	 */
-	constructor: function(req, bind_services_name) {
+	constructor: function(req, bind_services) {
 		event.initEvents(this, 'Open', 'Message', 'Ping', 'Error', 'Close');
-		
+
 		this.server = req.socket.server;
 		this.request = req;
 		this.socket = req.socket;
 		this.token = util.hash(util.id + this.server.host + '');
 		this.m_services = {};
-		
-		util.nextTick(initialize, this, bind_services_name);
+
+		util.nextTick(initialize, this, bind_services);
 	},
-	
+
 	/**
 	 * 是否已经打开
 	 */
 	get isOpen() {
 		return this.m_isOpen;
 	},
-	
+
 	/**
 	 * verifies the origin of a request.
 	 * @param  {String} origin
@@ -214,7 +218,7 @@ var Conversation = util.class('Conversation', {
 		}
 		return false;
 	},
-	
+
 	/**
 	 * 获取绑定的服务
 	 */
@@ -228,34 +232,35 @@ var Conversation = util.class('Conversation', {
 	 * @arg {String|Buffer} packet
 	 */
 	handlePacket: function(type, packet) {
-
-		var is_json_text = (type === 0 && packet[0] == '\ufffe');
-		if (is_json_text && packet.length == 1) {
+		var is_json = isJSON(type, packet);
+		if (is_json == 2) { // ping
 			this.onPing.trigger();
 			return;
 		}
 
 		this.onMessage.trigger({ type, data: packet });
 
-		if (is_json_text) { // json text
+		if (is_json) { // json text
 			try {
-				var data = JSON.parse(packet.substr(1));
+				var data = JSON.parse(packet.substr(JSON_MARK_LENGTH));
 			} catch(err) {
-				console.error(err); return;
+				console.error(err);
+				return;
 			}
-			if (data.type == 'bind_client_service') { // 绑定服务消息
-				bind_services(this, [data.name], (is)=>{ 
+
+			if (data.t == 'bind_service') { // 绑定服务消息
+				bind_services(this, [data.n], (is)=>{ 
 					if (!is) {
 						this.onError.trigger(Error.new('Bindings service failure'));
 					}
 				});
 			} else {
-				var service = this.m_services[data.service];
+				var service = this.m_services[data.s];
 				if (service) {
 					service.receiveMessage(data);
 				} else {
 					console.error('Could not find the message handler, '+
-												'discarding the message, ' + data.service);
+												'discarding the message, ' + data.s);
 				}
 			}
 		}
@@ -273,14 +278,14 @@ var Conversation = util.class('Conversation', {
 	send: function(data) {},
 
 	/**
-	 * @func ping()
+	 * @func pong()
 	 */
-	ping: function() {},
+	pong: function() {},
 	
 	/**
 	 * close the connection
 	 */
-	close: function () {}
+	close: function () {},
 	
 	// @end
 });

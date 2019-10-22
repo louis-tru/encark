@@ -38,8 +38,7 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 if (haveNgui) {
 	var user_agent = default_user_agent;
 	var http = requireNative('_http');
-} 
-else if (haveWeb) {
+} else if (haveWeb) {
 	var user_agent = navigator.userAgent;
 	var XMLHttpRequest = global.XMLHttpRequest;
 	var Buffer = class Buffer {

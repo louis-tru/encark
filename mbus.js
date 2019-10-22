@@ -57,9 +57,9 @@ class NotificationCenter extends Notification {
 
 		cli.on('message', (topic, data)=>{
 			if (topic.indexOf(this.m_topic) == 0) {
-				topic = topic.substr(this.m_topic.length + 1);
+				var event = topic.substr(this.m_topic.length + 1);
 				data = data.length ? JSON.parse(data.toString('utf8')): undefined;
-				this.afterNotificationHandle(topic, data);
+				this.afterNotificationHandle(event, data);
 			}
 		});
 		cli.on('reconnect', e=>console.log(`MQTT, ${msg}, reconnect`));
@@ -71,7 +71,7 @@ class NotificationCenter extends Notification {
 		this.m_topic = topic;
 		this.m_mqtt = cli
 	}
-	
+
 	afterNotificationHandle(event, data) {
 		return this.getNoticer(event).trigger(data);
 	}

@@ -29,35 +29,33 @@
  * ***** END LICENSE BLOCK ***** */
 
 var util = require('./util');
-var event = require('./event');
-var { Notification } = event;
 var Service = require('./service').Service;
 var Session = require('./session').Session;
 var errno = require('./errno');
 
 async function call_func(self, msg) {
-	var { data = {}, name: action, callback: cb } = msg;
-	var fn = self[action];
+	var { d: data = {}, n: name, cb } = msg;
+	var fn = self[name];
 	var hasCallback = false;
-	var rev = { type: 'callback', callback: cb, service: self.name };
+	var rev = { t: 'cb', cb, s: self.name };
 
 	if (self.server.printLog) {
-		console.log('Call', `${self.name}.${action}(${JSON.stringify(data, null, 2)})`);
+		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 	}
-	
+
 	var callback = function(err, data) {
 		if (hasCallback) {
 			throw new Error('callback has been completed');
 		}
 		hasCallback = true;
-		
+
 		if (!cb) return; // No callback
 
 		if (self.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			if (err) {
-				rev.error = Error.toJSON(err);
+				rev.e = Error.toJSON(err);
 			} else {
-				rev.data = data;
+				rev.d = data;
 			}
 			self.conv.send(rev);
 		} else {
@@ -65,16 +63,16 @@ async function call_func(self, msg) {
 		}
 	};
 
-	if (action in ClientService.prototype) {
+	if (name in ClientService.prototype) {
 		return callback(Error.new(errno.ERR_FORBIDDEN_ACCESS));
 	}
 	if (typeof fn != 'function') {
-		return callback(Error.new('"{0}" no defined function'.format(action)));
+		return callback(Error.new('"{0}" no defined function'.format(name)));
 	}
 
 	var err, r;
 	try {
-		var r = await self[action](data);
+		var r = await self[name](data);
 	} catch(e) {
 		err = e;
 	}
@@ -83,7 +81,6 @@ async function call_func(self, msg) {
 
 /**
  * @class ClientService
- * @bases service::Service
  */
 var ClientService = util.class('ClientService', Service, {
 	
@@ -91,11 +88,6 @@ var ClientService = util.class('ClientService', Service, {
 	m_conv: null,
 
 	// @public:
-	/**
-	 * @event onerror
-	 */
-	onError: null,
-
 	/**
 	 * conv
 	 * @type {conv}
@@ -116,7 +108,6 @@ var ClientService = util.class('ClientService', Service, {
 	 */
 	constructor: function(conv) {
 		Service.call(this, conv.request);
-		event.initEvents(this);
 		this.m_conv = conv;
 		this.session = new Session(this);
 	},
@@ -126,7 +117,7 @@ var ClientService = util.class('ClientService', Service, {
 	 * @arg data {Object}
 	 */
 	receiveMessage: function(data) {
-		if (data.type == 'call') {
+		if (data.t == 'call') {
 			call_func(this, data);
 		}
 	},
@@ -139,20 +130,20 @@ var ClientService = util.class('ClientService', Service, {
 		this.trigger('Error', Error.new(err));
 	},
 
-	// @end
-});
-
-// ext ClientService class
-util.extendClass(ClientService, Notification, {
-	// @overwrite:
+	/**
+	 * @func trigger(event, data)
+	 */
 	trigger: function(event, data) {
 		if(this.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			this.conv.send({
-				service: this.name, type: 'event', name: event, data: data,
+				s: this.name, t: 'event', n: event, d: data,
 			});
+		} else {
+			console.error('connection dropped, cannot send event');
 		}
-		return Notification.prototype.trigger.call(this, event, data);
 	},
+
+	// @end
 });
 
 ClientService.type = 'event';

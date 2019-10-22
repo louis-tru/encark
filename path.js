@@ -185,6 +185,7 @@ class URL {
 	 * @get path /a/b/s/test.html?aaaaa=100
 	 */
 	get path() {
+		parse_path(this);
 		return this._filename + this._search;
 	}
 	

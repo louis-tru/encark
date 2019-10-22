@@ -34,6 +34,7 @@ var crypto = require('crypto');
 var { Conversation } = require('./conv');
 var { Buffer } = require('buffer');
 var errno = require('./errno');
+var {JSON_MARK} = require('./ws_json');
 
 var KEEP_ALIVE_TIME = 5e4;
 
@@ -62,7 +63,7 @@ class PacketParser {
 
 			// \u0000\u0000   // close
 			// \u0000\ufffd		// data
-			// \u0000\ufffe\ufffd		// ping
+			// \u0000\ufffe\ufffa\ufffd		// ping
 			
 			if (len == 2 && this.buffer[1] == '\u0000') {
 				this.onClose.trigger();
@@ -233,7 +234,7 @@ class Early extends Conversation {
 	send(msg) {
 		// Text only.
 		if (this.isOpen) {
-			msg = '\ufffe' + JSON.stringify(msg);
+			msg = JSON_MARK + JSON.stringify(msg);
 			
 			var length = Buffer.byteLength(msg);
 			var buffer = new Buffer(2 + length);
@@ -252,9 +253,9 @@ class Early extends Conversation {
 		}
 	}
 
-	ping() {
+	pong() {
 		if (this.isOpen) {
-			var msg = '\ufffe';
+			var msg = JSON_MARK;
 			
 			var length = Buffer.byteLength(msg);
 			var buffer = new Buffer(2 + length);

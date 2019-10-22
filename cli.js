@@ -30,24 +30,26 @@
 
 var util = require('./util');
 var event = require('./event');
-var { userAgent, querystringStringify } = require('./request');
+var { userAgent } = require('./request');
 var { Notification } = require('./event');
 var url = require('./url');
 var errno = require('./errno');
+var {JSON_MARK, isJSON } = require('./ws_json');
 var { haveNgui, haveNode, haveWeb } = util;
+var JSON_MARK_LENGTH = JSON_MARK.length;
 
 if (haveWeb) {
 	var WebSocket = global.WebSocket;
-}
-else if (haveNode) {
+} else if (haveNode) {
 	var net = require('net');
 	var http = require('http');
 	var https = require('https');
 	var Buffer = require('buffer').Buffer;
 	var crypto = require('crypto');
-	var { PacketParser,sendDataPacket,sendPingPacket } = require('./ws_parser');
-}
-else {
+	var {
+		PacketParser, sendDataPacket,
+		sendPingPacket } = require('./ws_parser');
+} else {
 	throw 'Unimplementation';
 }
 
@@ -73,7 +75,7 @@ var Conversation = util.class('Conversation', {
 
 	onOpen: null,
 	onMessage: null,
-	onPing: null,
+	onPong: null,
 	onError: null,
 	onClose: null,
 
@@ -81,7 +83,7 @@ var Conversation = util.class('Conversation', {
 	 * @constructor
 	 */
 	constructor: function() {
-		event.initEvents(this, 'Open', 'Message', 'Ping', 'Error', 'Close');
+		event.initEvents(this, 'Open', 'Message', 'Pong', 'Error', 'Close');
 		this.onError.on((e)=>this.m_connect = false);
 		this.m_clients = {};
 	},
@@ -92,7 +94,7 @@ var Conversation = util.class('Conversation', {
 	get isOpen() {
 		return this.m_is_open;
 	},
-	
+
 	/**
 	 * @fun bindClient # 绑定
 	 * @arg client {Client}
@@ -105,14 +107,14 @@ var Conversation = util.class('Conversation', {
 		} else {
 			clients[name] = client;
 			if (this.m_is_open) {
-				this.send({ type: 'bind_client_service', name: name });
+				this.send({ t: 'bind_service', n: name });
 			}
 			else {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
 		}
 	},
-	
+
 	/**
 	 * @get clients # 获取绑定的Client列表
 	 */
@@ -147,37 +149,37 @@ var Conversation = util.class('Conversation', {
 			throw new Error('connection must bind service');
 		}
 	},
-	
+
 	/**
 	 * @fun parse # parser message
 	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg packet {String|Buffer}
 	 */
 	handlePacket: function(type, packet) {
-		var is_json_text = (type === 0 && packet[0] == '\ufffe');
-		if (is_json_text && packet.length == 1) {
-			this.onPing.trigger();
+		var is_json = isJSON(type, packet);
+		if (is_json == 2) { // pong
+			this.onPong.trigger();
 			return;
 		}
-
 		this.onMessage.trigger({ type, data: packet });
 
-		if (is_json_text) { // json text
+		if (is_json) { // json text
 			try {
-				var data = JSON.parse(packet.substr(1));
+				var data = JSON.parse(packet.substr(JSON_MARK_LENGTH));
 			} catch(err) {
-				console.log(err); return;
+				console.log(err);
+				return;
 			}
-			var client = this.m_clients[data.service];
+			var client = this.m_clients[data.s];
 			if (client) {
 				client.receiveMessage(data);
 			} else {
 				console.error('Could not find the message handler, '+
-											'discarding the message, ' + data.service);
+											'discarding the message, ' + data.s);
 			}
 		}
 	},
-	
+
 	/**
 	 * @fun init # init conversation
 	 */
@@ -229,7 +231,7 @@ var WSConversationBasic = util.class('WSConversationBasic', Conversation, {
 	 * @arg path {String} ws://192.168.1.101:8091/
 	 */
 	constructor: function(path) {
-		Conversation.call(this, path);
+		Conversation.call(this);
 		path = path || util.config.web_service || 'ws://localhost';
 		util.assert(path, 'Server path is not correct');
 		path = url.resolve(path);
@@ -288,17 +290,12 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 		var self = this;
 		var url = this.m_url;
 		var bind_client_services = Object.keys(this.clients).join(',');
-		var headers = this.getRequestHeaders();
+		var headers = this.getRequestHeaders() || {};
 
-		for (var i in headers) {
-			url.setParam(i, headers[i]);
-		}
 		if (this.m_signer) {
-			var sign = this.m_signer.sign(url.path);
-			for (var i in sign) {
-				url.setParam(i, sign[i]);
-			}
+			Object.assign(headers, this.m_signer.sign(url.path));
 		}
+		url.setParam('_headers', JSON.stringify(headers));
 		url.setParam('bind_client_services', bind_client_services);
 
 		var req = this.m_req = new WebSocket(url.href);
@@ -354,8 +351,7 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 			} else if (data && data.buffer instanceof ArrayBuffer) {
 				this.m_req.send(data.buffer);
 			} else { // send json string message
-				data = '\ufffe' + JSON.stringify(data);
-				this.m_req.send(data);
+				this.m_req.send(JSON_MARK + JSON.stringify(data));
 			}
 		} else {
 			this.m_message.push(data);
@@ -368,7 +364,7 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 	 */
 	ping: function() {
 		if (this.isOpen) {
-			this.m_req.send('\ufffe');
+			this.m_req.send(JSON_MARK);
 		} else {
 			this.connect(); // 尝试连接
 		}
@@ -406,7 +402,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		var url = this.m_url;
 		var bind_client_services = Object.keys(this.clients).join(',');
 
-		url.setParam('bind_client_services', bind_client_services);
+		url.setParam('bind_services', bind_client_services);
 
 		var isSSL = url.protocol == 'wss:';
 		var port = url.port || (isSSL ? 443: 80);
@@ -472,7 +468,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 
 			parser.onText.on(e=>self.handlePacket(0, e.data));
 			parser.onData.on(e=>self.handlePacket(1, e.data));
-			parser.onPing.on(e=>self.onPing.trigger());
+			parser.onPing.on(e=>self.onPong.trigger());
 			parser.onClose.on(e=>self.close());
 
 			parser.onError.on(function(e) {
@@ -609,20 +605,20 @@ var Client = util.class('Client', Notification, {
 	 * @func receiveMessage(data)
 	 */
 	receiveMessage: function(data) {
-		if (data.type == 'callback') {
-			var cb = this.m_callbacks[data.callback];
-			delete this.m_callbacks[data.callback];
+		if (data.t == 'cb') {
+			var cb = this.m_callbacks[data.cb];
+			delete this.m_callbacks[data.cb];
 			if (cb) {
-				if (data.error) { // throw error
-					cb.err(Error.new(data.error));
+				if (data.e) { // throw error
+					cb.err(Error.new(data.e));
 				} else {
-					cb.ok(data.data);
+					cb.ok(data.d);
 				}
 			} else {
 				console.error('Unable to callback, no callback context can be found');
 			}
-		} else if (data.type == 'event') {
-			this.trigger(data.name, data.data);
+		} else if (data.t == 'event') {
+			this.trigger(data.n, data.d);
 		} else {
 			// TODO ...
 		}
@@ -639,11 +635,11 @@ var Client = util.class('Client', Notification, {
 			var timeid = 0;
 
 			var msg = {
-				service: this.name,
-				type: 'call',
-				name: name,
-				data: data,
-				callback: id,
+				s: this.name,
+				t: 'call',
+				n: name,
+				d: data,
+				cb: id,
 			};
 
 			var callback = {
@@ -680,10 +676,10 @@ var Client = util.class('Client', Notification, {
 	 */
 	send: function(name, data) {
 		this.m_conv.send({ 
-			service: this.name,
-			type: 'call', 
-			name: name, 
-			data: data,
+			s: this.name,
+			t: 'call', 
+			n: name, 
+			d: data,
 		});
 	},
 

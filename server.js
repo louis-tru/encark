@@ -31,18 +31,18 @@
 var util = require('./util');
 var path = require('path');
 var fs = require('./fs');
-var event = require('./event');
 var Router = require('./router').Router;
 var service = require('./service');
-var http_service = require('./http_service');
 var ws_conv = require('./ws_conv');
-var http_heartbeat_proxy = require('./http_heartbeat_proxy');
 var StaticService = require('./static_service').StaticService;
-var http = require('http');
 var incoming_form = require('./incoming_form');
+var http = require('http');
+
+require('./http_service');
+require('./fmt');
 
 var shared = null;
-var mimeTypes = { };
+var mimeTypes = {};
 var default_root = process.cwd();
 var default_temp = incoming_form.temp_dir;
 

@@ -28,50 +28,17 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var Early = require('./early').Early;
-var { Hybi_07_12, Hybi_16, Hybi_17 } = require('./hybi');
-var querystring = require('querystring');
+var JSON_MARK = '\ufffe\ufffa';
 
-var protocol_versions = {
-	'7': Hybi_07_12,
-	'8': Hybi_07_12,
-	'9': Hybi_07_12,
-	'10': Hybi_07_12,
-	'11': Hybi_07_12,
-	'12': Hybi_07_12,
-	'13': Hybi_16,
-	'14': Hybi_16,
-	'15': Hybi_16,
-	'16': Hybi_16,
-	'17': Hybi_17
-};
+function isJSON(type, data) {
+	if (type === 0) {
+		if (data[0] == JSON_MARK[0] && data[1] == JSON_MARK[1]) {
+			return data.length == 2 ? 2/*ping*/: 1/*json data*/;
+		}
+	}
+	return 0;
+}
 
 module.exports = {
-	
-	Early: Early,
-	Hybi_07_12: Hybi_07_12,
-	Hybi_16: Hybi_16,
-	Hybi_17: Hybi_17,
-	
-	/**
-	 * create websocket
-	 * @param  {http.ServerRequest} req
-	 * @param  {Buffer}             upgradeHead
-	 * @return {Conversation}
-	 */
-	create: function (req, upgradeHead) {
-		var mat = decodeURI(req.url).match(/\?(.+)/);
-		var params = querystring.parse(mat ? mat[1] : '');
-		var bind_services = params.bind_services || '';
-		var version = req.headers['sec-websocket-version'];
-		
-		if (version) {
-			var klass = protocol_versions[version];
-			if (klass) {
-				return new klass(req, upgradeHead, bind_services);
-			}
-		}
-		return new Early(req, upgradeHead, bind_services);
-	},
+	JSON_MARK, isJSON,
 };

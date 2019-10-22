@@ -154,7 +154,7 @@ class Hybi extends Conversation {
 		}
 	}
 
-	ping() {
+	pong() {
 		if (this.isOpen) {
 			try {
 				sendPingPacket(this.socket);
