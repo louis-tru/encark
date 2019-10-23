@@ -28,9 +28,9 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var event = require('./event');
+var event = require('../event');
 var {Buffer} = require('buffer');
-var {JSON_MARK} = require('./ws_json');
+var {JSON_MARK} = require('./json');
 
 /*
  * Unpacks a buffer to a number.

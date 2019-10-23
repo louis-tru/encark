@@ -28,12 +28,13 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var Service = require('./service').Service;
-var Session = require('./session').Session;
-var errno = require('./errno');
+var Service = require('../service').Service;
+var Session = require('../session').Session;
+var errno = require('../errno');
 
-async function call_func(self, msg) {
+var METHOD_CALL_TIMEOUT = 12e4; // 120s
+
+async function func_call(self, msg) {
 	var { d: data = {}, n: name, cb } = msg;
 	var fn = self[name];
 	var hasCallback = false;
@@ -63,7 +64,7 @@ async function call_func(self, msg) {
 		}
 	};
 
-	if (name in ClientService.prototype) {
+	if (name in WSService.prototype) {
 		return callback(Error.new(errno.ERR_FORBIDDEN_ACCESS));
 	}
 	if (typeof fn != 'function') {
@@ -72,7 +73,7 @@ async function call_func(self, msg) {
 
 	var err, r;
 	try {
-		var r = await self[name](data);
+		r = await self[name](data);
 	} catch(e) {
 		err = e;
 	}
@@ -80,72 +81,74 @@ async function call_func(self, msg) {
 }
 
 /**
- * @class ClientService
+ * @class WSService
  */
-var ClientService = util.class('ClientService', Service, {
+class WSService extends Service {
 	
-	// @private:
-	m_conv: null,
-
-	// @public:
-	/**
-	 * conv
-	 * @type {conv}
-	 */	
 	get conv() {
 		return this.m_conv;
-	},
+	}
 
-	/**
-	 * site session
-	 * @type {Session}
-	 */
-	session: null,
+	get session() {
+		return this.m_session;
+	}
 
 	/**
 	 * @arg conv {Conversation}
 	 * @constructor
 	 */
-	constructor: function(conv) {
-		Service.call(this, conv.request);
+	constructor(conv) {
+		super(conv.request);
 		this.m_conv = conv;
-		this.session = new Session(this);
-	},
+		this.m_session = new Session(this);
+	}
+
+	loaded() {}
+	destroy() {}
 
 	/**
 	 * @fun receiveMessage # 消息处理器
 	 * @arg data {Object}
 	 */
-	receiveMessage: function(data) {
+	receiveMessage(data) {
 		if (data.t == 'call') {
-			call_func(this, data);
+			func_call(this, data);
+		} else if (data.t == 'cb') {
+			// TODO ...
 		}
-	},
+	}
 
 	/**
-	 * @fun error # trigger error event
-	 * @arg err {Error} 
+	 * @func call(method, data)
 	 */
-	error: function(err) {
-		this.trigger('Error', Error.new(err));
-	},
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOU) {
+		// TODO ... cli call
+	}
+
+	/**
+	 * @func weakCall(method, data) no callback, no return data
+	 */
+	weakCall(method, data) {
+		// TODO ... weak cli call
+	}
 
 	/**
 	 * @func trigger(event, data)
 	 */
-	trigger: function(event, data) {
-		if(this.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
-			this.conv.send({
+	trigger(event, data) {
+		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
+			this.m_conv.send({
 				s: this.name, t: 'event', n: event, d: data,
 			});
 		} else {
 			console.error('connection dropped, cannot send event');
 		}
-	},
+	}
 
 	// @end
-});
+}
 
-ClientService.type = 'event';
+WSService.type = 'event';
 
-exports.ClientService = ClientService;
+exports.WSService = WSService;
+exports.METHOD_CALL_TIMEOUT = METHOD_CALL_TIMEOUT;

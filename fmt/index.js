@@ -31,59 +31,168 @@
 var utils = require('../util');
 var event = require('../event');
 var service = require('../service');
-var path = require('../path');
-var {ClientService} = require('../cli_service');
-var {WSConversation,Client} = require('../cli');
+var {FMTClient} = require('./cli');
+var {WSService} = require('../ws/service');
 
 // Fast Message Transfer Center, 快速消息传输中心
+
+var G_fmtcs = new Map();
 
 /**
  * @class FastMessageTransferCenter
  */
-class FastMessageTransferCenter extends ClientService {
+class FastMessageTransferCenter extends event.Notification {
 
-	constructor(conv) {
-		super(conv);
-		// conv.onPing.on(e=>desktop.clientReport());
+	get clients() {
+		return this.m_clis;
+	}
+
+	constructor() {
+		super();
+		this.m_clis = new Set();
+	}
+
+	_addClient(cli) {
+		utils.assert(!this.m_clients.has(cli));
+		this.m_clients.set(s, cli);
+		this.trigger('Open', cli);
+	}
+
+	_deleteClient(cli) {
+		utils.assert(this.m_clients.has(cli));
+		this.m_clients.delete(cli);
+		this.trigger('Close', cli);
+	}
+
+	/**
+	 * @func publish()
+	 */
+	publish(event, data, id) {
+		// TODO ...
+	}
+
+	/**
+	 * @func broadcast()
+	 */
+	broadcast(event, data, gid = 0) {
+		// TODO ...
 	}
 
 }
 
 /**
- * @class FMTClient
+ * @class FMTService
  */
-class FMTClient extends event.Notification {
+class FMTService extends WSService {
 
 	get id() {
 		return this.m_id;
 	}
 
-	get cli() {
-		return this.m_cli;
+	get client() {
+		return this.m_client;
 	}
 
-	get conv() {
-		return this.m_cli.conv;
+	get center() {
+		return this.m_center;
 	}
 
-	get service() {
+	constructor(conv) {
+		super(conv);
+		this.m_center = null;
+		this.m_id = this.params.id;
+		this.m_cli = new FMTServerClient(this);
+	}
+
+	loaded() {
+		var center = G_fmtcs.get(conv.server);
+		if (center) {
+			center._addService(this.m_cli);
+			this.m_center = center;
+		} else {
+			console.error('FMTService.loaded()', 'FMTC No found');
+			this.conv.close();
+		}
+	}
+
+	destroy() {
+		var center = G_fmtcs.get(conv.server);
+		if (center) {
+			center._deleteService(this.m_cli);
+			this.m_center = null;
+		} else {
+			console.error('FMTService.destroy()', 'FMTC No found');
+		}
+	}
+
+	/**
+	 * @func publish()
+	 */
+	publish({ event, data, id }) {
+		return this.m_center.publish(event, data, id);
+	}
+
+	/**
+	 * @func broadcast()
+	 */
+	broadcast({ event, data, gid = 0 }) {
+		return this.m_center.broadcast(event, data, gid);
+	}
+
+	subscribeAll() {
 		// TODO ...
 	}
 
-	constructor(id = utils.random(), url = 'fmt://localhost/') {
-		super();
-		url = new path.URL(url);
-		url.setParam('id', id);
-		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
-				s += '//' + url.host + url.path;
-		this.m_id = id;
-		this.m_url = url;
-		// this.m_cli = new Client('fmt', new WSConversation(s));
+	subscribe({ events }) {
+		// TODO ...
+	}
+
+	callTo({ id, name, data }) {
+		// TODO ...
+	}
+
+	weakCallTo({ id, name, data }) {
+		// TODO ...
 	}
 
 }
 
-service.set('fmt', FastMessageTransferCenter);
+/**
+ * @class FMTServerClient
+ */
+class FMTServerClient {
 
-exports.FastMessageTransferCenter = FastMessageTransferCenter;
-exports.FMTClient = FMTClient;
+	get id() {
+		return this.m_service.id;
+	}
+
+	get center() {
+		return this.m_service.center;
+	}
+
+	constructor(fmtservice) {
+		this.m_service = fmtservice;
+	}
+
+}
+
+// /**
+//  * @class FMTServerGroup
+//  */
+// class FMTServerGroup {
+// 	// TODO ...
+// }
+
+service.set('fmt', FMTService);
+
+module.exports = {
+	FastMessageTransferCenter,
+	FMTClient,
+	registerFMTC(server, fmtc) {
+		utils.assert(fmtc instanceof FastMessageTransferCenter);
+		G_fmtcs.set(server, fmtc);
+	},
+	fmtc(server) {
+		return G_fmtcs.get(server);
+	},
+};

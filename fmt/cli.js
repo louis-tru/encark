@@ -27,3 +27,45 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * ***** END LICENSE BLOCK ***** */
+
+var path = require('../path');
+var event = require('../event');
+var {WSConversation,Client} = require('../ws/cli');
+
+/**
+ * @class FMTClient
+ */
+class FMTClient extends event.Notification {
+
+	get id() {
+		return this.m_id;
+	}
+
+	// get cli() {
+	// 	return this.m_cli;
+	// }
+
+	// get conv() {
+	// 	return this.m_cli.conv;
+	// }
+
+	// get service() {
+	// 	// TODO ...
+	// }
+
+	constructor(id = utils.random(), url = 'fmt://localhost/') {
+		super();
+		url = new path.URL(url);
+		url.setParam('id', id);
+		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
+				s += '//' + url.host + url.path;
+		this.m_id = id;
+		this.m_url = url;
+		this.m_cli = new Client('fmt', new WSConversation(s));
+	}
+
+}
+
+module.exports = {
+	FMTClient,
+};

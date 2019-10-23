@@ -79,14 +79,14 @@ var Service = util.class('Service', {
 	 * @type {String}
 	 */
 	url: '',
-	
+
 	/**
 	 * @get headers
 	 */
 	get headers() {
 		return this.request.headers;
 	},
-	
+
 	/**
 	 * no param url
 	 * @type {String}
@@ -98,7 +98,7 @@ var Service = util.class('Service', {
 		}
 		return this.m_pathname;
 	},
-	
+
 	/**
 	 * request path directory
 	 * @type {String}
@@ -109,7 +109,7 @@ var Service = util.class('Service', {
 		}
 		return this.m_dirname;
 	},
-	
+
 	/**
 	 * request extended name
 	 * @type {String}
@@ -121,7 +121,7 @@ var Service = util.class('Service', {
 		}
 		return this._extname;
 	},
-	
+
 	/**
 	 * url param list
 	 * @type {Object}
@@ -134,26 +134,40 @@ var Service = util.class('Service', {
 		}
 		return this.m_params;
 	},
-	
+
+	get headers() {
+		if (!this.m_headers) {
+			var _headers;
+			try {
+				if (this.params._headers)
+					_headers = JSON.parse(this.params._headers);
+			} catch(e) {
+				console.error(e);
+			}
+			this.m_headers = { ...this.request.headers, ..._headers };
+		}
+		return this.m_headers;
+	},
+
 	/**
 	 * @func setTimeout(value)
 	 */
 	setTimeout: function(value) {
 		this.request.setTimeout(value);
 	},
-	
+
 	/**
 	 * @constructor
 	 * @arg req {http.ServerRequest}
 	 */
 	constructor: function(req) {
-		this.server = req.socket.server;
+		this.server = req.socket.server.wrap;
 		this.request = req;
 		this.socket = req.socket;
 		this.host = req.headers.host;
 		this.url = decodeURI(req.url);
 	},
-	
+
 	/**
 	 * authentication by default all, subclasses override
 	 * @param {Function} cb
@@ -162,13 +176,12 @@ var Service = util.class('Service', {
 	requestAuth: function(info) {
 		return true;
 	},
-	
+
 	/**
 	 * call function virtual function
 	 * @param {Object} info service info
 	 */
-	action: function(info) { 
-		
+	action: function(info) {
 	},
 	// @end
 });

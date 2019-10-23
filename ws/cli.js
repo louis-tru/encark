@@ -28,27 +28,27 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var event = require('./event');
-var { userAgent } = require('./request');
-var { Notification } = require('./event');
-var url = require('./url');
-var errno = require('./errno');
-var {JSON_MARK, isJSON } = require('./ws_json');
+var util = require('../util');
+var event = require('../event');
+var { userAgent } = require('../request');
+var { Notification } = require('../event');
+var url = require('../url');
+var errno = require('../errno');
+var {JSON_MARK, isJSON } = require('./json');
 var { haveNgui, haveNode, haveWeb } = util;
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
 if (haveWeb) {
 	var WebSocket = global.WebSocket;
 } else if (haveNode) {
-	var net = require('net');
+	// var net = require('net');
 	var http = require('http');
 	var https = require('https');
 	var Buffer = require('buffer').Buffer;
 	var crypto = require('crypto');
 	var {
 		PacketParser, sendDataPacket,
-		sendPingPacket } = require('./ws_parser');
+		sendPingPacket } = require('./parser');
 } else {
 	throw 'Unimplementation';
 }
@@ -59,47 +59,49 @@ var METHOD_CALL_TIMEOUT = 12e4; // 120s
 /**
  * @class Conversation 
  */
-var Conversation = util.class('Conversation', {
-
+class Conversation {
 	// @private:
-	m_connect: false, // 是否尝试连接中
-	m_is_open: false, // open status
-	m_clients: null, // client list
-	m_token: '',
+	// m_connect: false, // 是否尝试连接中
+	// m_is_open: false, // open status
+	// m_clients: null, // client list
+	// m_token: '',
 
 	// @public:
+	// onOpen: null,
+	// onMessage: null,
+	// onPong: null,
+	// onError: null,
+	// onClose: null,
+
 	/**
 	 * @get token
 	 */
-	get token() { return this.m_token },
-
-	onOpen: null,
-	onMessage: null,
-	onPong: null,
-	onError: null,
-	onClose: null,
+	get token() { return this.m_token }
 
 	/**
 	 * @constructor
 	 */
-	constructor: function() {
+	constructor() {
 		event.initEvents(this, 'Open', 'Message', 'Pong', 'Error', 'Close');
-		this.onError.on((e)=>this.m_connect = false);
+		this.m_connect = false;
+		this.m_is_open = false;
 		this.m_clients = {};
-	},
+		this.m_token = '';
+		this.onError.on(e=>this.m_connect = false);
+	}
 
 	/**
 	 * @get isOpen # 获取是否打开连接
 	 */
 	get isOpen() {
 		return this.m_is_open;
-	},
+	}
 
 	/**
-	 * @fun bindClient # 绑定
+	 * @fun bind # 绑定
 	 * @arg client {Client}
 	 */
-	bindClient: function(client) {
+	bind(client) {
 		var name = client.name;
 		var clients = this.m_clients;
 		if (name in clients) {
@@ -113,32 +115,36 @@ var Conversation = util.class('Conversation', {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
 		}
-	},
+	}
+
+	bindClient(client) {
+		return this.bind(client);
+	}
 
 	/**
 	 * @get clients # 获取绑定的Client列表
 	 */
 	get clients() {
 		return this.m_clients;
-	},
+	}
 
-	_open: function() {
+	_open() {
 		util.assert(!this.m_is_open);
 		util.assert(this.m_connect);
 		this.m_is_open = true;
 		this.m_connect = false;
 		this.onOpen.trigger();
-	},
+	}
 
-	_error: function(err) {
+	_error(err) {
 		this.m_connect = false;
 		this.onError.trigger(err);
-	},
+	}
 
 	/**
 	 * @fun connect # connercion server
 	 */
-	connect: function() {
+	connect() {
 		if (!this.m_is_open && !this.m_connect) {
 			for (var i in this.m_clients) {
 				this.m_connect = true;
@@ -148,14 +154,14 @@ var Conversation = util.class('Conversation', {
 			// 连接必需要绑定服务才能使用
 			throw new Error('connection must bind service');
 		}
-	},
+	}
 
 	/**
 	 * @fun parse # parser message
 	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg packet {String|Buffer}
 	 */
-	handlePacket: function(type, packet) {
+	handlePacket(type, packet) {
 		var is_json = isJSON(type, packet);
 		if (is_json == 2) { // pong
 			this.onPong.trigger();
@@ -178,17 +184,17 @@ var Conversation = util.class('Conversation', {
 											'discarding the message, ' + data.s);
 			}
 		}
-	},
+	}
 
 	/**
 	 * @fun init # init conversation
 	 */
-	initialize: function() {},
+	initialize() {}
 
 	/**
 	 * @fun close # close conversation connection
 	 */
-	close: function() {
+	close() {
 		if (this.m_connect)
 			this.m_connect = false;
 		if (this.m_is_open) {
@@ -196,95 +202,77 @@ var Conversation = util.class('Conversation', {
 			this.m_token = '';
 			this.onClose.trigger();
 		}
-	},
+	}
 
 	/**
 	 * @fun send # send message to server
 	 * @arg [data] {Object}
 	 */
-	send: function(data) {},
+	send(data) {}
 
 	/**
 	 * @func ping()
 	 */
-	ping: function() {},
+	ping() {}
 
 	// @end
-});
+}
 
 /**
  * @class WSConversationBasic
  */
-var WSConversationBasic = util.class('WSConversationBasic', Conversation, {
+class WSConversationBasic extends Conversation {
 
-	m_url: null,
-	m_message: null,
+	// m_url: null,
+	// m_message: null,
 
 	/**
 	 * @get url
 	 */
-	get url() { return this.m_url },
+	get url() { return this.m_url }
 
 	// @public:
 	/**
 	 * @constructor
 	 * @arg path {String} ws://192.168.1.101:8091/
 	 */
-	constructor: function(path) {
-		Conversation.call(this);
+	constructor(path) {
+		super();
 		path = path || util.config.web_service || 'ws://localhost';
 		util.assert(path, 'Server path is not correct');
 		path = url.resolve(path);
 		this.m_url = new url.URL(path.replace(/^http/, 'ws'));
 		this.m_message = [];
 		this.m_signer = null;
-	},
+	}
 
 	get signer() {
 		return this.m_signer;
-	},
+	}
 
 	set signer(value) {
 		this.m_signer = value;
-	},
+	}
 
 	/**
 	 * @rewrite
 	 * @func getRequestHeaders
 	 */
-	getRequestHeaders: function() {
+	getRequestHeaders() {
 		return null;
-	},
-
-});
-
-// private:
-function handshakes(res, key) {
-	var accept = res.headers['sec-websocket-accept'];
-	if (accept) {
-		var shasum = crypto.createHash('sha1');
-		shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
-		key = shasum.digest('base64');
-		return key == accept;
 	}
-	return false;
+
 }
 
-/**
- * @class WSConversation
- */
-var WSConversation = 
-
 // Web implementation
-haveWeb ? util.class('WSConversation', WSConversationBasic, {
-
-	m_req: null,
-	m_message: null,
+class WebConversation extends WSConversationBasic {
+	// m_req: null,
+	// m_message: null,
 
 	/**
 	 * @ovrewrite 
 	 */
-	initialize: function() {
+	initialize() {
 		util.assert(!this.m_req, 'No need to repeat open');
 
 		var self = this;
@@ -331,20 +319,20 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 			self._error(e);
 			self.close();
 		};
-	},
+	}
 
 	/**
 	 * @ovrewrite 
 	 */
-	close: function() {
+	close() {
 		this.m_req = null;
 		Conversation.members.close.call(this);
-	},
+	}
 
 	/**
 	 * @ovrewrite 
 	 */
-	send: function(data) {
+	send(data) {
 		if (this.isOpen) {
 			if (data instanceof ArrayBuffer) {
 				this.m_req.send(data);
@@ -357,45 +345,35 @@ haveWeb ? util.class('WSConversation', WSConversationBasic, {
 			this.m_message.push(data);
 			this.connect(); // 尝试连接
 		}
-	},
+	}
 
 	/**
 	 * @ovrewrite 
 	 */
-	ping: function() {
+	ping() {
 		if (this.isOpen) {
 			this.m_req.send(JSON_MARK);
 		} else {
 			this.connect(); // 尝试连接
 		}
-	},
+	}
 
-}):
+}
 
 // Node implementation
-haveNode ? util.class('WSConversation', WSConversationBasic, {
-
+class NodeConversation extends WSConversationBasic {
 	// @private:
-	m_req: null,
-	m_socket: null, // web socket connection
-	m_response: null,
-
+	// m_req: null,
+	// m_socket: null, // web socket connection
+	// m_response: null,
 	// @public:
+	// get response() { return this.m_response }
+	// get socket() { return this.m_socket }
 
-	/**
-	 * @get response
-	 */
-	get response() { return this.m_response },
-
-	/**
-	 * @get socket
-	 */
-	get socket() { return this.m_socket },
-	
 	/** 
 	 * @ovrewrite 
 	 */
-	initialize: function() {
+	initialize() {
 		util.assert(!this.m_req, 'No need to repeat open');
 
 		var self = this;
@@ -439,6 +417,17 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 
 		var req = this.m_req = lib.request(options);
 
+		function handshakes(res, key) {
+			var accept = res.headers['sec-websocket-accept'];
+			if (accept) {
+				var shasum = crypto.createHash('sha1');
+				shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
+				key = shasum.digest('base64');
+				return key == accept;
+			}
+			return false;
+		}
+
 		req.on('upgrade', function(res, socket, upgradeHead) {
 			if ( !self.m_connect || !handshakes(res, key) ) {
 				socket.end();
@@ -470,11 +459,7 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 			parser.onData.on(e=>self.handlePacket(1, e.data));
 			parser.onPing.on(e=>self.onPong.trigger());
 			parser.onClose.on(e=>self.close());
-
-			parser.onError.on(function(e) {
-				self._error(e.data);
-				self.close();
-			});
+			parser.onError.on(e=>(self._error(e.data),self.close()));
 
 			var message = self.m_message;
 			self.m_message = [];
@@ -489,12 +474,12 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		});
 
 		req.end();
-	},
+	}
 	
 	/** 
 	 * @ovrewrite 
 	 */
-	close: function() {
+	close() {
 		var socket = this.m_socket;
 		if (socket) {
 			this.m_socket = null;
@@ -516,12 +501,12 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		this.m_socket = null;
 		this.m_response = null;
 		Conversation.members.close.call(this);
-	},
+	}
 	
 	/**
 	 * @ovrewrite
 	 */
-	send: function(data) {
+	send(data) {
 		if (this.isOpen) {
 			if (this.m_socket) {
 				sendDataPacket(this.m_socket, data);
@@ -532,12 +517,12 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 			this.m_message.push(data);
 			this.connect(); // 尝试连接
 		}
-	},
+	}
 
 	/**
 	 * @ovrewrite 
 	 */
-	ping: function() {
+	ping() {
 		if (this.isOpen) {
 			if (this.m_socket) {
 				sendPingPacket(this.m_socket);
@@ -547,40 +532,34 @@ haveNode ? util.class('WSConversation', WSConversationBasic, {
 		} else {
 			this.connect(); // 尝试连接
 		}
-	},
+	}
 	
-})
-
-: util.unrealized;
+}
 
 /**
- * @class Client
+ * @class WSConversation
  */
-var Client = util.class('Client', Notification, {
+var WSConversation =
+	haveWeb ? WebConversation: 
+	haveNode ? NodeConversation: util.unrealized;
+
+/**
+ * @class WSClient
+ */
+class WSClient extends Notification {
 	// @private:
-	m_callbacks: null,
-	m_service_name: '',
-	m_conv: null,   // conversation
+	// m_callbacks: null,
+	// m_service_name: '',
+	// m_conv: null,   // conversation
 
 	// @public:
-	/**
-	 * @get name
-	 */
-	get name() {
-		return this.m_service_name;
-	},
-
-	/**
-	 * @get conv
-	 */	
-	get conv() {
-		return this.m_conv;
-	},
+	get name() { return this.m_service_name }
+	get conv() { return this.m_conv }
 
 	/**
 	 * @constructor constructor(service_name, conv)
 	 */
-	constructor: function(service_name, conv) {
+	constructor(service_name, conv) {
 		this.m_callbacks = {};
 		this.m_service_name = service_name;
 		this.m_conv = conv || new WSConversation();
@@ -599,12 +578,12 @@ var Client = util.class('Client', Notification, {
 		});
 
 		this.m_conv.bindClient(this);
-	},
+	}
 
 	/**
 	 * @func receiveMessage(data)
 	 */
-	receiveMessage: function(data) {
+	receiveMessage(data) {
 		if (data.t == 'cb') {
 			var cb = this.m_callbacks[data.cb];
 			delete this.m_callbacks[data.cb];
@@ -619,17 +598,15 @@ var Client = util.class('Client', Notification, {
 			}
 		} else if (data.t == 'event') {
 			this.trigger(data.n, data.d);
-		} else {
+		} else if (data.t == 'call') {
 			// TODO ...
 		}
-	},
+	}
 
 	/**
-	 * @func call(name, data)
+	 * @func call(method, data, timeout)
 	 */
-	call: function(name, data, timeout) {
-		timeout = typeof timeout == 'number' ? timeout : exports.METHOD_CALL_TIMEOUT;
-		
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return new Promise((resolve, reject)=>{
 			var id = util.id;
 			var timeid = 0;
@@ -637,7 +614,7 @@ var Client = util.class('Client', Notification, {
 			var msg = {
 				s: this.name,
 				t: 'call',
-				n: name,
+				n: method,
 				d: data,
 				cb: id,
 			};
@@ -658,9 +635,9 @@ var Client = util.class('Client', Notification, {
 
 			if (timeout) {
 				timeid = setTimeout(e=>{
-					// console.error(`method call timeout, ${this.name}/${name}`);
+					// console.error(`method call timeout, ${this.name}/${method}`);
 					reject(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
-						`method call timeout, ${this.name}/${name}`]));
+						`method call timeout, ${this.name}/${method}`]));
 					msg.cancel = true;
 					delete this.m_callbacks[id];
 				}, timeout);
@@ -669,25 +646,26 @@ var Client = util.class('Client', Notification, {
 			this.m_callbacks[id] = callback;
 			this.m_conv.send(msg);
 		});
-	},
+	}
 
 	/**
-	 * @func send(name, data) no callback, no return data
+	 * @func weakCall(method, data) no callback, no return data
 	 */
-	send: function(name, data) {
-		this.m_conv.send({ 
+	weakCall(method, data) {
+		this.m_conv.send({
 			s: this.name,
 			t: 'call', 
-			n: name, 
+			n: method, 
 			d: data,
 		});
-	},
+	}
 
-});
+}
 
 exports = module.exports = {
 	METHOD_CALL_TIMEOUT: METHOD_CALL_TIMEOUT,
 	Conversation: Conversation,
 	WSConversation: WSConversation,
-	Client: Client,
+	Client: WSClient,
+	WSClient,
 };

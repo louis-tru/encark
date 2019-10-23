@@ -33,7 +33,8 @@ var path = require('path');
 var fs = require('./fs');
 var Router = require('./router').Router;
 var service = require('./service');
-var ws_conv = require('./ws_conv');
+var event = require('./event');
+var upgrade = require('./ws/upgrade');
 var StaticService = require('./static_service').StaticService;
 var incoming_form = require('./incoming_form');
 var http = require('http');
@@ -70,21 +71,21 @@ function read_mime(filename) {
 }
 
 //Handle http and websocket and http-heartbeat request
-function initializ(self) {
-	
+function initializ(self, server) {
 	//http
-	self.on('request', async function (req, res) {
+	server.on('request', async function (req, res) {
 		if (self.interceptRequest(req, res)) 
 			return;
+
 		var url = decodeURI(req.url);       // 解码
 		var info = self.router.find(url);   // 通过url查找目标服务信息
 		var name = info.service;
 		var cls = service.get(name);
-		
+
 		if (self.printLog) {
 			console.log(url);
 		}
-		
+
 		if (cls) {
 			if (!util.equalsClass(StaticService, cls)) {
 				console.error(name + ' not the correct type, http request');
@@ -93,39 +94,45 @@ function initializ(self) {
 		} else {
 			cls = StaticService;
 		}
-		
-		var ser = new cls(req, res, info);
 
-		if (util.isAsync(ser.requestAuth)) {
-			req.pause();
-			if (!await ser.requestAuth(info)) { // 认证请求的合法性
-				return req.socket.destroy(); // 立即断开连接
+		try {
+			var ser = new cls(req, res, info);
+
+			if (util.isAsync(ser.requestAuth)) {
+				req.pause();
+				if (!await ser.requestAuth(info)) { // 认证请求的合法性
+					return req.socket.destroy(); // 立即断开连接
+				}
+				req.resume();
+			} else {
+				if (!ser.requestAuth(info)) {
+					return req.socket.destroy();
+				}
 			}
-			req.resume();
-		} else {
-			if (!ser.requestAuth(info)) {
-				return req.socket.destroy();
-			}
+		} catch(err) {
+			console.error(err);
+			return req.socket.destroy();
 		}
-		
+
 		req.on('data', function() {});
+
 		ser.action(info);
 	});
-	
+
 	// upgrade websocket, create web socket connection
-	self.on('upgrade', function(req, socket, upgradeHead) {
+	server.on('upgrade', function(req, socket, upgradeHead) {
 		if (self.printLog) {
 			console.log(`Web socket upgrade ws://${req.headers.host}${req.url}`);
 		}
-		ws_conv.create(req, upgradeHead);
+		upgrade(req, upgradeHead);
 	});
 	
-	self.on('error', function (err) {
+	server.on('error', function (err) {
 		console.log(err);
 		console.log('Server Error ---------------');
 	});
 
-	self.setTimeout(self.timeout * 1e3);
+	server.setTimeout(self.timeout * 1e3);
 }
 
 /**
@@ -198,10 +205,15 @@ function config_server(self, config) {
 /**
 	* @class Server
 	*/
-var Server = util.class('Server', http.Server, {
+var Server = util.class('Server', event.Notification, {
 
 // private:
 	m_ws_conversations: null,
+	m_server: null,
+	/**
+	 * 是否正在运行
+	 */
+	m_isRun: false,
 
 //public:
 	/**
@@ -354,38 +366,34 @@ var Server = util.class('Server', http.Server, {
 	// event onWSConversationOpen
 	// event onWSConversationClose
 	
-	//private:
-	/**
-	 * 是否正在运行
-	 */
-	m_isRun: false,
-
 	/**
 	 * 构造函数
 	 * @constructor
 	 * @param {Object} opt (Optional) 配置项
 	 */
 	constructor: function(config) {
-		http.Server.call(this);
+		super();
 		this.m_ws_conversations = {};
+		this.m_server = new http.Server();
+		this.m_server.wrap = this;
 		this.gzip = /javascript|text|json|xml/i;
-		this.errorStatus = { };
+		this.errorStatus = {};
 		this.disable = /^\/server/i;
 		this.defaults = [];
 		this.mimeTypes = {};
 		this.origins = ['*:*'];
 		this.router = new Router();
 		config_server(this, config);
-		initializ(this);
+		initializ(this, this.m_server);
 	},
-	
+
 	/**
 	 * Get wsConversations conversation 
 	 */
 	get wsConversations() {
 		return this.m_ws_conversations;
 	},
-	
+
 	/**
 	 * @func interceptRequest(req, res)
 	 */
@@ -422,35 +430,35 @@ var Server = util.class('Server', http.Server, {
 		var self = this;
 
 		if (this.port) {
-			this.listen(this.port, this.host);
+			this.m_server.listen(this.port, this.host);
 		} else if ( this.host ) {
-			this.listen(String(this.host), function() {
-				self.port = self.address().port;
+			this.m_server.listen(String(this.host), function() {
+				self.port = self.m_server.address().port;
 			});
 		} else {
-			this.listen(function() {
-				var addr = self.address();
+			this.m_server.listen(function() {
+				var addr = self.m_server.address();
 				self.host = addr.address;
 				self.port = addr.port;
 			});
 		}
 		this.m_isRun = true;
 	},
-	
+
 	/**
 	 * 停止服务
 	 */
 	stop: function () {
-		this.close();
+		this.m_server.close();
 		this.m_isRun = false;
 	},
-	 
+
 	/**
 	 * 重新启动
 	 */
 	restart: function (){
-		this.stop();
-		this.start();
+		this.m_server.stop();
+		this.m_server.start();
 	},
 	// @end
 });
@@ -465,7 +473,7 @@ module.exports = {
 	setShared: function(server) {
 		shared = server;
 	},
-	
+
 	/**
 	 * @get shared # default web server
 	 */

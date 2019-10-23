@@ -310,7 +310,7 @@ var HttpService = util.class('HttpService', StaticService, {
 				}
 			}
 		};
-		
+
 		if (this.request.method == 'POST') {
 			var form = this.form = new IncomingForm(this);
 			try {

@@ -28,29 +28,43 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-class DelayCall {
+var Early = require('./early').Early;
+var Hybi = require('./hybi').Hybi;
+var querystring = require('querystring');
 
-	constructor(onExecute, delay = 400) {
-		this.m_onExecute = onExecute;
-		this.m_timeoutid = 0;
-		this.m_delay = delay;
+var protocol_versions = {
+	'7': Hybi,
+	'8': Hybi,
+	'9': Hybi,
+	'10': Hybi,
+	'11': Hybi,
+	'12': Hybi,
+	'13': Hybi,
+	'14': Hybi,
+	'15': Hybi,
+	'16': Hybi,
+	'17': Hybi
+};
+
+/**
+ * @func upgrade() create websocket
+ * @arg  {http.ServerRequest} req
+ * @arg  {Buffer}             upgradeHead
+ * @ret {Conversation}
+ */
+function upgrade(req, upgradeHead) {
+	var mat = decodeURI(req.url).match(/\?(.+)/);
+	var params = querystring.parse(mat ? mat[1] : '');
+	var bind_services = params.bind_services || '';
+	var version = req.headers['sec-websocket-version'];
+	
+	if (version) {
+		var klass = protocol_versions[version];
+		if (klass) {
+			return new klass(req, upgradeHead, bind_services);
+		}
 	}
-
-	notice(...args) {
-		this.call(...args);
-	}
-
-	call(...args) {
-		this.clear();
-		this.m_timeoutid = setTimeout(e=>{
-			this.m_onExecute(...args);
-		}, this.m_delay);
-	}
-
-	clear() {
-		clearTimeout(this.m_timeoutid);
-	}
-
+	return new Early(req, upgradeHead, bind_services);
 }
 
-exports.DelayCall = DelayCall;
+module.exports = upgrade;

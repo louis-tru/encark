@@ -28,108 +28,42 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
+var utils = require('./util');
 var event = require('./event');
-var ClientService = require('./cli_service').ClientService;
 var url = require('url');
 var service = require('./service');
 var {Buffer} = require('buffer');
-var {isJSON,JSON_MARK} = require('./ws_json');
-var errno = require('./errno');
+var {isJSON,JSON_MARK} = require('./json');
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
 // 绑定服务
-function bind_services(self, services, cb) {
-	if (!services.length) {
-		cb(true);
-		return;
-	}
+async function bind_services(self, bind_services) {
+	utils.assert(bind_services[0], 'service undefined');
 
-	var name = services.shift();
-	var cls = service.get(name);
-	
-	if (name in self.m_services) {
-		console.error('Service no need to repeat binding');
-		cb(false);
-		return;
-	}
+	for (var name of bind_services) {
+		var cls = service.get(name);
 
-	if (!cls || !util.equalsClass(ClientService, cls)) {
-		console.error(name + ' Service type is not correct');
-		cb(false);
-		return;
-	}
+		utils.assert(cls, name + ' not found');
+		utils.assert(utils.equalsClass(service.WSService, cls), name + ' Service type is not correct');
+		utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
 
-	try {
 		var ser = new cls(self);
-	} catch(err) {
-		cb(err);
-		return;
+		ser.name = name;
+		utils.assert(await ser.requestAuth(null), 'request auth fail');
+		self.m_services[name] = ser;
+
+		utils.nextTick(e=>ser.loaded());
 	}
-
-	ser.name = name;
-	self.m_services[name] = ser;
-
-	(async function() { // auth
-		if ( await ser.requestAuth(null) ) {
-			bind_services(self, services, cb); // 继续绑定
-		} else {
-			cb(false);
-		}
-	})().catch(e=>cb(false));
-}
-
-//Init
-function initialize(self, bind_services_name) {
-	var services = bind_services_name.split(',');
-
-	if (!services[0]) { // 没有服务,这种连接没有意义
-		self.socket.destroy();
-		return;
-	}
-
-	bind_services(self, services, function(is) {
-
-		if (!is) {
-			self.onError.trigger(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
-		}
-
-		if (is && self.initialize()) {
-			util.assert(!self.m_isOpen);
-			self.server.m_ws_conversations[self.token] = self;
-			self.m_isOpen = true;
-
-			self.onClose.once(e=>{
-				util.assert(self.m_isOpen);
-				delete self.server.m_ws_conversations[self.token];
-				self.m_isOpen = false;
-				self.request = null;
-				self.socket = null;
-				self.token = '';
-				self.onOpen.off();
-				self.onMessage.off();
-				self.onError.off();
-				self.server.emit('WSConversationClose', self);
-				self.server = null;
-				util.nextTick(e=>self.onClose.off());
-			});
-
-			self.onOpen.trigger();
-			self.server.emit('WSConversationOpen', self);
-		} else { // 绑定失败
-			self.socket.destroy();  // 关闭连接
-		}
-	});
 }
 
 /**
  * @class Conversation
  */
-var Conversation = util.class('Conversation', {
+var Conversation = utils.class('Conversation', {
 
 	m_isOpen: false,
 	m_services: null,
-	
+
 	/**
 	 * @field server {Server}
 	 */
@@ -151,7 +85,6 @@ var Conversation = util.class('Conversation', {
 	token: '',
 
 	// @event:
-	onError: null,
 	onMessage: null,
 	onPing: null,
 	onClose: null,
@@ -162,16 +95,54 @@ var Conversation = util.class('Conversation', {
 	 * @param {String}   bind_services
 	 * @constructor
 	 */
-	constructor: function(req, bind_services) {
-		event.initEvents(this, 'Open', 'Message', 'Ping', 'Error', 'Close');
+	constructor: function(req, bind_services_name) {
+		event.initEvents(this, 'Open', 'Message', 'Ping', 'Close');
 
-		this.server = req.socket.server;
+		this.server = req.socket.server.wrap;
 		this.request = req;
 		this.socket = req.socket;
-		this.token = util.hash(util.id + this.server.host + '');
+		this.token = utils.hash(utils.id + this.server.host + '');
 		this.m_services = {};
+		var self = this;
 
-		util.nextTick(initialize, this, bind_services);
+		// initialize
+		utils.nextTick(function() {
+			bind_services(self, bind_services_name.split(',')).then(function() {
+				if (!self.initialize())
+					return self.socket.destroy();  // 关闭连接
+
+				utils.assert(!self.m_isOpen);
+				self.server.m_ws_conversations[self.token] = self;
+				self.m_isOpen = true;
+
+				self.onClose.once(function() {
+					utils.assert(self.m_isOpen);
+					delete self.server.m_ws_conversations[self.token];
+					self.m_isOpen = false;
+					self.request = null;
+					self.socket = null;
+					self.token = '';
+					self.onOpen.off();
+					self.onMessage.off();
+					// self.onError.off();
+					try {
+						for (var s of Object.values(self.m_services))
+							s.destroy();
+						self.server.trigger('WSConversationClose', self);
+					} catch(err) {
+						console.error(err);
+					}
+					self.server = null;
+					utils.nextTick(e=>self.onClose.off());
+				});
+
+				self.onOpen.trigger();
+				self.server.trigger('WSConversationOpen', self);
+			}).catch(function() {
+				self.socket.destroy();  // 关闭连接
+				console.error(e);
+			});
+		});
 	},
 
 	/**
@@ -187,17 +158,17 @@ var Conversation = util.class('Conversation', {
 	 * @return {Boolean}
 	 */
 	verifyOrigin: function(origin) {
-		
+
 		var origins = this.server.origins;
-		
+
 		if (origin == 'null') {
 			origin = '*';
 		}
-		
+
 		if (origins.indexOf('*:*') != -1) {
 			return true;
 		}
-		
+
 		if (origin) {
 			try {
 				var parts = url.parse(origin);
@@ -222,10 +193,10 @@ var Conversation = util.class('Conversation', {
 	/**
 	 * 获取绑定的服务
 	 */
-	get clientServices() {
+	get wsServices() {
 		return this.m_services;
 	},
-	
+
 	/**
 	 * @func handlePacket() 进一步解析数据
 	 * @arg {Number} type    0:String|1:Buffer
@@ -249,11 +220,7 @@ var Conversation = util.class('Conversation', {
 			}
 
 			if (data.t == 'bind_service') { // 绑定服务消息
-				bind_services(this, [data.n], (is)=>{ 
-					if (!is) {
-						this.onError.trigger(Error.new('Bindings service failure'));
-					}
-				});
+				bind_services(this, [data.n]).catch(console.error);
 			} else {
 				var service = this.m_services[data.s];
 				if (service) {
@@ -281,12 +248,12 @@ var Conversation = util.class('Conversation', {
 	 * @func pong()
 	 */
 	pong: function() {},
-	
+
 	/**
 	 * close the connection
 	 */
 	close: function () {},
-	
+
 	// @end
 });
 

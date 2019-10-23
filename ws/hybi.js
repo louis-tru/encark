@@ -30,8 +30,8 @@
 
 var crypto = require('crypto');
 var {Conversation} = require('./conv');
-var {PacketParser,sendDataPacket,sendPingPacket} = require('./ws_parser');
-var errno = require('./errno');
+var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
+var errno = require('../errno');
 
 var KEEP_ALIVE_TIME = 5e4;
 
@@ -43,7 +43,7 @@ class Hybi extends Conversation {
 	constructor(req, upgradeHead, bind_services_name) {
 		super(req, bind_services_name);
 	}
-	
+
 	/**
 	 * @func handshakes()
 	 */
@@ -53,9 +53,9 @@ class Hybi extends Conversation {
 		var socket = self.socket;
 		var key = req.headers['sec-websocket-key'];
 		var origin = req.headers['sec-websocket-origin'];
-		var location = (socket.encrypted ? 'wss' : 'ws') + '://' + req.headers.host + req.url;
+		// var location = (socket.encrypted ? 'wss' : 'ws') + '://' + req.headers.host + req.url;
 		var upgrade = req.headers.upgrade;
-		
+
 		if (!upgrade || upgrade.toLowerCase() !== 'websocket') {
 			console.error('connection invalid');
 			return false;
@@ -94,7 +94,7 @@ class Hybi extends Conversation {
 
 		return true;
 	}
-	
+
 	/**
 	 * @overwrite
 	 */
@@ -117,7 +117,6 @@ class Hybi extends Conversation {
 
 		socket.on('error', function (e) {
 			var socket = self.socket;
-			self.onError.trigger(e);
 			self.close();
 			if (socket)
 				socket.destroy();
@@ -127,13 +126,7 @@ class Hybi extends Conversation {
 		parser.onData.on(e=>self.handlePacket(1, e.data));
 		parser.onPing.on(e=>self.onPing.trigger());
 		parser.onClose.on(e=>self.close());
-
-		parser.onError.on(function (e) {
-			var data = e.data;
-			console.error('web socket parser error:', data);
-			self.onError.trigger(data);
-			self.close();
-		});
+		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
 
 		return true;
 	}
@@ -182,21 +175,6 @@ class Hybi extends Conversation {
 
 }
 
-/**
- * @class Hybi_16
- */
-class Hybi_16 extends Hybi {}
-
-/**
- * @class Hybi_07_12
- */
-class Hybi_07_12 extends Hybi {}
-
-/**
- * @class Hybi_17
- */ 
-class Hybi_17 extends Hybi {}
-
-module.exports = { 
-	PacketParser, Hybi, Hybi_16, Hybi_07_12, Hybi_17,
+module.exports = {
+	PacketParser, Hybi
 };

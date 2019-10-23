@@ -28,13 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var event = require('./event');
+var event = require('../event');
 var crypto = require('crypto');
 var { Conversation } = require('./conv');
 var { Buffer } = require('buffer');
-var errno = require('./errno');
-var {JSON_MARK} = require('./ws_json');
+var errno = require('../errno');
+var {JSON_MARK} = require('./json');
 
 var KEEP_ALIVE_TIME = 5e4;
 
@@ -207,10 +206,9 @@ class Early extends Conversation {
 		socket.on('end', e=>self.close());
 		socket.on('close', e=>self.close());
 		socket.on('data', e=>parser.add(e));
-		
+
 		socket.on('error', function(e) {
 			var socket = self.socket;
-			self.onError.trigger(e);
 			self.close();
 			if (socket)
 				socket.destroy();
@@ -218,12 +216,7 @@ class Early extends Conversation {
 
 		parser.onText.on(e=>self.handlePacket(0, e.data));
 		parser.onClose.on(e=>self.close());
-		
-		parser.onError.on(function(e) {
-			console.error(e.data);
-			self.onError.trigger(e.data);
-			self.close();
-		});
+		parser.onError.on(e=>(console.error(e.data),self.close()));
 
 		return true;
 	}
