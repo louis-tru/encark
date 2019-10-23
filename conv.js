@@ -233,7 +233,7 @@ var Conversation = util.class('Conversation', {
 	 */
 	handlePacket: function(type, packet) {
 		var is_json = isJSON(type, packet);
-		if (is_json == 2) { // ping
+		if (is_json == 2) { // ping, browser web socket 
 			this.onPing.trigger();
 			return;
 		}
