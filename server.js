@@ -372,7 +372,6 @@ var Server = util.class('Server', event.Notification, {
 	 * @param {Object} opt (Optional) 配置项
 	 */
 	constructor: function(config) {
-		super();
 		this.m_ws_conversations = {};
 		this.m_server = new http.Server();
 		this.m_server.wrap = this;

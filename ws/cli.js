@@ -326,7 +326,7 @@ class WebConversation extends WSConversationBasic {
 	 */
 	close() {
 		this.m_req = null;
-		Conversation.members.close.call(this);
+		super.close();
 	}
 
 	/**
@@ -500,7 +500,7 @@ class NodeConversation extends WSConversationBasic {
 		this.m_req = null;
 		this.m_socket = null;
 		this.m_response = null;
-		Conversation.members.close.call(this);
+		super.close();
 	}
 	
 	/**
@@ -560,6 +560,7 @@ class WSClient extends Notification {
 	 * @constructor constructor(service_name, conv)
 	 */
 	constructor(service_name, conv) {
+		super();
 		this.m_callbacks = {};
 		this.m_service_name = service_name;
 		this.m_conv = conv || new WSConversation();

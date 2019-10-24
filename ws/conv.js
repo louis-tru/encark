@@ -28,10 +28,11 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var event = require('./event');
+var utils = require('../util');
+var event = require('../event');
 var url = require('url');
-var service = require('./service');
+var service = require('../service');
+var {WSService} = require('./service');
 var {Buffer} = require('buffer');
 var {isJSON,JSON_MARK} = require('./json');
 var JSON_MARK_LENGTH = JSON_MARK.length;
@@ -44,7 +45,7 @@ async function bind_services(self, bind_services) {
 		var cls = service.get(name);
 
 		utils.assert(cls, name + ' not found');
-		utils.assert(utils.equalsClass(service.WSService, cls), name + ' Service type is not correct');
+		utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
 		utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
 
 		var ser = new cls(self);
@@ -138,7 +139,7 @@ var Conversation = utils.class('Conversation', {
 
 				self.onOpen.trigger();
 				self.server.trigger('WSConversationOpen', self);
-			}).catch(function() {
+			}).catch(function(e) {
 				self.socket.destroy();  // 关闭连接
 				console.error(e);
 			});
