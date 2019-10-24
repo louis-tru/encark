@@ -39,6 +39,28 @@ function isJSON(type, data) {
 	return 0;
 }
 
+/**
+ * @class DataFormater
+ */
+class DataFormater {
+	constructor(data) {
+		Object.assign(this, data);
+	}
+	static parse([service,type,name,data,error,cb]=[]) {
+		return Object.assign(new DataFormater(), {service,type,name,data,error,cb});
+	}
+	toJSON() {
+		return [
+			this.service,
+			this.type,
+			this.name,
+			this.data,
+			this.error,
+			this.cb,
+		]
+	}
+}
+
 module.exports = {
-	JSON_MARK, isJSON,
+	JSON_MARK, isJSON, DataFormater,
 };

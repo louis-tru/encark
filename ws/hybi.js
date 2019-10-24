@@ -39,7 +39,7 @@ var KEEP_ALIVE_TIME = 5e4;
  * @class Hybi
  */
 class Hybi extends Conversation {
-	
+
 	constructor(req, upgradeHead, bind_services_name) {
 		super(req, bind_services_name);
 	}
@@ -114,7 +114,6 @@ class Hybi extends Conversation {
 		socket.on('end', e=>self.close());
 		socket.on('close', e=>self.close());
 		socket.on('data', e=>parser.add(e));
-
 		socket.on('error', function (e) {
 			var socket = self.socket;
 			self.close();

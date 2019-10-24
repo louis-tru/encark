@@ -34,7 +34,7 @@ var { userAgent } = require('../request');
 var { Notification } = require('../event');
 var url = require('../url');
 var errno = require('../errno');
-var {JSON_MARK, isJSON } = require('./json');
+var {JSON_MARK, isJSON, DataFormater } = require('./json');
 var { haveNgui, haveNode, haveWeb } = util;
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
@@ -65,6 +65,8 @@ class Conversation {
 	// m_is_open: false, // open status
 	// m_clients: null, // client list
 	// m_token: '',
+	// m_message: null, 
+	// m_signer: null,
 
 	// @public:
 	// onOpen: null,
@@ -87,6 +89,8 @@ class Conversation {
 		this.m_is_open = false;
 		this.m_clients = {};
 		this.m_token = '';
+		this.m_message = [];
+		this.m_signer = null;
 		this.onError.on(e=>this.m_connect = false);
 	}
 
@@ -109,16 +113,12 @@ class Conversation {
 		} else {
 			clients[name] = client;
 			if (this.m_is_open) {
-				this.send({ t: 'bind_service', n: name });
+				this.send(new DataFormater({ service: name, type: 'bind' }));
 			}
 			else {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
 		}
-	}
-
-	bindClient(client) {
-		return this.bind(client);
 	}
 
 	/**
@@ -131,9 +131,12 @@ class Conversation {
 	_open() {
 		util.assert(!this.m_is_open);
 		util.assert(this.m_connect);
+		var message = this.m_message;
 		this.m_is_open = true;
 		this.m_connect = false;
+		this.m_message = [];
 		this.onOpen.trigger();
+		message.forEach(e=>e.cancel||this.send(e));
 	}
 
 	_error(err) {
@@ -171,19 +174,35 @@ class Conversation {
 
 		if (is_json) { // json text
 			try {
-				var data = JSON.parse(packet.substr(JSON_MARK_LENGTH));
+				var data = DataFormater.parse( JSON.parse(packet.substr(JSON_MARK_LENGTH)) );
 			} catch(err) {
 				console.log(err);
 				return;
 			}
-			var client = this.m_clients[data.s];
+			var client = this.m_clients[data.service];
 			if (client) {
 				client.receiveMessage(data);
 			} else {
 				console.error('Could not find the message handler, '+
-											'discarding the message, ' + data.s);
+											'discarding the message, ' + data.service);
 			}
 		}
+	}
+
+	get signer() {
+		return this.m_signer;
+	}
+
+	set signer(value) {
+		this.m_signer = value;
+	}
+
+	/**
+	 * @rewrite
+	 * @func getRequestHeaders
+	 */
+	getRequestHeaders() {
+		return null;
 	}
 
 	/**
@@ -222,16 +241,11 @@ class Conversation {
  * @class WSConversationBasic
  */
 class WSConversationBasic extends Conversation {
-
-	// m_url: null,
-	// m_message: null,
-
 	/**
 	 * @get url
 	 */
 	get url() { return this.m_url }
 
-	// @public:
 	/**
 	 * @constructor
 	 * @arg path {String} ws://192.168.1.101:8091/
@@ -242,32 +256,12 @@ class WSConversationBasic extends Conversation {
 		util.assert(path, 'Server path is not correct');
 		path = url.resolve(path);
 		this.m_url = new url.URL(path.replace(/^http/, 'ws'));
-		this.m_message = [];
-		this.m_signer = null;
 	}
-
-	get signer() {
-		return this.m_signer;
-	}
-
-	set signer(value) {
-		this.m_signer = value;
-	}
-
-	/**
-	 * @rewrite
-	 * @func getRequestHeaders
-	 */
-	getRequestHeaders() {
-		return null;
-	}
-
 }
 
 // Web implementation
 class WebConversation extends WSConversationBasic {
 	// m_req: null,
-	// m_message: null,
 
 	/**
 	 * @ovrewrite 
@@ -308,11 +302,7 @@ class WebConversation extends WSConversationBasic {
 				self.close();
 			};
 
-			var message = self.m_message;
-			self.m_message = [];
 			self._open();
-
-			message.forEach(e=>e.cancel||self.send(e));
 		};
 
 		req.onerror = function(e) {
@@ -441,12 +431,11 @@ class NodeConversation extends WSConversationBasic {
 
 			socket.setTimeout(0);
 			socket.setKeepAlive(true, KEEP_ALIVE_TIME);
-			
+
 			socket.on('timeout', e=>self.close());
 			socket.on('end', e=>self.close());
 			socket.on('close', e=>self.close());
 			socket.on('data', d=>parser.add(d));
-
 			socket.on('error', function(e) {
 				var s = self.m_socket;
 				self._error(e);
@@ -461,11 +450,7 @@ class NodeConversation extends WSConversationBasic {
 			parser.onClose.on(e=>self.close());
 			parser.onError.on(e=>(self._error(e.data),self.close()));
 
-			var message = self.m_message;
-			self.m_message = [];
 			self._open();
-
-			message.forEach(e=>e.cancel||self.send(e));
 		});
 
 		req.on('error', function(e) {
@@ -533,7 +518,7 @@ class NodeConversation extends WSConversationBasic {
 			this.connect(); // 尝试连接
 		}
 	}
-	
+
 }
 
 /**
@@ -542,6 +527,52 @@ class NodeConversation extends WSConversationBasic {
 var WSConversation =
 	haveWeb ? WebConversation: 
 	haveNode ? NodeConversation: util.unrealized;
+
+/** 
+ * @func call_function()
+*/
+async function call_function(self, msg) {
+	var { data = {}, name, cb } = msg;
+	var fn = self[name];
+	var hasCallback = false;
+
+	if (self.server.printLog) {
+		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
+	}
+
+	var callback = function(err, data) {
+		if (hasCallback) {
+			throw new Error('callback has been completed');
+		}
+		hasCallback = true;
+
+		if (!cb) return; // No callback
+
+		var rev = new DataFormater({ service: self.name, type: 'cb', cb });
+
+		if (err) {
+			rev.error = err; // Error.toJSON(err);
+		} else {
+			rev.data = data;
+		}
+		self.conv.send(rev);
+	};
+
+	if (name in WSClient.prototype) {
+		return callback(Error.new(errno.ERR_FORBIDDEN_ACCESS));
+	}
+	if (typeof fn != 'function') {
+		return callback(Error.new('"{0}" no defined function'.format(name)));
+	}
+
+	var err, r;
+	try {
+		r = await self[name](data);
+	} catch(e) {
+		err = e;
+	}
+	callback(err, r);
+}
 
 /**
  * @class WSClient
@@ -568,39 +599,39 @@ class WSClient extends Notification {
 		util.assert(service_name);
 		util.assert(this.m_conv);
 
-		conv.onClose.on(e=>{
+		conv.onClose.on(async e=>{
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var i in callbacks) {
-				var callback = callbacks[i];
-				callback.err(err);
+			for (var cb in Object.values(callbacks)) {
+				// cb.cancel = true;
+				cb.err(err);
 			}
 		});
 
-		this.m_conv.bindClient(this);
+		this.m_conv.bind(this);
 	}
 
 	/**
-	 * @func receiveMessage(data)
+	 * @func receiveMessage(msg)
 	 */
-	receiveMessage(data) {
-		if (data.t == 'cb') {
-			var cb = this.m_callbacks[data.cb];
-			delete this.m_callbacks[data.cb];
+	receiveMessage(msg) {
+		if (msg.type == 'call') {
+			call_function(this, msg);
+		} else if (msg.type == 'cb') {
+			var cb = this.m_callbacks[msg.cb];
+			delete this.m_callbacks[msg.cb];
 			if (cb) {
-				if (data.e) { // throw error
-					cb.err(Error.new(data.e));
+				if (msg.error) { // throw error
+					cb.err(Error.new(msg.error));
 				} else {
-					cb.ok(data.d);
+					cb.ok(msg.data);
 				}
 			} else {
 				console.error('Unable to callback, no callback context can be found');
 			}
-		} else if (data.t == 'event') {
-			this.trigger(data.n, data.d);
-		} else if (data.t == 'call') {
-			// TODO ...
+		} else if (msg.type == 'event') {
+			this.trigger(msg.name, msg.data);
 		}
 	}
 
@@ -609,19 +640,15 @@ class WSClient extends Notification {
 	 */
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return new Promise((resolve, reject)=>{
-			var id = util.id;
+			var cb = util.id;
 			var timeid = 0;
 
-			var msg = {
-				s: this.name,
-				t: 'call',
-				n: method,
-				d: data,
-				cb: id,
-			};
-
-			var callback = {
-				id: id,
+			var msg = new DataFormater({
+				service: this.name,
+				type: 'call',
+				name: method,
+				data: data,
+				cb: cb,
 				ok: (e)=>{
 					if (timeid)
 						clearTimeout(timeid);
@@ -632,7 +659,7 @@ class WSClient extends Notification {
 						clearTimeout(timeid);
 					reject(e);
 				},
-			};
+			});
 
 			if (timeout) {
 				timeid = setTimeout(e=>{
@@ -640,12 +667,12 @@ class WSClient extends Notification {
 					reject(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
 						`method call timeout, ${this.name}/${method}`]));
 					msg.cancel = true;
-					delete this.m_callbacks[id];
+					delete this.m_callbacks[cb];
 				}, timeout);
 			}
 
-			this.m_callbacks[id] = callback;
 			this.m_conv.send(msg);
+			this.m_callbacks[cb] = msg;
 		});
 	}
 
@@ -653,20 +680,19 @@ class WSClient extends Notification {
 	 * @func weakCall(method, data) no callback, no return data
 	 */
 	weakCall(method, data) {
-		this.m_conv.send({
-			s: this.name,
-			t: 'call', 
-			n: method, 
-			d: data,
-		});
+		this.m_conv.send(new DataFormater({
+			service: this.name,
+			type: 'call', 
+			name: method, 
+			data: data,
+		}));
 	}
 
 }
 
 exports = module.exports = {
-	METHOD_CALL_TIMEOUT: METHOD_CALL_TIMEOUT,
-	Conversation: Conversation,
-	WSConversation: WSConversation,
-	Client: WSClient,
+	METHOD_CALL_TIMEOUT,
+	Conversation,
+	WSConversation,
 	WSClient,
 };

@@ -32,7 +32,7 @@ var utils = require('../util');
 var event = require('../event');
 var service = require('../service');
 var {FMTClient} = require('./cli');
-var {WSService} = require('../ws/service');
+var wsservice = require('../ws/service');
 
 // Fast Message Transfer Center, 快速消息传输中心
 
@@ -83,7 +83,7 @@ class FastMessageTransferCenter extends event.Notification {
 /**
  * @class FMTService
  */
-class FMTService extends WSService {
+class FMTService extends wsservice.WSService {
 
 	get id() {
 		return this.m_id;
@@ -147,12 +147,16 @@ class FMTService extends WSService {
 		// TODO ...
 	}
 
-	callTo({ id, name, data }) {
+	callTo({ id, name, data, timeout = wsservice.METHOD_CALL_TIMEOUT }) {
 		// TODO ...
+		// var ser = null;
+		// return ser.call(name, data, timeout);
 	}
 
 	weakCallTo({ id, name, data }) {
 		// TODO ...
+		// var ser = null;
+		// return ser.call(name, data);
 	}
 
 }

@@ -34,11 +34,13 @@ var errno = require('../errno');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
 
-async function func_call(self, msg) {
-	var { d: data = {}, n: name, cb } = msg;
+/** 
+ * @func call_function()
+*/
+async function call_function(self, msg) {
+	var { data = {}, name, cb } = msg;
 	var fn = self[name];
 	var hasCallback = false;
-	var rev = { t: 'cb', cb, s: self.name };
 
 	if (self.server.printLog) {
 		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
@@ -52,11 +54,13 @@ async function func_call(self, msg) {
 
 		if (!cb) return; // No callback
 
+		var rev = new DataFormater({ service: self.name, type: 'cb', cb });
+
 		if (self.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			if (err) {
-				rev.e = Error.toJSON(err);
+				rev.error = err; // Error.toJSON(err);
 			} else {
-				rev.d = data;
+				rev.data = data;
 			}
 			self.conv.send(rev);
 		} else {
@@ -84,6 +88,9 @@ async function func_call(self, msg) {
  * @class WSService
  */
 class WSService extends Service {
+	// m_conv: null,
+	// m_session: null,
+	// m_callbacks: null,
 	
 	get conv() {
 		return this.m_conv;
@@ -101,6 +108,17 @@ class WSService extends Service {
 		super(conv.request);
 		this.m_conv = conv;
 		this.m_session = new Session(this);
+		this.m_callbacks = {};
+
+		conv.onClose.on(async e=>{
+			var callbacks = this.m_callbacks;
+			this.m_callbacks = {};
+			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
+			for (var cb in Object.values(callbacks)) {
+				// cb.cancel = true;
+				cb.err(err);
+			}
+		});
 	}
 
 	loaded() {}
@@ -110,26 +128,79 @@ class WSService extends Service {
 	 * @fun receiveMessage # 消息处理器
 	 * @arg data {Object}
 	 */
-	receiveMessage(data) {
-		if (data.t == 'call') {
-			func_call(this, data);
-		} else if (data.t == 'cb') {
-			// TODO ...
+	receiveMessage(msg) {
+		if (msg.type == 'call') {
+			call_function(this, msg);
+		} else if (msg.type == 'cb') {
+			var cb = this.m_callbacks[msg.cb];
+			delete this.m_callbacks[msg.cb];
+			if (cb) {
+				if (msg.error) { // throw error
+					cb.err(Error.new(msg.error));
+				} else {
+					cb.ok(msg.data);
+				}
+			} else {
+				console.error('Unable to callback, no callback context can be found');
+			}
 		}
 	}
 
 	/**
 	 * @func call(method, data)
 	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOU) {
-		// TODO ... cli call
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+		return new Promise((resolve, reject)=>{
+			var cb = util.id;
+			var timeid = 0;
+
+			var msg = new DataFormater({
+				service: this.name,
+				type: 'call',
+				name: method,
+				data: data,
+				cb: cb,
+				ok: (e)=>{
+					if (timeid)
+						clearTimeout(timeid);
+					resolve(e);
+				},
+				err: (e)=>{
+					if (timeid)
+						clearTimeout(timeid);
+					reject(e);
+				},
+			});
+
+			if (timeout) {
+				timeid = setTimeout(e=>{
+					// console.error(`method call timeout, ${this.name}/${method}`);
+					reject(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
+						`method call timeout, ${this.name}/${method}`]));
+					msg.cancel = true;
+					delete this.m_callbacks[cb];
+				}, timeout);
+			}
+
+			try {
+				this.m_conv.send(msg);
+				this.m_callbacks[cb] = msg;
+			} catch(err) {
+				msg.err(err);
+			}
+		});
 	}
 
 	/**
 	 * @func weakCall(method, data) no callback, no return data
 	 */
 	weakCall(method, data) {
-		// TODO ... weak cli call
+		this.m_conv.send(new DataFormater({
+			service: this.name,
+			type: 'call', 
+			name: method, 
+			data: data,
+		}));
 	}
 
 	/**
@@ -137,9 +208,9 @@ class WSService extends Service {
 	 */
 	trigger(event, data) {
 		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
-			this.m_conv.send({
-				s: this.name, t: 'event', n: event, d: data,
-			});
+			this.m_conv.send(new DataFormater({
+				service: this.name, type: 'event', name: event, data: data,
+			}));
 		} else {
 			console.error('connection dropped, cannot send event');
 		}
@@ -150,5 +221,7 @@ class WSService extends Service {
 
 WSService.type = 'event';
 
-exports.WSService = WSService;
-exports.METHOD_CALL_TIMEOUT = METHOD_CALL_TIMEOUT;
+module.exports = {
+	WSService,
+	METHOD_CALL_TIMEOUT,
+};

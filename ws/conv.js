@@ -34,10 +34,12 @@ var url = require('url');
 var service = require('../service');
 var {WSService} = require('./service');
 var {Buffer} = require('buffer');
-var {isJSON,JSON_MARK} = require('./json');
+var {isJSON,JSON_MARK,DataFormater} = require('./json');
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
-// 绑定服务
+/** 
+ * @func bind_services() 绑定服务
+*/
 async function bind_services(self, bind_services) {
 	utils.assert(bind_services[0], 'service undefined');
 
@@ -209,26 +211,24 @@ var Conversation = utils.class('Conversation', {
 			this.onPing.trigger();
 			return;
 		}
-
 		this.onMessage.trigger({ type, data: packet });
 
 		if (is_json) { // json text
 			try {
-				var data = JSON.parse(packet.substr(JSON_MARK_LENGTH));
+				var data = DataFormater.parse( JSON.parse(packet.substr(JSON_MARK_LENGTH)) );
 			} catch(err) {
 				console.error(err);
 				return;
 			}
-
-			if (data.t == 'bind_service') { // 绑定服务消息
-				bind_services(this, [data.n]).catch(console.error);
+			if (data.type == 'bind') { // 绑定服务消息
+				bind_services(this, [data.service]).catch(console.error);
 			} else {
-				var service = this.m_services[data.s];
+				var service = this.m_services[data.service];
 				if (service) {
 					service.receiveMessage(data);
 				} else {
 					console.error('Could not find the message handler, '+
-												'discarding the message, ' + data.s);
+												'discarding the message, ' + data.service);
 				}
 			}
 		}

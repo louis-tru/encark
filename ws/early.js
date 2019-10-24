@@ -183,7 +183,7 @@ function handshakes(self, req, socket, head, parser) {
 class Early extends Conversation {
 
 	constructor(req, upgradeHead, bind_services_name) {
-		Conversation.call(this, req, bind_services_name);
+		super(req, bind_services_name);
 		this.m_head = upgradeHead;
 	}
 
