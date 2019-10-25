@@ -518,5 +518,13 @@ module.exports = exports = extend(extend(utils, _util), {
 		});
 	},
 
+	/**
+	 * @func uuid() gen uuid
+	 */
+	uuid() {
+		// TODO ...
+		// 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+	}
+
 	// @end
 });

@@ -43,41 +43,70 @@ var G_fmtcs = new Map();
  */
 class FastMessageTransferCenter extends event.Notification {
 
-	get clients() {
-		return this.m_clis;
-	}
-
-	constructor() {
+	constructor(server, nodes = []) {
 		super();
-		this.m_clis = new Set();
+		utils.assert(!G_fmtcs.has(server), 'Repeat FastMessageTransferCenter instance in Server');
+		utils.assert(server instanceof FastMessageTransferCenter, errno.ERR_PARAM_TYPE_MISMATCH);
+		G_fmtcs.set(server, this);
+
+		this.m_services = new Map();
+		this.m_clients = new Map();
+		this.m_id = utils.id; // center server global id
+
+		// { "0": "127.0.0.1:8091" }
+		// { "1": "127.0.0.1:8091" }
+		// { "2": "186.32.6.52:8093" }
+
+		this.m_groups = new Map();
+		// this.m_groups.set('0', new FMTServerGroup(this, '0'));
+		// this.m_center_services = null;
+		// this.m_center_clients = null;
+
+		this.m_nodes = nodes;
+
+		for ( var node of nodes ) {
+			// TODO ...
+		}
+
 	}
 
-	_addClient(cli) {
-		utils.assert(!this.m_clients.has(cli));
-		this.m_clients.set(s, cli);
-		this.trigger('Open', cli);
+	async client(id) {
+		var host = this.m_clients.get(id);
+		// return this.m_clients.get(String(id));
 	}
 
-	_deleteClient(cli) {
-		utils.assert(this.m_clients.has(cli));
-		this.m_clients.delete(cli);
-		this.trigger('Close', cli);
+	async group(gid) {
+		// return this.m_groups.get(String(gid));
 	}
 
-	/**
-	 * @func publish()
-	 */
-	publish(event, data, id) {
+	async _addService(service) {
+		utils.assert(!this.m_services.has(service.id));
+		this.m_services.set(service.id, service);
+		this.trigger('Open', service.id);
+	}
+
+	async _deleteService(service) {
+		utils.assert(this.m_services.has(service.id));
+		this.m_services.delete(service.id);
+		this.trigger('Close', service.id);
+	}
+
+	trigger(event, data) {
 		// TODO ...
+		super.trigger(event, data);
 	}
 
-	/**
-	 * @func broadcast()
-	 */
-	broadcast(event, data, gid = 0) {
-		// TODO ...
+	broadcast(event, data, gid = '0') {
+		return this.group(gid).then(e=>e.publish(event, data));
 	}
 
+}
+
+/**
+ * @class FMTCenterService
+ */
+class FMTCenterService extends wsservice.WSService {
+	// TODO ...
 }
 
 /**
@@ -89,25 +118,17 @@ class FMTService extends wsservice.WSService {
 		return this.m_id;
 	}
 
-	get client() {
-		return this.m_client;
-	}
-
-	get center() {
-		return this.m_center;
-	}
-
 	constructor(conv) {
 		super(conv);
 		this.m_center = null;
-		this.m_id = this.params.id;
-		this.m_cli = new FMTServerClient(this);
+		this.m_id = String(this.params.id);
+		this.m_subscribe = new Set();
 	}
 
-	loaded() {
+	async loaded() {
 		var center = G_fmtcs.get(conv.server);
 		if (center) {
-			center._addService(this.m_cli);
+			await center._addService(this);
 			this.m_center = center;
 		} else {
 			console.error('FMTService.loaded()', 'FMTC No found');
@@ -115,10 +136,10 @@ class FMTService extends wsservice.WSService {
 		}
 	}
 
-	destroy() {
+	async destroy() {
 		var center = G_fmtcs.get(conv.server);
 		if (center) {
-			center._deleteService(this.m_cli);
+			await center._deleteService(this);
 			this.m_center = null;
 		} else {
 			console.error('FMTService.destroy()', 'FMTC No found');
@@ -129,34 +150,40 @@ class FMTService extends wsservice.WSService {
 	 * @func publish()
 	 */
 	publish({ event, data, id }) {
-		return this.m_center.publish(event, data, id);
+		return this.m_center.client(id).then(e=>e.publish(event, data));
 	}
 
 	/**
 	 * @func broadcast()
 	 */
-	broadcast({ event, data, gid = 0 }) {
-		return this.m_center.broadcast(event, data, gid);
+	broadcast({ event, data, gid = '0' }) {
+		return this.m_center.group(gid).then(e=>e.publish(event, data));
 	}
 
 	subscribeAll() {
-		// TODO ...
+		this.m_subscribe.add('*');
 	}
 
 	subscribe({ events }) {
-		// TODO ...
+		for (var event of events)
+			this.m_subscribe.add(event);
+	}
+
+	unsubscribe({ events }) {
+		for (var event of events)
+			this.m_subscribe.delete(event);
+	}
+
+	hasSubscribe({ event }) {
+		return this.m_subscribe.has(event);
 	}
 
 	callTo({ id, name, data, timeout = wsservice.METHOD_CALL_TIMEOUT }) {
-		// TODO ...
-		// var ser = null;
-		// return ser.call(name, data, timeout);
+		return this.m_center.client(id).then(e=>e.call(name, data, timeout));
 	}
 
 	weakCallTo({ id, name, data }) {
-		// TODO ...
-		// var ser = null;
-		// return ser.call(name, data);
+		return this.m_center.client(id).then(e=>e.weakCall(name, data));
 	}
 
 }
@@ -167,35 +194,53 @@ class FMTService extends wsservice.WSService {
 class FMTServerClient {
 
 	get id() {
-		return this.m_service.id;
+		return this.m_id;
 	}
 
-	get center() {
-		return this.m_service.center;
+	constructor(center, id) {
+		this.m_center = center;
+		this.m_id = id;
 	}
 
-	constructor(fmtservice) {
-		this.m_service = fmtservice;
+	call(method, data, timeout = wsservice.METHOD_CALL_TIMEOUT) {
+		// TODO ...
+	}
+
+	weakCall(method, data) {
+		// TODO ...
+	}
+
+	publish(event, data) {
+		// TODO ...
 	}
 
 }
 
-// /**
-//  * @class FMTServerGroup
-//  */
-// class FMTServerGroup {
-// 	// TODO ...
-// }
+/**
+ * @class FMTServerGroup
+ */
+class FMTServerGroup {
+
+	get gid() {
+		return this.m_gid;
+	}
+
+	constructor(center, gid) {
+		this.m_center = center;
+		this.m_gid = gid;
+	}
+
+	publish(event, data) {
+		// TODO ...
+	}
+
+}
 
 service.set('fmt', FMTService);
 
 module.exports = {
 	FastMessageTransferCenter,
 	FMTClient,
-	registerFMTC(server, fmtc) {
-		utils.assert(fmtc instanceof FastMessageTransferCenter);
-		G_fmtcs.set(server, fmtc);
-	},
 	fmtc(server) {
 		return G_fmtcs.get(server);
 	},

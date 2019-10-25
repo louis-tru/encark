@@ -356,7 +356,7 @@ var Server = util.class('Server', event.Notification, {
 	 * @type {Object}
 	 */
 	mimeTypes: null,
-	
+
 	/**
 	 * http请求路由器
 	 * @type {Router}
@@ -365,7 +365,7 @@ var Server = util.class('Server', event.Notification, {
 
 	// event onWSConversationOpen
 	// event onWSConversationClose
-	
+
 	/**
 	 * 构造函数
 	 * @constructor
@@ -399,14 +399,13 @@ var Server = util.class('Server', event.Notification, {
 	interceptRequest(req, res) {
 		return false;
 	},
-	
+
 	/**
 	 * MIME 获取类型
 	 * @param {String}   ename  扩展名或文件名称
 	 * @return {String}
 	 */
 	getMime: function (name) {
-		
 		var mat = name.match(/\.([^$\?\/\\\.]+)((#|\?).+)?$/);
 		if (mat) {
 			name = mat[1];
@@ -414,34 +413,33 @@ var Server = util.class('Server', event.Notification, {
 		name = name.toLowerCase();
 		return this.mimeTypes[name] || mimeTypes[name] || 'application/octet-stream';
 	},
-	
+
 	/**
 	 * 是否正在运行
 	 */
 	get isRun(){
 		return this.m_isRun;
 	},
-	
+
 	/**
 	 * 启动服务
 	 */
 	start: function () {
 		var self = this;
-
-		if (this.port) {
-			this.m_server.listen(this.port, this.host);
-		} else if ( this.host ) {
-			this.m_server.listen(String(this.host), function() {
-				self.port = self.m_server.address().port;
-			});
-		} else {
-			this.m_server.listen(function() {
-				var addr = self.m_server.address();
-				self.host = addr.address;
-				self.port = addr.port;
-			});
+		function complete() {
+			var addr = self.m_server.address();
+			self.host = addr.address;
+			self.port = addr.port;
+			this.m_isRun = true;
+			self.trigger('Startup');
 		}
-		this.m_isRun = true;
+		if (this.port) {
+			this.m_server.listen(this.port, this.host, complete);
+		} else if ( this.host ) {
+			this.m_server.listen(String(this.host), complete);
+		} else {
+			this.m_server.listen(complete);
+		}
 	},
 
 	/**
@@ -450,6 +448,7 @@ var Server = util.class('Server', event.Notification, {
 	stop: function () {
 		this.m_server.close();
 		this.m_isRun = false;
+		self.trigger('Stop');
 	},
 
 	/**

@@ -40,7 +40,7 @@ var JSON_MARK_LENGTH = JSON_MARK.length;
 /** 
  * @func bind_services() 绑定服务
 */
-async function bind_services(self, bind_services) {
+async function bindServices(self, bind_services) {
 	utils.assert(bind_services[0], 'service undefined');
 
 	for (var name of bind_services) {
@@ -110,7 +110,7 @@ var Conversation = utils.class('Conversation', {
 
 		// initialize
 		utils.nextTick(function() {
-			bind_services(self, bind_services_name.split(',')).then(function() {
+			bindServices(self, bind_services_name.split(',')).then(function() {
 				if (!self.initialize())
 					return self.socket.destroy();  // 关闭连接
 
@@ -221,7 +221,7 @@ var Conversation = utils.class('Conversation', {
 				return;
 			}
 			if (data.type == 'bind') { // 绑定服务消息
-				bind_services(this, [data.service]).catch(console.error);
+				bindServices(this, [data.service]).catch(console.error);
 			} else {
 				var service = this.m_services[data.service];
 				if (service) {

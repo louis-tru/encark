@@ -529,49 +529,28 @@ var WSConversation =
 	haveNode ? NodeConversation: util.unrealized;
 
 /** 
- * @func call_function()
+ * @func callFunction()
 */
-async function call_function(self, msg) {
+async function callFunction(self, msg) {
 	var { data = {}, name, cb } = msg;
-	var fn = self[name];
-	var hasCallback = false;
-
 	if (self.server.printLog) {
 		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 	}
-
-	var callback = function(err, data) {
-		if (hasCallback) {
-			throw new Error('callback has been completed');
-		}
-		hasCallback = true;
-
-		if (!cb) return; // No callback
-
-		var rev = new DataFormater({ service: self.name, type: 'cb', cb });
-
-		if (err) {
-			rev.error = err; // Error.toJSON(err);
-		} else {
-			rev.data = data;
-		}
-		self.conv.send(rev);
-	};
-
-	if (name in WSClient.prototype) {
-		return callback(Error.new(errno.ERR_FORBIDDEN_ACCESS));
-	}
-	if (typeof fn != 'function') {
-		return callback(Error.new('"{0}" no defined function'.format(name)));
-	}
-
 	var err, r;
 	try {
-		r = await self[name](data);
-	} catch(e) {
-		err = e;
+		r = await self.handleCall(name, data);
+	} catch(e) { err = e }
+
+	if (!cb) { // No callback
+		return;
 	}
-	callback(err, r);
+	var rev = new DataFormater({ service: self.name, type: 'cb', cb });
+	if (err) {
+		rev.error = err; // Error.toJSON(err);
+	} else {
+		rev.data = r;
+	}
+	self.conv.send(rev);
 }
 
 /**
@@ -595,11 +574,10 @@ class WSClient extends Notification {
 		this.m_callbacks = {};
 		this.m_service_name = service_name;
 		this.m_conv = conv || new WSConversation();
-
 		util.assert(service_name);
 		util.assert(this.m_conv);
 
-		conv.onClose.on(async e=>{
+		this.m_conv.onClose.on(async e=>{
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
@@ -608,7 +586,6 @@ class WSClient extends Notification {
 				cb.err(err);
 			}
 		});
-
 		this.m_conv.bind(this);
 	}
 
@@ -617,7 +594,7 @@ class WSClient extends Notification {
 	 */
 	receiveMessage(msg) {
 		if (msg.type == 'call') {
-			call_function(this, msg);
+			callFunction(this, msg);
 		} else if (msg.type == 'cb') {
 			var cb = this.m_callbacks[msg.cb];
 			delete this.m_callbacks[msg.cb];
@@ -636,14 +613,26 @@ class WSClient extends Notification {
 	}
 
 	/**
+	 * @class handleCall
+	 */
+	handleCall(method, data) {
+		if (method in WSClient.prototype) {
+			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
+		}
+		var fn = this[method];
+		if (typeof fn != 'function') {
+			throw Error.new('"{0}" no defined function'.format(name));
+		}
+		return fn.call(this, data);
+	}
+
+	/**
 	 * @func call(method, data, timeout)
 	 */
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return new Promise((resolve, reject)=>{
 			var cb = util.id;
-			var timeid = 0;
-
-			var msg = new DataFormater({
+			var timeid, msg = new DataFormater({
 				service: this.name,
 				type: 'call',
 				name: method,
@@ -660,7 +649,6 @@ class WSClient extends Notification {
 					reject(e);
 				},
 			});
-
 			if (timeout) {
 				timeid = setTimeout(e=>{
 					// console.error(`method call timeout, ${this.name}/${method}`);
@@ -670,7 +658,6 @@ class WSClient extends Notification {
 					delete this.m_callbacks[cb];
 				}, timeout);
 			}
-
 			this.m_conv.send(msg);
 			this.m_callbacks[cb] = msg;
 		});
