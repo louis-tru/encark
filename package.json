@@ -1,37 +1,38 @@
 {
 	"name": "nxkit",
 	"version": "0.8.64",
-	"description": "A GUI typesetting display engine and cross platform GUI application development framework based on NodeJS/OpenGL",
+	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "util.js",
 	"author": {
 		"name": "xuewen.chu",
 		"email": "louistru@hotmail.com",
-		"url": "http://ngui.fun/"
+		"url": "https://github.com/louis-tru/nxkit/"
 	},
 	"keywords": [
-		"jsx",
-		"javascript",
-		"ecmascript",
-		"html5",
-		"css",
-		"css3",
-		"qt",
-		"android",
-		"ios",
-		"appletv",
-		"gui",
-		"ui",
-		"opengl",
-		"react",
-		"native",
-		"es6",
-		"es7",
-		"es2017"
+		"mysql",
+		"mqtt",
+		"mbus",
+		"fmt",
+		"websocket",
+		"web",
+		"server",
+		"ejs",
+		"express",
+		"md5",
+		"sha1",
+		"uuid",
+		"hash",
+		"memcached",
+		"xml",
+		"request",
+		"wget",
+		"shell",
+		"storage"
 	],
 	"license": "BSD-2-Clause",
 	"bugs": {
-		"url": "https://github.com/louis-tru/ngui/issues",
+		"url": "https://github.com/louis-tru/nxkit/issues",
 		"email": "louistru@hotmail.com"
 	},
-	"homepage": "http://ngui.fun/"
+	"homepage": "https://github.com/louis-tru/nxkit/"
 }

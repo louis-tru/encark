@@ -37,7 +37,7 @@ var http = require('http');
 var zlib = require('zlib');
 var crypto = require('crypto');
 
-var g_static_cache = { };
+var g_static_cache = {};
 
 //set util
 function setHeader(self, expires) {

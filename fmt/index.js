@@ -31,8 +31,10 @@
 var utils = require('../util');
 var event = require('../event');
 var service = require('../service');
+var {Server} = require('../server');
 var {FMTClient} = require('./cli');
 var wsservice = require('../ws/service');
+var uuid = require('../hash/uuid');
 
 // Fast Message Transfer Center, 快速消息传输中心
 
@@ -43,21 +45,25 @@ var G_fmtcs = new Map();
  */
 class FastMessageTransferCenter extends event.Notification {
 
+	get id() {
+		return this.m_id;
+	}
+
 	constructor(server, nodes = []) {
 		super();
 		utils.assert(!G_fmtcs.has(server), 'Repeat FastMessageTransferCenter instance in Server');
-		utils.assert(server instanceof FastMessageTransferCenter, errno.ERR_PARAM_TYPE_MISMATCH);
+		utils.assert(server instanceof Server, errno.ERR_PARAM_TYPE_MISMATCH);
 		G_fmtcs.set(server, this);
 
+		this.m_id = uuid(); // center server global id
 		this.m_services = new Map();
-		this.m_clients = new Map();
-		this.m_id = utils.id; // center server global id
+		// this.m_clients = new Map();
 
 		// { "0": "127.0.0.1:8091" }
 		// { "1": "127.0.0.1:8091" }
 		// { "2": "186.32.6.52:8093" }
 
-		this.m_groups = new Map();
+		// this.m_groups = new Map();
 		// this.m_groups.set('0', new FMTServerGroup(this, '0'));
 		// this.m_center_services = null;
 		// this.m_center_clients = null;
@@ -71,7 +77,7 @@ class FastMessageTransferCenter extends event.Notification {
 	}
 
 	async client(id) {
-		var host = this.m_clients.get(id);
+		// var host = this.m_clients.get(id);
 		// return this.m_clients.get(String(id));
 	}
 

@@ -110,6 +110,9 @@ function require_ejs(filename, options, __mainfilename) {
 	return mod.exports;
 }
 
+/**
+ * @class ViewController
+ */
 class ViewController extends HttpService {
 
 	view(name, data) {
