@@ -86,9 +86,8 @@ class WSService extends Service {
 	 */
 	constructor(conv) {
 		super(conv.request);
-		this.m_conv = conv;
-		this.m_session = new Session(this);
 		this.m_callbacks = {};
+		this.m_conv = conv;
 		this.m_conv.onClose.on(async e=>{
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
@@ -98,6 +97,7 @@ class WSService extends Service {
 				cb.err(err);
 			}
 		});
+		this.m_session = new Session(this);
 	}
 
 	loaded() {}
