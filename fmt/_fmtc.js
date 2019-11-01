@@ -28,44 +28,23 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var path = require('../path');
-var event = require('../event');
-var {WSConversation,Client} = require('../ws/cli');
+var utils = require('../util');
+var errno = require('../errno');
+var Server = require('../server').Server;
 
-/**
- * @class FMTClient
- */
-class FMTClient extends event.Notification {
-
-	get id() {
-		return this.m_id;
-	}
-
-	// get cli() {
-	// 	return this.m_cli;
-	// }
-
-	// get conv() {
-	// 	return this.m_cli.conv;
-	// }
-
-	// get service() {
-	// 	// TODO ...
-	// }
-
-	constructor(id = utils.random(), url = 'fmt://localhost/') {
-		super();
-		url = new path.URL(url);
-		url.setParam('id', id);
-		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
-				s += '//' + url.host + url.path;
-		this.m_id = id;
-		this.m_url = url;
-		this.m_cli = new Client('_fmts', new WSConversation(s));
-	}
-
-}
+var _fmtcs = new Map();
 
 module.exports = {
-	FMTClient,
+	_register(server, fmtc) {
+		utils.assert(!_fmtcs.has(server), 'Repeat FastMessageTransferCenter instance in Server');
+		utils.assert(server instanceof Server, errno.ERR_PARAM_TYPE_MISMATCH);
+		_fmtcs.set(server, fmtc);
+	},
+	_fmtc(server) {
+		return _fmtcs.get(server);
+	},
+	get(server) {
+		var inl = _fmtcs.get(server);
+		return inl && inl.host;
+	},
 };
