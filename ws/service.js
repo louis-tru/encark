@@ -31,7 +31,7 @@
 var Service = require('../service').Service;
 var Session = require('../session').Session;
 var errno = require('../errno');
-var {DataFormater} = require('./json');
+var {DataFormater,T_CALLBACK,T_CALL,T_EVENT} = require('./json');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
 
@@ -49,9 +49,11 @@ async function callFunction(self, msg) {
 	} catch(e) { err = e }
 
 	if (!cb) { // No callback
+		if (err)
+			console.warn(err);
 		return;
 	}
-	var rev = new DataFormater({ service: self.name, type: 'cb', cb });
+	var rev = new DataFormater({ service: self.name, type: T_CALLBACK, cb });
 	if (self.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 		if (err) {
 			rev.error = err; // Error.toJSON(err);
@@ -108,9 +110,9 @@ class WSService extends Service {
 	 * @arg data {Object}
 	 */
 	receiveMessage(msg) {
-		if (msg.type == 'call') {
+		if (msg.isCall()) {
 			callFunction(this, msg);
-		} else if (msg.type == 'cb') {
+		} else if (msg.isCallback()) {
 			var cb = this.m_callbacks[msg.cb];
 			delete this.m_callbacks[msg.cb];
 			if (cb) {
@@ -147,7 +149,7 @@ class WSService extends Service {
 			var cb = util.id;
 			var timeid, msg = new DataFormater({
 				service: this.name,
-				type: 'call',
+				type: T_CALL,
 				name: method,
 				data: data,
 				cb: cb,
@@ -184,12 +186,16 @@ class WSService extends Service {
 	 * @func weakCall(method, data) no callback, no return data
 	 */
 	weakCall(method, data) {
-		this.m_conv.send(new DataFormater({
-			service: this.name,
-			type: 'call', 
-			name: method, 
-			data: data,
-		}));
+		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
+			this.m_conv.send(new DataFormater({
+				service: this.name,
+				type: T_CALL, 
+				name: method, 
+				data: data,
+			}));
+		} else {
+			console.error('connection dropped, cannot call method');
+		}
 	}
 
 	/**
@@ -198,7 +204,7 @@ class WSService extends Service {
 	trigger(event, data) {
 		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			this.m_conv.send(new DataFormater({
-				service: this.name, type: 'event', name: event, data: data,
+				service: this.name, type: T_EVENT, name: event, data: data,
 			}));
 		} else {
 			console.error('connection dropped, cannot send event');

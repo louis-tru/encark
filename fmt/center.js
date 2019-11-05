@@ -36,6 +36,7 @@ var service = require('../service');
 var wsservice = require('../ws/service');
 var cli = require('../ws/cli');
 var ser = require('./ser');
+var path = require('../path');
 
 // Fast Message Transfer Center, 快速消息传输中心
 
@@ -48,17 +49,17 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_inl.id;
 	}
 
-	constructor(server, nodes = [/* 'fmtc://127.0.0.1:9081/' */]) {
+	get publishURL() {
+		return this.m_inl.publishURL;
+	}
+
+	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
 		super();
-		this.m_inl = new FastMessageTransferCenter_INL(this, server, nodes);
+		this.m_inl = new FastMessageTransferCenter_INL(this, server, fnodes, publish);
 	}
 
 	client(id) {
 		return this.m_inl.client(id);
-	}
-
-	group(gid) {
-		return this.m_inl.group(gid);
 	}
 
 	trigger(event, data) {
@@ -73,50 +74,166 @@ class FastMessageTransferCenter extends event.Notification {
 
 /**
  * @class FastMessageTransferCenter_INL
+ * @private
  */
 class FastMessageTransferCenter_INL {
 
 	get id() {
-		return this.m_center_id;
+		return this.m_fnode_id;
 	}
 
 	get host() {
 		return this.m_host;
 	}
 
-	constructor(host, server, nodes) {
+	get publishURL() {
+		return this.m_publish_url;
+	}
+
+	constructor(host, server, fnodes, publish) {
 		_fmtc._register(server, this);
 		this.m_host = host;
-		this.m_center_id = uuid(); // center server global id
-		this.m_node_server = {}; // node server
-		this.m_cur_cli_service = {}; // client handle
-		this.m_cli_route_cache = { // route cache
-			// "0_a": {server:{ip:'127.0.0.1',port:8091,id:'a'}},
-			// "1_b": {server:{ip:'127.0.0.1'port:8091,id:'b'}},
-			// "2_c": {server:{ip:'186.32.6.52',port:8093,id:'c'}},
-		};
+		this.m_server = server;
+		this.m_fnode_id = uuid(); // center server global id
+		this.m_publish_url = publish ? new path.URL(publish): null;
+		this.m_fnodes = null;
+		this.m_fnodes_cfg = {}; // node server cfg
+		this.m_fmtservice = new Map(); // client service handle
+		this.m_cli_route = new Map(); // client route
+		//{
+		// 0_a: 'fnodeId-abcdefg-1',
+		// 1_b: 'fnodeId-abcdefg-2',
+		// 2_c: 'fnodeId-abcdefg-3',
+		//}
 
-		this.addEventListener('Open', e=>{
-			var {center,id} = e.data;
+		this.m_host.addEventListener('AddNode', e=>{ // New Node connect
 			// TODO ...
 		});
 
-		this.addEventListener('Close', e=>{
-			var {center,id} = e.data;
-			// TODO ...
+		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
+			var {fnodeId} = e.data;
+			for (var [id,fid] of this.m_cli_route) {
+				if (fnodeId == fid) {
+					this.m_cli_route.delete(id);
+				}
+			}
 		});
 
-		for (var n of nodes) {
-			// TODO ...
+		this.m_host.addEventListener('Login', e=>{ // client connect
+			var {fnodeId,id} = e.data;
+			this.m_cli_route.set(id, fnodeId);
+		});
+
+		this.m_host.addEventListener('Logout', e=>{ // client disconnect
+			this.m_cli_route.delete(e.data.id);
+		});
+
+		for (var cfg of fnodes) {
+			this.addFnodeCfg(cfg, true);
 		}
 	}
 
-	async client(id) {
-		// TODO ...
+	addFnodeCfg(url, init = false) {
+		if (!this.m_fnodes_cfg.hasOwnProperty(url)) {
+			this.m_fnodes_cfg[url] = { url, init, retry: 0 };
+		}
 	}
 
-	async group(gid) {
-		// TODO ...
+	async run() {
+		utils.assert(!this.m_fnodes);
+		this.m_fnodes = {};
+
+		// init local node
+		await (new FNodeLocal(this)).initialize();
+		// witch nodes
+		while ( this.m_server && _fmtc._fmtc(this.m_server) === this ) {
+			for (var cfg of Object.values(this.m_fnodes_cfg)) {
+				if ( !this.getFnodeFrom(cfg.url) ) {
+					cfg.retry++;
+					console.log('FastMessageTransferCenter_INL.initializeNodes(), connect', cfg.url);
+					FNodeRemoteClient.connect(this, cfg.url).catch(err=>{
+						if (err.code != errno[0]) {
+							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
+								delete this.m_fnodes_cfg[cfg.url];
+							}
+							console.error(err);
+						}
+					});
+				}
+			}
+			await utils.sleep(1e4); // 10s
+		}
+
+		for (var fnode of Object.values(this.m_fnodes)) {
+			try {
+				await fnode.destroy();
+			} catch(err) {
+				console.error(err);
+			}
+		}
+		this.m_fnodes = null;
+	}
+
+	client(id) {
+		return new ser.FMTServerClient(this, id);
+	}
+
+	getFMTService(id) {
+		var handle = this.m_fmtservice.get(id);
+		utils.assert(handle, errno.ERR_FMT_CLIENT_OFFLINE);
+		return handle;
+	}
+
+	getFMTServiceNoError(id) {
+		return this.m_fmtservice.get(id);
+	}
+
+	async exec(id, args = [], method = null) {
+		var fnodeId = this.m_cli_route.get(id);
+		if (fnodeId) {
+			var fnode = this.m_fnodes[fnodeId];
+			utils.assert(fnode);
+			try {
+				if (method)
+					return await fnode[method](id, ...args);
+				else
+					return utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
+			} catch(err) {
+				if (err.code != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
+					throw err;
+				}
+			}
+			this.m_cli_route.delete(id);
+		}
+
+		var fnode = await utils.promise((resolve, reject)=>{
+			var i = 0;
+			Object.values(this.m_fnodes).forEach((fnode,i,fnodes)=>{
+				utils.assert(fnodes.length);
+				fnode.query(id).then(e=>{
+					i++;
+					if (e) {
+						resolve(fnode);
+					} else if (fnodes.length == i) {
+						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
+					}
+				}).catch(e=>{
+					console.error(err);
+					i++;
+					if (fnodes.length == i) {
+						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
+					}
+				});
+			});
+		});
+
+		this.m_cli_route.set(id, fnode.id);
+
+		if (!fnodeId) { // Trigger again
+			this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id });
+		}
+		if (method)
+			return await fnode[method](id, ...args);
 	}
 
 	async broadcast(event, data) {
@@ -124,87 +241,291 @@ class FastMessageTransferCenter_INL {
 	}
 
 	publish(event, data) {
-		// TODO ...
+		for (var fnode of Object.values(this.m_fnodes)) {
+			fnode.publish(event, data);
+		}
 	}
 
-	async registerService(fmtservice) {
+	/** 
+	 * @func loginFrom() client login 
+	 */
+	async loginFrom(fmtservice) {
 		utils.assert(fmtservice.id);
-		utils.assert(!this.m_cur_cli_service.has(fmtservice.id));
+		utils.assert(!this.m_fmtservice.has(fmtservice.id));
 		utils.assert(!await this.client(fmtservice.id));
-		this.m_cur_cli_service.set(fmtservice.id, fmtservice);
-		this.publish('Open', { center: this.id, id: fmtservice.id });
+		this.m_fmtservice.set(fmtservice.id, fmtservice);
+		this.publish('Login', { fnodeId: this.id, id: fmtservice.id });
 	}
 
-	async unregisterService(fmtservice) {
+	/**
+	 * @func logoutFrom() client logout
+	*/
+	async logoutFrom(fmtservice) {
 		utils.assert(fmtservice.id);
-		utils.assert(this.m_cur_cli_service.has(fmtservice.id));
-		this.m_cur_cli_service.delete(fmtservice.id);
-		this.publish('Close', { center: this.id, id: fmtservice.id });
+		utils.assert(this.m_fmtservice.has(fmtservice.id));
+		this.m_fmtservice.delete(fmtservice.id);
+		this.publish('Logout', { fnodeId: this.id, id: fmtservice.id });
 	}
 
-	async addNode(node) {
-		// TODO ...
+	/**
+	 * @func getFnodeFrom()
+	 */
+	getFnodeFrom(url) {
+		return Object.values(this.m_fnodes)
+			.find(e=>e.publishURL&&e.publishURL.href==url);
 	}
 
-	async deleteNode(node) {
-		// TODO ...
+	/**
+	 * @func getFnode() get fnode by id
+	 */
+	getFnode(id) {
+		return this.m_fnodes[id];
+	}
+
+	/**
+	 * @func addNode()
+	 */
+	async addNode(fnode) {
+		// console.error(`Node with ID ${fnode.id} already exists`);
+		utils.assert(!this.m_fnodes[fnode.id], errno.ERR_REPEAT_FNODE_CONNECT);
+		this.m_fnodes[fnode.id] = fnode;
+		var url = fnode.publishURL;
+		if (url) {
+			if (!this.publishURL || this.publishURL.href != url.href) {
+				this.addFnodeCfg(url.href);
+				var cfg = this.m_fnodes_cfg[url.href];
+				if (cfg) {
+					cfg.retry = 0;
+				}
+			}
+		}
+		this.m_host.getNoticer('AddNode').trigger({ fnodeId: fnode.id });
+	}
+
+	/**
+	 * @func deleteNode()
+	 */
+	async deleteNode(fnode) {
+		if (!this.m_fnodes[fnode.id])
+			return;
+		delete this.m_fnodes[fnode.id];
+		this.m_host.getNoticer('DeleteNode').trigger({ fnodeId: fnode.id });
 	}
 
 }
 
 /**
- * @class FMTCenterAPI
+ * @class FNode
  */
-class FMTCenterNode {
-	// TODO ...
-	initialize() {
-		//
+class FNode {
+	get id() {return null}
+	get publishURL() {return null}
+	get center() {return this.m_center}
+	constructor(center) { this.m_center = center}
+	initialize() { return this.m_center.addNode(this)}
+	destroy() { return this.m_center.deleteNode(this)}
+	publish(event, data) {}
+	triggerTo(id, event, data) {}
+	callTo(id, name, data, timeout) {}
+	weakCallTo(id, name, data) {}
+	query(id) {}
+}
+
+/**
+ * @class FMTNodeLocal
+ */
+class FNodeLocal extends FNode {
+	get id() {
+		return this.m_center.id;
 	}
-	get center() {
-		return this.m_center;
+	get publishURL() {
+		return this.m_center.publishURL;
+	}
+	publish(event, data) {
+		this.m_center.host.getNoticer(event).trigger(data);
+	}
+	triggerTo(id, event, data) {
+		return this.m_center.getFMTService(id).trigger(event, data); // trigger event
+	}
+	callTo(id, method, data, timeout) {
+		return this.m_center.getFMTService(id).call(method, data, timeout); // call method
+	}
+	weakCallTo(id, method, data) {
+		return this.m_center.getFMTService(id).weakCall(method, data); // weak call method
+	}
+	async query(id) {
+		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
 	}
 }
 
 /**
- * @class FMTCenterService
+ * @class FNodeRemote
  */
-class FMTCenterService extends wsservice.WSService {
+class FNodeRemote extends FNode {
+	get id() {
+		return this.m_node_id;
+	}
+	get publishURL() {
+		return this.m_impl.getThatFnode;
+	}
+	constructor(center, impl, id) {
+		super(center);
+		this.m_impl = impl;
+		this.m_node_id = id;
+		this.m_is_initialize = false;
+	}
+	async initialize() {
+		utils.assert(!this.m_is_initialize);
+		try {
+			this.m_impl.conv.onClose.once(async e=>{
+				if (this.m_is_initialize) {
+					await this.m_center.deleteNode(this);
+					var url = this.publishURL;
+					if (url) { // recontect
+						console.log('recontect', url.href);
+						await utils.sleep(2e2); // 200ms
+						if ( !this.m_center.getFnodeFrom(url.href) ) {
+							FNodeRemoteClient.connect(this.m_center, url.href);
+						}
+					}
+				}
+			});
+			console.log('FNodeRemote.initialize()', this.m_node_id);
+			await this.m_center.addNode(this);
+			console.log('FNodeRemote.initialize(), ok', this.m_node_id);
+			this.m_is_initialize = true;
+		} catch(err) {
+			try {
+				await this.destroy();
+			} catch(e) {
+				console.error(e);
+			}
+			throw err;
+		}
+	}
+	async destroy() {
+		this.m_impl.conv.close();
+		await this.m_center.deleteNode(this);
+	}
+	publish(event, data) {
+		this.m_impl.weakCall('publish', {event,data});
+	}
+	triggerTo(id, event, data) {
+		return this.m_impl.call('triggerTo', {id, event, data}); // trigger event
+	}
+	callTo(id, method, data, timeout) {
+		return this.m_impl.call('callTo', {id, method, data, timeout}, timeout); // call method
+	}
+	weakCallTo(id, method, data) {
+		return this.m_impl.call('weakCallTo', {id, method, data}); // weak call method
+	}
+	query(id) {
+		return this.m_impl.call('query', {id});
+	}
+}
+
+class FNodeRemoteEXT {
+
+	getThatFnode() {
+		return this.m_that_fnode;
+	}
+
+	getFnode() {
+		return this.m_center.publishURL;
+	}
+
+	getNodeId() {
+		return this.m_center.id;
+	}
+
+	publish({event, data}) {
+		this.m_center.host.getNoticer(event).trigger(data);
+	}
+
+	triggerTo({id, event, data}) {
+		this.m_center.getFMTService(id).trigger(event, data);
+	}
+
+	callTo({id, method, data, timeout}) {
+		return this.m_center.getFMTService(id).call(method, data, timeout);
+	}
+
+	weakCallTo({id, method, data}) {
+		this.m_center.getFMTService(id).weakCall(method, data);
+	}
+
+	query({id}) {
+		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
+	}
+}
+
+/**
+ * @class FNodeRemoteService
+ */
+class FNodeRemoteService extends wsservice.WSService {
 
 	async loaded() {
-		var center = _fmtc._fmtc(this.conv.server);
-		if (center) {
-			await center.addNode(this);
+		try {
+			var center = _fmtc._fmtc(this.conv.server);
+			utils.assert(center, 'FNodeRemoteService.loaded() fmt center No found');
+			var id = this.params.id;
+			utils.assert(id, 'FNodeRemoteService.loaded() node id param undefined');
+			var fnode = await this.call('getFnode');
+			this.m_that_fnode = fnode ? new path.URL(fnode): null;
+			console.log('FNodeRemoteService.loaded', id, this.m_that_fnode&&this.m_that_fnode.href);
+			this.m_fnode = new FNodeRemote(center, this, id);
+			await this.m_fnode.initialize();
 			this.m_center = center;
-		} else {
-			console.error('FMTCenterService.loaded()', 'FMTC No found');
+		} catch(err) {
+			console.error(err);
 			this.conv.close();
 		}
 	}
 
 	async destroy() {
-		var center = _fmtc._fmtc(this.conv.server);
-		if (center) {
-			await center.deleteNode(this);
+		try {
+			var center = _fmtc._fmtc(this.conv.server);
+			utils.assert(center, 'FNodeRemoteService.destroy() fmt center No found');
+			utils.assert(center === this.m_center);
+			console.log('FNodeRemoteService.destroy()', this.m_fnode.id);
+			await this.m_fnode.destroy();
+			this.m_fnode = null;
 			this.m_center = null;
-		} else {
-			console.error('FMTCenterService.destroy()', 'FMTC No found');
+		} catch(err) {
+			console.error(err);
 		}
 	}
-
 }
 
 /**
- * @class FMTCenterClient
+ * @class FNodeRemoteClient
  */
-class FMTCenterClient extends cli.WSClient {
-	constructor(center, node) {
-		super('_fmtcs', 'ws://127.0.0.1:8091');
+class FNodeRemoteClient extends cli.WSClient {
+
+	constructor(center, url = 'fnode://localhost/') {
+		url = new path.URL(fnode);
+		url.setParam('id', center.id);
+		var s = url.protocol == 'fnode:'? 'wss:': 'ws:';
+				s += '//' + url.host + url.path;
+		super('_fnode', new cli.WSConversation(s));
+		this.m_center = center;
+		this.m_that_fnode = url.deleteParam('id');
+		this.m_fnode = null;
+	}
+
+	static async connect(center, url) {
+		console.log('FNodeRemoteClient.connect', url);
+		var impl = new FNodeRemoteClient(center, url);
+		var id = await impl.call('getNodeId');
+		impl.m_fnode = new FNodeRemote(center, impl, id);
+		await impl.m_fnode.initialize();
+		return impl.m_fnode;
 	}
 }
 
-utils.extendClass(FMTCenterService, FMTCenterAPI);
-utils.extendClass(FMTCenterClient, FMTCenterAPI);
-service.set('_fmtcs', FMTCenterService);
+utils.extendClass(FNodeRemoteService, FNodeRemoteEXT);
+utils.extendClass(FNodeRemoteClient, FNodeRemoteEXT);
+service.set('_fnode', FNodeRemoteService);
 
 module.exports = {
 	FastMessageTransferCenter,

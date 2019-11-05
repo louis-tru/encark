@@ -336,6 +336,10 @@ class URL {
 		}
 		return '';
 	}
+
+	toJSON() {
+		return this.href;
+	}
 	// @end
 }
 

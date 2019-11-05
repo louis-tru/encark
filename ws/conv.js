@@ -34,7 +34,7 @@ var url = require('url');
 var service = require('../service');
 var {WSService} = require('./service');
 var {Buffer} = require('buffer');
-var {isJSON,JSON_MARK,DataFormater} = require('./json');
+var {isJSON,JSON_MARK,DataFormater,M_PING} = require('./json');
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
 /** 
@@ -207,7 +207,7 @@ var Conversation = utils.class('Conversation', {
 	 */
 	handlePacket: function(type, packet) {
 		var is_json = isJSON(type, packet);
-		if (is_json == 2) { // ping, browser web socket 
+		if (is_json == M_PING) { // ping, browser web socket 
 			this.onPing.trigger();
 			return;
 		}
@@ -220,7 +220,7 @@ var Conversation = utils.class('Conversation', {
 				console.error(err);
 				return;
 			}
-			if (data.type == 'bind') { // 绑定服务消息
+			if (data.isBind()) { // 绑定服务消息
 				bindServices(this, [data.service]).catch(console.error);
 			} else {
 				var service = this.m_services[data.service];

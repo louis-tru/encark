@@ -33,7 +33,7 @@ var event = require('../event');
 var { userAgent } = require('../request');
 var url = require('../url');
 var errno = require('../errno');
-var {JSON_MARK, isJSON, DataFormater } = require('./json');
+var {JSON_MARK, isJSON, DataFormater, T_BIND, M_PING } = require('./json');
 var { haveNode, haveWeb } = util;
 var JSON_MARK_LENGTH = JSON_MARK.length;
 
@@ -111,7 +111,7 @@ class Conversation {
 		} else {
 			clients[name] = client;
 			if (this.m_is_open) {
-				this.send(new DataFormater({ service: name, type: 'bind' }));
+				this.send(new DataFormater({ service: name, type: T_BIND }));
 			}
 			else {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
@@ -164,7 +164,7 @@ class Conversation {
 	 */
 	handlePacket(type, packet) {
 		var is_json = isJSON(type, packet);
-		if (is_json == 2) { // pong
+		if (is_json == M_PING) { // pong
 			this.onPong.trigger();
 			return;
 		}
@@ -282,7 +282,6 @@ class WebConversation extends WSConversationBasic {
 
 		req.onopen = function(e) {
 			if (!self.m_connect) {
-				self.m_req.close();
 				self.close(); return;
 			}
 			// self.m_token = res.headers['session-token'] || '';
@@ -313,7 +312,15 @@ class WebConversation extends WSConversationBasic {
 	 * @ovrewrite 
 	 */
 	close() {
-		this.m_req = null;
+		var req = this.m_req;
+		if (req) {
+			this.m_req = null;
+			try {
+				req.close();
+			} catch(err) {
+				console.error(err);
+			}
+		}
 		super.close();
 	}
 

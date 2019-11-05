@@ -28,7 +28,6 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
 var _fmtc = require('../_fmtc');
 var service = require('../service');
 var wsservice = require('../ws/service');
@@ -58,7 +57,7 @@ class FMTService extends wsservice.WSService {
 	async loaded() {
 		var center = _fmtc._fmtc(this.conv.server);
 		if (center) {
-			await center.registerService(this);
+			await center.loginFrom(this);
 			this.m_center = center;
 		} else {
 			console.error('FMTService.loaded()', 'FMTC No found');
@@ -72,7 +71,7 @@ class FMTService extends wsservice.WSService {
 	async destroy() {
 		var center = _fmtc._fmtc(this.conv.server);
 		if (center) {
-			await center.unregisterService(this);
+			await center.logoutFrom(this);
 			this.m_center = null;
 		} else {
 			console.error('FMTService.destroy()', 'FMTC No found');
@@ -87,6 +86,8 @@ class FMTService extends wsservice.WSService {
 			super.trigger(event, data);
 		}
 	}
+
+	// ------------ api ------------
 
 	subscribeAll() {
 		this.m_subscribe.add('*');
@@ -106,34 +107,40 @@ class FMTService extends wsservice.WSService {
 		return this.m_subscribe.has('*') || this.m_subscribe.has(event);
 	}
 
-	// ------------
-
-	/**
-	 * @func send() event message
-	 */
-	send({ id, event, data }) {
-		return this.m_center.client(id).then(e=>e.send(event, data));
+	async hasOnline({ id }) {
+		try {
+			await this.m_center.exec(id);
+		} catch(err) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
-	 * @func publish() publish multicast,broadcast event message
+	 * @func triggerTo() event message
 	 */
-	publish({ event, data, gid = '0' }) {
-		return this.m_center.group(gid).then(e=>e.publish(event, data));
+	triggerTo({ id, event, data }) {
+		return this.m_center.exec(id, [event, data], 'triggerTo');
 	}
+
+	// /**
+	//  * @func publishTo() publish multicast,broadcast event message
+	//  */
+	// publishTo({ event, data, gid = '0' }) {
+	// }
 
 	/**
 	 * @func callTo()
 	 */
-	callTo({ id, name, data, timeout = wsservice.METHOD_CALL_TIMEOUT }) {
-		return this.m_center.client(id).then(e=>e.call(name, data, timeout));
+	callTo({ id, method, data, timeout }) {
+		return this.m_center.exec(id, [method, data, timeout], 'callTo');
 	}
 
 	/**
 	 * @func weakCallTo()
 	 */
-	weakCallTo({ id, name, data }) {
-		return this.m_center.client(id).then(e=>e.weakCall(name, data));
+	weakCallTo({ id, method, data }) {
+		return this.m_center.exec(id, [method, data], 'weakCallTo');
 	}
 
 }
@@ -148,47 +155,25 @@ class FMTServerClient {
 	}
 
 	constructor(center, id) {
-		this.m_center = center;
 		this.m_id = id;
+		this.m_center = center;
 	}
 
-	send(event, data) {
-		// TODO ...
+	trigger(event, data) {
+		return this.m_center.exec(this.m_id, [event, data], 'triggerTo');
 	}
 
 	call(method, data, timeout = wsservice.METHOD_CALL_TIMEOUT) {
-		// TODO ...
+		return this.m_center.exec(this.m_id, [method, data, timeout], 'callTo');
 	}
 
 	weakCall(method, data) {
-		// TODO ...
+		return this.m_center.exec(this.m_id, [method, data], 'weakCallTo');
 	}
-
 }
 
-/**
- * @class FMTServerGroup
- */
-class FMTServerGroup {
-
-	get gid() {
-		return this.m_gid;
-	}
-
-	constructor(center, gid) {
-		this.m_center = center;
-		this.m_gid = gid;
-	}
-
-	publish(event, data) {
-		// TODO ...
-	}
-
-}
-
-service.set('_fmts', FMTService);
+service.set('_fmt', FMTService);
 
 module.exports = {
 	FMTServerClient,
-	FMTServerGroup,
 };

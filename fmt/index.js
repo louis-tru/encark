@@ -28,4 +28,10 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
- module.exports = require('./center');
+var center = require('./center');
+var cli = require('./cli');
+
+ module.exports = {
+	 ...center,
+	 ...cli,
+ };

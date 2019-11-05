@@ -32,19 +32,20 @@ var utils = require('../util');
 var errno = require('../errno');
 var Server = require('../server').Server;
 
-var _fmtcs = new Map();
+var _centers = new WeakMap();
 
 module.exports = {
-	_register(server, fmtc) {
-		utils.assert(!_fmtcs.has(server), 'Repeat FastMessageTransferCenter instance in Server');
+	_register(server, center) {
+		utils.assert(!_centers.has(server), 'Repeat FastMessageTransferCenter instance in Server');
 		utils.assert(server instanceof Server, errno.ERR_PARAM_TYPE_MISMATCH);
-		_fmtcs.set(server, fmtc);
+		_centers.set(server, center);
+		center.run(); // run watch
 	},
 	_fmtc(server) {
-		return _fmtcs.get(server);
+		return _centers.get(server);
 	},
 	get(server) {
-		var inl = _fmtcs.get(server);
-		return inl && inl.host;
+		var c = _centers.get(server);
+		return c && c.host;
 	},
 };

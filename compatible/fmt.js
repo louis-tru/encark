@@ -28,20 +28,4 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-module.exports = {
-	ERR_MONITOR_BEEN_STARTED: [-30001, 'MONITOR BEEN STARTED'],
-	ERR_MONITOR_NOT_BEEN_STARTED: [-30002, 'MONITOR NOT BEEN STARTED'],
-	ERR_FORBIDDEN_ACCESS : [-30003, 'FORBIDDEN ACCESS'],
-	ERR_CONNECTION_DISCONNECTION: [-30004, 'Connection accidental disconnection'],
-	ERR_CONNECTION_CLOSE_STATUS: [-30005, 'error connection close status'],
-	ERR_METHOD_CALL_TIMEOUT: [-30006, 'method call timeout'],
-	ERR_DOWNLOAD_FAIL: [-30007, 'Download fail'],
-	ERR_ILLEGAL_ACCESS: [-30008, 'Illegal access'],
-	ERR_REQUEST_AUTH_FAIL: [-30010, 'request auth fail'],
-	ERR_REQUEST_ABORT: [-30011, 'request abort'],
-	ERR_HTTP_REQUEST_TIMEOUT: [-10045, 'http request timeout'],
-	ERR_METHOD_UNREALIZED: [-10046, 'method unrealized'],
-	ERR_PARAM_TYPE_MISMATCH: [-10047, 'param type mismatch'],
-	ERR_REPEAT_FNODE_CONNECT: [-10048, 'REPEAT FNODE CONNECT'],
-	ERR_FMT_CLIENT_OFFLINE: [-10049, 'FMT CLIENT OFFLINE'],
-};
+module.exports = require('../fmt/cli');

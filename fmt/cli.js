@@ -30,7 +30,46 @@
 
 var path = require('../path');
 var event = require('../event');
-var {WSConversation,Client} = require('../ws/cli');
+var cli = require('../ws/cli');
+var uuid = require('../hash/uuid');
+var errno = require('../errno');
+
+/**
+ * @class Client
+ */
+class WSClient extends cli.WSClient {
+
+	constructor(host) {
+		var url = host.m_url;
+		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
+				s += '//' + url.host + url.path;
+		super('_fmt', new cli.Conversation(s));
+		this.m_host = host;
+		this.conv.onOpen.on(e=>{
+			if (host.m_subscribe.size) {
+				var events = [];
+				for (var i of host.m_subscribe)
+					events.push(i);
+				this.weakCall('subscribe', {events});
+			}
+		});
+	}
+
+	/**
+	 * @overwrite
+	 */
+	handleCall(method, data) {
+		if (method in FMTClient.prototype) {
+			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
+		}
+		var fn = this.m_host[method];
+		if (typeof fn != 'function') {
+			throw Error.new('"{0}" no defined function'.format(name));
+		}
+		return fn.call(this.m_host, data);
+	}
+
+}
 
 /**
  * @class FMTClient
@@ -41,29 +80,78 @@ class FMTClient extends event.Notification {
 		return this.m_id;
 	}
 
-	// get cli() {
-	// 	return this.m_cli;
-	// }
+	get conv() {
+		return this.m_cli.conv;
+	}
 
-	// get conv() {
-	// 	return this.m_cli.conv;
-	// }
+	close() {
+		this.conv.close();
+	}
 
-	// get service() {
-	// 	// TODO ...
-	// }
-
-	constructor(id = utils.random(), url = 'fmt://localhost/') {
+	constructor(id = uuid(), url = 'fmt://localhost/') {
 		super();
 		url = new path.URL(url);
 		url.setParam('id', id);
-		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
-				s += '//' + url.host + url.path;
 		this.m_id = id;
 		this.m_url = url;
-		this.m_cli = new Client('_fmts', new WSConversation(s));
+		this.m_subscribe = new Set();
+		this.m_cli = new WSClient(this, url);
 	}
 
+	subscribeAll() {
+		this.m_cli.weakCall('subscribeAll');
+	}
+
+	unsubscribe(events = []) {
+		events.forEach(e=>this.m_subscribe.delete(e));
+		this.m_cli.weakCall('unsubscribe', {events});
+	}
+
+	subscribe(events = []) {
+		events.forEach(e=>this.m_subscribe.add(e));
+		this.m_cli.weakCall('subscribe', {events});
+	}
+
+	that(id) {
+		utils.assert(id != this.id);
+		return new ThatClient(this, id);
+	}
+
+	// @overwrite:
+	getNoticer(name) {
+		if (!this.hasNoticer(name)) {
+			this.m_subscribe.add(name);
+			this.m_cli.weakCall('subscribe', {events:[name]});
+			this.m_cli.addEventListener(name, super.getNoticer(name)); // Forward event
+		}
+		return super.getNoticer(name);
+	}
+
+}
+
+/**
+ * @class ThatClient
+ */
+class ThatClient {
+	get id() {
+		return this.m_id;
+	}
+	constructor(host, id) {
+		this.m_host = host;
+		this.m_id = id;
+	}
+	hasOnline() {
+		return this.m_host.call('hasOnline', { id: this.m_id });
+	}
+	trigger(event, data) {
+		this.m_host.weakCall('triggerTo', { id: this.m_id, event, data });
+	}
+	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
+		return this.m_host.call('callTo', { id: this.m_id, method, data, timeout }, timeout);
+	}
+	weakCall(method, data) {
+		this.m_host.weakCall('weakCallTo', { id: this.m_id, method, data });
+	}
 }
 
 module.exports = {

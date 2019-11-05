@@ -30,10 +30,22 @@
 
 var JSON_MARK = '\ufffe';
 
+var TYPES = {
+	T_BIND: 1,
+	T_EVENT: 2,
+	T_CALL: 3,
+	T_CALLBACK: 4,
+};
+
+var MARK = {
+	M_JSON: 1,
+	M_PING: 2,
+};
+
 function isJSON(type, data) {
 	if (type === 0) {
 		if (data[0] == JSON_MARK[0]) {
-			return data.length == 1 ? 2/*ping*/: 1/*json data*/;
+			return data.length == 1 ? MARK.M_PING: MARK.M_JSON;
 		}
 	}
 	return 0;
@@ -59,8 +71,20 @@ class DataFormater {
 			this.cb,
 		]
 	}
+	isBind() {
+		return this.type == TYPES.T_BIND;
+	}
+	isEvent() {
+		return this.type == TYPES.T_EVENT;
+	}
+	isCall() {
+		return this.type == TYPES.T_CALL;
+	}
+	isCallback() {
+		return this.type == TYPES.T_CALLBACK;
+	}
 }
 
 module.exports = {
-	JSON_MARK, isJSON, DataFormater,
+	JSON_MARK, isJSON, DataFormater, ...TYPES, ...MARK,
 };

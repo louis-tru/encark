@@ -31,7 +31,7 @@
 var util = require('../util');
 var errno = require('../errno');
 var { Notification } = require('../event');
-var { DataFormater } = require('./json');
+var { DataFormater,T_CALLBACK,T_CALL} = require('./json');
 var cli_conv = require('./cli_conv');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
@@ -50,9 +50,11 @@ async function callFunction(self, msg) {
 	} catch(e) { err = e }
 
 	if (!cb) { // No callback
+		if (err)
+			console.warn(err);
 		return;
 	}
-	var rev = new DataFormater({ service: self.name, type: 'cb', cb });
+	var rev = new DataFormater({ service: self.name, type: T_CALLBACK, cb });
 	if (err) {
 		rev.error = err; // Error.toJSON(err);
 	} else {
@@ -101,9 +103,9 @@ class WSClient extends Notification {
 	 * @func receiveMessage(msg)
 	 */
 	receiveMessage(msg) {
-		if (msg.type == 'call') {
+		if (msg.isCall()) {
 			callFunction(this, msg);
-		} else if (msg.type == 'cb') {
+		} else if (msg.isCallback()) {
 			var cb = this.m_callbacks[msg.cb];
 			delete this.m_callbacks[msg.cb];
 			if (cb) {
@@ -113,9 +115,9 @@ class WSClient extends Notification {
 					cb.ok(msg.data);
 				}
 			} else {
-				console.error('Unable to callback, no callback context can be found');
+				console.warn('Unable to callback, no callback context can be found');
 			}
-		} else if (msg.type == 'event') {
+		} else if (msg.isEvent()) {
 			this.trigger(msg.name, msg.data);
 		}
 	}
@@ -142,7 +144,7 @@ class WSClient extends Notification {
 			var cb = util.id;
 			var timeid, msg = new DataFormater({
 				service: this.name,
-				type: 'call',
+				type: T_CALL,
 				name: method,
 				data: data,
 				cb: cb,
@@ -177,8 +179,8 @@ class WSClient extends Notification {
 	weakCall(method, data) {
 		this.m_conv.send(new DataFormater({
 			service: this.name,
-			type: 'call', 
-			name: method, 
+			type: T_CALL,
+			name: method,
 			data: data,
 		}));
 	}
