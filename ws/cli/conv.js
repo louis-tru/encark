@@ -28,14 +28,13 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var event = require('../event');
-var { userAgent } = require('../request');
-var url = require('../url');
-var errno = require('../errno');
-var {JSON_MARK, isJSON, DataFormater, T_BIND, M_PING } = require('./json');
+var util = require('../../util');
+var event = require('../../event');
+var { userAgent } = require('../../request');
+var url = require('../../url');
+var errno = require('../../errno');
+var {EXT_PING_MARK, DataFormater, T_BIND } = require('../formater');
 var { haveNode, haveWeb } = util;
-var JSON_MARK_LENGTH = JSON_MARK.length;
 
 if (haveWeb) {
 	var WebSocket = global.WebSocket;
@@ -47,7 +46,7 @@ if (haveWeb) {
 	var crypto = require('crypto');
 	var {
 		PacketParser, sendDataPacket,
-		sendPingPacket } = require('./parser');
+		sendPingPacket } = require('../parser');
 } else {
 	throw 'Unimplementation';
 }
@@ -111,9 +110,8 @@ class Conversation {
 		} else {
 			clients[name] = client;
 			if (this.m_is_open) {
-				this.send(new DataFormater({ service: name, type: T_BIND }));
-			}
-			else {
+				this.send(new DataFormater({ service: name, type: T_BIND }).toBuffer());
+			} else {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
 		}
@@ -162,21 +160,11 @@ class Conversation {
 	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg packet {String|Buffer}
 	 */
-	handlePacket(type, packet) {
-		var is_json = isJSON(type, packet);
-		if (is_json == M_PING) { // pong
+	handlePacket(packet, isText) {
+		var data = DataFormater.parse(packet, isText);
+		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPong.trigger();
-			return;
-		}
-		this.onMessage.trigger({ type, data: packet });
-
-		if (is_json) { // json text
-			try {
-				var data = DataFormater.parse( JSON.parse(packet.substr(JSON_MARK_LENGTH)) );
-			} catch(err) {
-				console.log(err);
-				return;
-			}
+		} else if (data.isValidEXT()) { // Extension protocol
 			var client = this.m_clients[data.service];
 			if (client) {
 				client.receiveMessage(data);
@@ -184,6 +172,8 @@ class Conversation {
 				console.error('Could not find the message handler, '+
 											'discarding the message, ' + data.service);
 			}
+		} else {
+			this.onMessage.trigger({ isText, data: packet });
 		}
 	}
 
@@ -289,9 +279,9 @@ class WebConversation extends WSConversationBasic {
 			req.onmessage = function(e) {
 				var data = e.data;
 				if (data instanceof ArrayBuffer) {
-					self.handlePacket(1, data);
+					self.handlePacket(data, 0);
 				} else { // string
-					self.handlePacket(0, data);
+					self.handlePacket(data, 1);
 				}
 			};
 
@@ -334,7 +324,7 @@ class WebConversation extends WSConversationBasic {
 			} else if (data && data.buffer instanceof ArrayBuffer) {
 				this.m_req.send(data.buffer);
 			} else { // send json string message
-				this.m_req.send(JSON_MARK + JSON.stringify(data));
+				this.m_req.send(JSON.stringify(data));
 			}
 		} else {
 			this.m_message.push(data);
@@ -347,7 +337,7 @@ class WebConversation extends WSConversationBasic {
 	 */
 	ping() {
 		if (this.isOpen) {
-			this.m_req.send(JSON_MARK);
+			this.m_req.send(EXT_PING_MARK);
 		} else {
 			this.connect(); // 尝试连接
 		}
@@ -449,8 +439,8 @@ class NodeConversation extends WSConversationBasic {
 					s.destroy();
 			});
 
-			parser.onText.on(e=>self.handlePacket(0, e.data));
-			parser.onData.on(e=>self.handlePacket(1, e.data));
+			parser.onText.on(e=>self.handlePacket(e.data, 1));
+			parser.onData.on(e=>self.handlePacket(e.data, 0));
 			parser.onPing.on(e=>self.onPong.trigger());
 			parser.onClose.on(e=>self.close());
 			parser.onError.on(e=>(self._error(e.data),self.close()));
@@ -466,7 +456,7 @@ class NodeConversation extends WSConversationBasic {
 		req.end();
 	}
 	
-	/** 
+	/**
 	 * @ovrewrite 
 	 */
 	close() {

@@ -29,8 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var event = require('../event');
-var {Buffer} = require('buffer');
-var {JSON_MARK} = require('./json');
+var Buffer = require('buffer').Buffer;
 
 /*
  * Unpacks a buffer to a number.
@@ -417,7 +416,7 @@ function sendDataPacket(socket, data) {
 	if (data instanceof Uint8Array) {
 		opcode = 0x82;
 	} else { // send json string message
-		data = JSON_MARK + JSON.stringify(data);
+		data = JSON.stringify(data);
 		data = new Buffer(data);
 	}
 
@@ -426,9 +425,9 @@ function sendDataPacket(socket, data) {
 	var secondByte = dataLength;
 
 	/*
-		0   - 125   : 2,	opcode|len
-		126 - 65536 : 4,	opcode|126|len|len
-		65537 -     : 10,	opcode|127|len|len|len|len|len|len|len|len
+		0   - 125   : 2,	opcode|len|data
+		126 - 65536 : 4,	opcode|126|len|len|data
+		65537 -     : 10,	opcode|127|len|len|len|len|len|len|len|len|data
 	*/
 	/*
 		opcode:

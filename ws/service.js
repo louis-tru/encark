@@ -31,7 +31,7 @@
 var Service = require('../service').Service;
 var Session = require('../session').Session;
 var errno = require('../errno');
-var {DataFormater,T_CALLBACK,T_CALL,T_EVENT} = require('./json');
+var {DataFormater,T_CALLBACK,T_CALL,T_EVENT} = require('./data');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
 
@@ -60,7 +60,7 @@ async function callFunction(self, msg) {
 		} else {
 			rev.data = r;
 		}
-		self.conv.send(rev);
+		self.conv.send(rev.toBuffer());
 	} else {
 		console.error('connection dropped, cannot callback');
 	}
@@ -174,7 +174,7 @@ class WSService extends Service {
 				}, timeout);
 			}
 			try {
-				this.m_conv.send(msg);
+				this.m_conv.send(msg.toBuffer());
 				this.m_callbacks[cb] = msg;
 			} catch(err) {
 				msg.err(err);
@@ -192,7 +192,7 @@ class WSService extends Service {
 				type: T_CALL, 
 				name: method, 
 				data: data,
-			}));
+			}).toBuffer());
 		} else {
 			console.error('connection dropped, cannot call method');
 		}
@@ -205,7 +205,7 @@ class WSService extends Service {
 		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			this.m_conv.send(new DataFormater({
 				service: this.name, type: T_EVENT, name: event, data: data,
-			}));
+			}).toBuffer());
 		} else {
 			console.error('connection dropped, cannot send event');
 		}

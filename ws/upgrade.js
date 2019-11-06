@@ -28,8 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var Early = require('./early').Early;
-var Hybi = require('./hybi').Hybi;
+var Hybi = require('./conv').Hybi;
 var querystring = require('querystring');
 
 var protocol_versions = {
@@ -64,7 +63,8 @@ function upgrade(req, upgradeHead) {
 			return new klass(req, upgradeHead, bind_services);
 		}
 	}
-	return new Early(req, upgradeHead, bind_services);
+	req.socket.destroy();
+	console.warn('Unrecognized websocket protocol header');
 }
 
 module.exports = upgrade;

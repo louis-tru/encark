@@ -34,30 +34,11 @@ var url = require('url');
 var service = require('../service');
 var {WSService} = require('./service');
 var {Buffer} = require('buffer');
-var {isJSON,JSON_MARK,DataFormater,M_PING} = require('./json');
-var JSON_MARK_LENGTH = JSON_MARK.length;
-
-/** 
- * @func bind_services() 绑定服务
-*/
-async function bindServices(self, bind_services) {
-	utils.assert(bind_services[0], 'service undefined');
-
-	for (var name of bind_services) {
-		var cls = service.get(name);
-
-		utils.assert(cls, name + ' not found');
-		utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
-		utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
-
-		var ser = new cls(self);
-		ser.name = name;
-		utils.assert(await ser.requestAuth(null), 'request auth fail');
-		self.m_services[name] = ser;
-
-		utils.nextTick(e=>ser.loaded());
-	}
-}
+var crypto = require('crypto');
+var errno = require('../errno');
+var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
+var {DataFormater} = require('./data');
+var KEEP_ALIVE_TIME = 5e4;
 
 /**
  * @class Conversation
@@ -107,45 +88,72 @@ var Conversation = utils.class('Conversation', {
 		this.token = utils.hash(utils.id + this.server.host + '');
 		this.m_services = {};
 		var self = this;
-
 		// initialize
 		utils.nextTick(function() {
-			bindServices(self, bind_services_name.split(',')).then(function() {
-				if (!self.initialize())
-					return self.socket.destroy();  // 关闭连接
-
-				utils.assert(!self.m_isOpen);
-				self.server.m_ws_conversations[self.token] = self;
-				self.m_isOpen = true;
-
-				self.onClose.once(function() {
-					utils.assert(self.m_isOpen);
-					delete self.server.m_ws_conversations[self.token];
-					self.m_isOpen = false;
-					self.request = null;
-					self.socket = null;
-					self.token = '';
-					self.onOpen.off();
-					self.onMessage.off();
-					// self.onError.off();
-					try {
-						for (var s of Object.values(self.m_services))
-							s.destroy();
-						self.server.trigger('WSConversationClose', self);
-					} catch(err) {
-						console.error(err);
-					}
-					self.server = null;
-					utils.nextTick(e=>self.onClose.off());
-				});
-
-				self.onOpen.trigger();
-				self.server.trigger('WSConversationOpen', self);
+			self._bind(bind_services_name.split(',')).then(function() {
+				self._initialize();
 			}).catch(function(e) {
 				self.socket.destroy();  // 关闭连接
 				console.error(e);
 			});
 		});
+	},
+
+	_initialize: function() {
+		var self = this;
+		if (!self.initialize())
+			return self.socket.destroy();  // 关闭连接
+
+		utils.assert(!self.m_isOpen);
+		self.server.m_ws_conversations[self.token] = self; // TODO private visit
+		self.m_isOpen = true;
+
+		self.onClose.once(function() {
+			utils.assert(self.m_isOpen);
+			delete self.server.m_ws_conversations[self.token]; // private visit
+			self.m_isOpen = false;
+			self.request = null;
+			self.socket = null;
+			self.token = '';
+			self.onOpen.off();
+			self.onMessage.off();
+			// self.onError.off();
+			try {
+				for (var s of Object.values(self.m_services))
+					s.destroy();
+				self.server.trigger('WSConversationClose', self);
+			} catch(err) {
+				console.error(err);
+			}
+			self.server = null;
+			utils.nextTick(e=>self.onClose.off());
+		});
+
+		self.onOpen.trigger();
+		self.server.trigger('WSConversationOpen', self);
+	},
+
+	/** 
+	 * @func _bind() 绑定服务
+	*/
+	_bind: async function(bind_services) {
+		utils.assert(bind_services[0], 'service undefined');
+		var slef = this;
+
+		for (var name of bind_services) {
+			var cls = service.get(name);
+
+			utils.assert(cls, name + ' not found');
+			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
+			utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
+
+			var ser = new cls(self);
+			ser.name = name;
+			utils.assert(await ser.requestAuth(null), 'request auth fail');
+			self.m_services[name] = ser;
+
+			utils.nextTick(e=>ser.loaded());
+		}
 	},
 
 	/**
@@ -202,26 +210,15 @@ var Conversation = utils.class('Conversation', {
 
 	/**
 	 * @func handlePacket() 进一步解析数据
-	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg {String|Buffer} packet
 	 */
-	handlePacket: function(type, packet) {
-		var is_json = isJSON(type, packet);
-		if (is_json == M_PING) { // ping, browser web socket 
+	handlePacket: function(packet, isText) {
+		var data = DataFormater.parse(packet, isText);
+		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPing.trigger();
-			return;
-		}
-		this.onMessage.trigger({ type, data: packet });
-
-		if (is_json) { // json text
-			try {
-				var data = DataFormater.parse( JSON.parse(packet.substr(JSON_MARK_LENGTH)) );
-			} catch(err) {
-				console.error(err);
-				return;
-			}
+		} else if (data.isValidEXT()) { // Extension protocol
 			if (data.isBind()) { // 绑定服务消息
-				bindServices(this, [data.service]).catch(console.error);
+				this._bind([data.service]).catch(console.error);
 			} else {
 				var service = this.m_services[data.service];
 				if (service) {
@@ -231,6 +228,8 @@ var Conversation = utils.class('Conversation', {
 												'discarding the message, ' + data.service);
 				}
 			}
+		} else {
+			this.onMessage.trigger({ isText, data: packet });
 		}
 	},
 
@@ -258,4 +257,147 @@ var Conversation = utils.class('Conversation', {
 	// @end
 });
 
-exports.Conversation = Conversation;
+/**
+ * @class Hybi
+ */
+class Hybi extends Conversation {
+
+	constructor(req, upgradeHead, bind_services_name) {
+		super(req, bind_services_name);
+	}
+
+	/**
+	 * @func _handshakes()
+	 */
+	_handshakes() {
+		var self = this;
+		var req = self.request;
+		var socket = self.socket;
+		var key = req.headers['sec-websocket-key'];
+		var origin = req.headers['sec-websocket-origin'];
+		// var location = (socket.encrypted ? 'wss' : 'ws') + '://' + req.headers.host + req.url;
+		var upgrade = req.headers.upgrade;
+
+		if (!upgrade || upgrade.toLowerCase() !== 'websocket') {
+			console.error('connection invalid');
+			return false;
+		}
+		
+		if (!self.verifyOrigin(origin)) {
+			console.error('connection invalid: origin mismatch');
+			return false;
+		}
+
+		if (!key) {
+			console.error('connection invalid: received no key');
+			return false;
+		}
+
+		// calc key
+		var shasum = crypto.createHash('sha1');
+		shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
+		key = shasum.digest('base64');
+
+		var headers = [
+			'HTTP/1.1 101 Switching Protocols',
+			'Upgrade: websocket',
+			'Connection: Upgrade',
+			'Session-Token: ' + self.token,
+			'Sec-WebSocket-Accept: ' + key,
+		];
+
+		try {
+			socket.write(headers.concat('', '').join('\r\n'));
+		}
+		catch (e) {
+			console.error(e);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * @overwrite
+	 */
+	initialize() {
+		if (!this._handshakes()) {
+			return false;
+		}
+		var self = this;
+		var socket = this.socket;
+		var parser = new PacketParser();
+
+		//socket.setNoDelay(true);
+		socket.setTimeout(0);
+		socket.setKeepAlive(true, KEEP_ALIVE_TIME);
+
+		socket.on('timeout', e=>self.close());
+		socket.on('end', e=>self.close());
+		socket.on('close', e=>self.close());
+		socket.on('data', e=>parser.add(e));
+		socket.on('error', function (e) {
+			var socket = self.socket;
+			self.close();
+			if (socket)
+				socket.destroy();
+		});
+
+		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
+		parser.onData.on(e=>self.handlePacket(e.data, 0));
+		parser.onPing.on(e=>self.onPing.trigger());
+		parser.onClose.on(e=>self.close());
+		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
+
+		return true;
+	}
+
+	/**
+	 * @overwrite
+	 */
+	send(data) {
+		if (this.isOpen) {
+			try {
+				sendDataPacket(this.socket, data);
+			} catch (e) {
+				console.error(e);
+				this.close();
+			}
+		} else {
+			throw Error.new(errno.ERR_CONNECTION_CLOSE_STATUS);
+		}
+	}
+
+	pong() {
+		if (this.isOpen) {
+			try {
+				sendPingPacket(this.socket);
+			} catch (e) {
+				console.error(e);
+			}
+		}
+	}
+
+	/**
+	 * @overwrite
+	 */
+	close () {
+		if (this.isOpen) {
+			var socket = this.socket;
+			socket.removeAllListeners('end');
+			socket.removeAllListeners('close');
+			socket.removeAllListeners('error');
+			socket.removeAllListeners('data');
+			if (socket.writable) 
+				socket.end();
+			this.onClose.trigger();
+		}
+	}
+
+}
+
+module.exports = {
+	PacketParser,
+	Conversation,
+	Hybi,
+};

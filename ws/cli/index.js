@@ -28,11 +28,11 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var errno = require('../errno');
-var { Notification } = require('../event');
-var { DataFormater,T_CALLBACK,T_CALL} = require('./json');
-var cli_conv = require('./cli_conv');
+var util = require('../../util');
+var errno = require('../../errno');
+var { Notification } = require('../../event');
+var { DataFormater,T_CALLBACK,T_CALL} = require('../formater');
+var conv = require('./conv');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
 
@@ -60,7 +60,7 @@ async function callFunction(self, msg) {
 	} else {
 		rev.data = r;
 	}
-	self.conv.send(rev);
+	self.conv.send(rev.toBuffer());
 }
 
 /**
@@ -168,7 +168,7 @@ class WSClient extends Notification {
 					delete this.m_callbacks[cb];
 				}, timeout);
 			}
-			this.m_conv.send(msg);
+			this.m_conv.send(msg.toBuffer());
 			this.m_callbacks[cb] = msg;
 		});
 	}
@@ -182,13 +182,12 @@ class WSClient extends Notification {
 			type: T_CALL,
 			name: method,
 			data: data,
-		}));
+		}).toBuffer());
 	}
 
 }
 
-exports = module.exports = {
-	...cli_conv,
+exports = module.exports = Object.assign({
 	METHOD_CALL_TIMEOUT,
 	WSClient,
-};
+}, conv);

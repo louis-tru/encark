@@ -150,7 +150,7 @@ class FastMessageTransferCenter_INL {
 			for (var cfg of Object.values(this.m_fnodes_cfg)) {
 				if ( !this.getFnodeFrom(cfg.url) ) {
 					cfg.retry++;
-					console.log('FastMessageTransferCenter_INL.initializeNodes(), connect', cfg.url);
+					console.log('FastMessageTransferCenter_INL.run(), connect', cfg.url);
 					FNodeRemoteClient.connect(this, cfg.url).catch(err=>{
 						if (err.code != errno[0]) {
 							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
@@ -424,7 +424,7 @@ class FNodeRemote extends FNode {
 	}
 }
 
-class FNodeRemoteEXT {
+class FNodeRemoteIMPL {
 
 	getThatFnode() {
 		return this.m_that_fnode;
@@ -523,8 +523,8 @@ class FNodeRemoteClient extends cli.WSClient {
 	}
 }
 
-utils.extendClass(FNodeRemoteService, FNodeRemoteEXT);
-utils.extendClass(FNodeRemoteClient, FNodeRemoteEXT);
+utils.extendClass(FNodeRemoteService, FNodeRemoteIMPL);
+utils.extendClass(FNodeRemoteClient, FNodeRemoteIMPL);
 service.set('_fnode', FNodeRemoteService);
 
 module.exports = {
