@@ -61,6 +61,7 @@ class Conversation {
 	// m_connect: false, // 是否尝试连接中
 	// m_is_open: false, // open status
 	// m_clients: null, // client list
+	// m_default_service: '',
 	// m_token: '',
 	// m_message: null, 
 	// m_signer: null,
@@ -85,6 +86,7 @@ class Conversation {
 		this.m_connect = false;
 		this.m_is_open = false;
 		this.m_clients = {};
+		this.m_clients_count = 0;
 		this.m_token = '';
 		this.m_message = [];
 		this.m_signer = null;
@@ -109,6 +111,9 @@ class Conversation {
 			throw new Error('No need to repeat binding');
 		} else {
 			clients[name] = client;
+			if (!this.m_default_service)
+				this.m_default_service = name;
+			this.m_clients_count++;
 			if (this.m_is_open) {
 				this.send(new DataFormater({ service: name, type: T_BIND }).toBuffer());
 			} else {
@@ -122,6 +127,10 @@ class Conversation {
 	 */
 	get clients() {
 		return this.m_clients;
+	}
+
+	_service(service) {
+		return self.m_clients_count == 1 ? undefined: service;
 	}
 
 	_open() {
@@ -165,7 +174,7 @@ class Conversation {
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPong.trigger();
 		} else if (data.isValidEXT()) { // Extension protocol
-			var client = this.m_clients[data.service];
+			var client = this.m_clients[data.service || this.m_default_service];
 			if (client) {
 				client.receiveMessage(data);
 			} else {

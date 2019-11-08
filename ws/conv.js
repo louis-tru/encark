@@ -47,6 +47,8 @@ var Conversation = utils.class('Conversation', {
 
 	m_isOpen: false,
 	m_services: null,
+	m_default_service: '',
+	m_services_count: 0,
 
 	/**
 	 * @field server {Server}
@@ -87,6 +89,7 @@ var Conversation = utils.class('Conversation', {
 		this.socket = req.socket;
 		this.token = utils.hash(utils.id + this.server.host + '');
 		this.m_services = {};
+		this.m_services_count = 0;
 		var self = this;
 		// initialize
 		utils.nextTick(function() {
@@ -137,7 +140,7 @@ var Conversation = utils.class('Conversation', {
 	 * @func _bind() 绑定服务
 	*/
 	_bind: async function(bind_services) {
-		utils.assert(bind_services[0], 'service undefined');
+		utils.assert(bind_services[0], 'bind service undefined');
 		var slef = this;
 
 		for (var name of bind_services) {
@@ -151,9 +154,17 @@ var Conversation = utils.class('Conversation', {
 			ser.name = name;
 			utils.assert(await ser.requestAuth(null), 'request auth fail');
 			self.m_services[name] = ser;
+			self.m_services_count++;
+
+			if (!self.m_default_service)
+				self.m_default_service = name;
 
 			utils.nextTick(e=>ser.loaded());
 		}
+	},
+
+	_service: function(service) {
+		return self.m_services_count == 1 ? undefined: service;
 	},
 
 	/**
@@ -220,7 +231,7 @@ var Conversation = utils.class('Conversation', {
 			if (data.isBind()) { // 绑定服务消息
 				this._bind([data.service]).catch(console.error);
 			} else {
-				var service = this.m_services[data.service];
+				var service = this.m_services[data.service || this.m_default_service];
 				if (service) {
 					service.receiveMessage(data);
 				} else {

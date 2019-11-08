@@ -53,14 +53,14 @@ async function callFunction(self, msg) {
 			console.warn(err);
 		return;
 	}
-	var rev = new DataFormater({ service: self.name, type: T_CALLBACK, cb });
-	if (self.conv.isOpen) {  // 如果连接断开,将这个数据丢弃
+	var rev = new DataFormater({ service: self.m_conv._service(self.name), type: T_CALLBACK, cb });
+	if (self.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 		if (err) {
 			rev.error = err; // Error.toJSON(err);
 		} else {
 			rev.data = r;
 		}
-		self.conv.send(rev.toBuffer());
+		self.m_conv.send(rev.toBuffer());
 	} else {
 		console.error('connection dropped, cannot callback');
 	}
@@ -148,7 +148,7 @@ class WSService extends Service {
 		return new Promise((resolve, reject)=>{
 			var cb = util.id;
 			var timeid, msg = new DataFormater({
-				service: this.name,
+				service: this.m_conv._service(this.name),
 				type: T_CALL,
 				name: method,
 				data: data,
@@ -188,7 +188,7 @@ class WSService extends Service {
 	weakCall(method, data) {
 		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			this.m_conv.send(new DataFormater({
-				service: this.name,
+				service: this.m_conv._service(this.name),
 				type: T_CALL, 
 				name: method, 
 				data: data,
@@ -204,7 +204,7 @@ class WSService extends Service {
 	trigger(event, data) {
 		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
 			this.m_conv.send(new DataFormater({
-				service: this.name, type: T_EVENT, name: event, data: data,
+				service: this.m_conv._service(this.name), type: T_EVENT, name: event, data: data,
 			}).toBuffer());
 		} else {
 			console.error('connection dropped, cannot send event');

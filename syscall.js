@@ -116,13 +116,13 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 			stderr: empty,
 		};
 
-		function on_data(data) {
+		function on_data_before(data) {
 			var r = onData.call(ch, data);
 			if (r)
 				r_stdout.push(r);
 		}
 
-		function on_error(data) {
+		function on_error_before(data) {
 			var r = onError.call(ch, data);
 			if (r)
 				r_stderr.push(r);
@@ -131,7 +131,7 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 		function parse_data(data, name) {
 			var output = data_tmp[name];
 			var index, prev = 0;
-			var handle = name == 'stdout' ? on_data: on_error;
+			var handle = name == 'stdout' ? on_data_before: on_error_before;
 
 			while ( (index = data.indexOf('\n', prev)) != -1 ) {
 				handle(Buffer.concat([output, data.slice(prev, index)]));
@@ -151,10 +151,10 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 					reject(Error.new(err));
 				} else {
 					if (data_tmp.stdout.length) {
-						on_data(data_tmp.stdout);
+						on_data_before(data_tmp.stdout);
 					}
 					if (data_tmp.stderr.length) {
-						on_error(data_tmp.stderr);
+						on_error_before(data_tmp.stderr);
 					}
 					resolve({ code, first: r_stdout[0], stdout: r_stdout, stderr: r_stderr });
 				}
@@ -168,7 +168,7 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 				stdout.write(e);
 			parse_data(e, 'stdout');
 		});
-	
+
 		ch.stderr.on('error', function(e) {
 			if (stderr)
 				stderr.write(e);
@@ -176,7 +176,7 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 		});
 
 		ch.on('error', e=>on_end(e));
-		ch.on('exit', e=>on_end(null, e));
+		ch.on('exit', e=>util.nextTick(on_end, null, e));
 
 		if (stdin) {
 			stdin.addListener('data', on_stdin = function(e) {

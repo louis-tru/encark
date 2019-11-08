@@ -54,7 +54,7 @@ async function callFunction(self, msg) {
 			console.warn(err);
 		return;
 	}
-	var rev = new DataFormater({ service: self.name, type: T_CALLBACK, cb });
+	var rev = new DataFormater({ service: self.conv._service(self.name), type: T_CALLBACK, cb });
 	if (err) {
 		rev.error = err; // Error.toJSON(err);
 	} else {
@@ -143,7 +143,7 @@ class WSClient extends Notification {
 		return new Promise((resolve, reject)=>{
 			var cb = util.id;
 			var timeid, msg = new DataFormater({
-				service: this.name,
+				service: this.conv._service(this.name),
 				type: T_CALL,
 				name: method,
 				data: data,
@@ -178,7 +178,7 @@ class WSClient extends Notification {
 	 */
 	weakCall(method, data) {
 		this.m_conv.send(new DataFormater({
-			service: this.name,
+			service: this.conv._service(this.name),
 			type: T_CALL,
 			name: method,
 			data: data,
