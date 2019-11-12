@@ -31,7 +31,7 @@
 var util = require('../../util');
 var errno = require('../../errno');
 var { Notification } = require('../../event');
-var { DataFormater,T_CALLBACK,T_CALL} = require('../formater');
+var { DataFormater,T_CALLBACK,T_CALL} = require('../data');
 var conv = require('./conv');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s

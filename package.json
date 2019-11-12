@@ -1,6 +1,6 @@
 {
 	"name": "nxkit",
-	"version": "0.8.64",
+	"version": "0.8.65",
 	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "util.js",
 	"author": {

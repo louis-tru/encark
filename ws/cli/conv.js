@@ -33,7 +33,7 @@ var event = require('../../event');
 var { userAgent } = require('../../request');
 var url = require('../../url');
 var errno = require('../../errno');
-var {EXT_PING_MARK, DataFormater, T_BIND } = require('../formater');
+var {EXT_PING_MARK, DataFormater, T_BIND } = require('../data');
 var { haveNode, haveWeb } = util;
 
 if (haveWeb) {
