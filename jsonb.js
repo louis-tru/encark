@@ -363,9 +363,9 @@ function read_next(bin) {
 		case F_UINT_8:
 			return read_num(bin, 'readUInt8', 1);
 		case F_INT_16:
-			return read_num(bin, 'readInt16BE', 1);
+			return read_num(bin, 'readInt16BE', 2);
 		case F_UINT_16:
-			return read_num(bin, 'readUInt16BE', 1);
+			return read_num(bin, 'readUInt16BE', 2);
 		case F_INT_32:
 			return read_num(bin, 'readInt32BE', 4);
 		case F_UINT_32:

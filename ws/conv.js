@@ -70,6 +70,8 @@ var Conversation = utils.class('Conversation', {
 	 */
 	token: '',
 
+	isGzip: false,
+
 	// @event:
 	onMessage: null,
 	onPing: null,
@@ -97,7 +99,7 @@ var Conversation = utils.class('Conversation', {
 				self._initialize();
 			}).catch(function(e) {
 				self.socket.destroy();  // 关闭连接
-				console.error(e);
+				console.warn(e);
 			});
 		});
 	},
@@ -141,7 +143,7 @@ var Conversation = utils.class('Conversation', {
 	*/
 	_bind: async function(bind_services) {
 		utils.assert(bind_services[0], 'bind service undefined');
-		var slef = this;
+		var self = this;
 
 		for (var name of bind_services) {
 			var cls = service.get(name);
@@ -156,15 +158,16 @@ var Conversation = utils.class('Conversation', {
 			self.m_services[name] = ser;
 			self.m_services_count++;
 
-			if (!self.m_default_service)
+			if (!self.m_default_service) {
 				self.m_default_service = name;
-
+				self.isGzip = ser.headers['use-gzip'] == 'on';
+			}
 			utils.nextTick(e=>ser.loaded());
 		}
 	},
 
 	_service: function(service) {
-		return self.m_services_count == 1 ? undefined: service;
+		return this.m_services_count == 1 ? undefined: service;
 	},
 
 	/**
@@ -223,13 +226,13 @@ var Conversation = utils.class('Conversation', {
 	 * @func handlePacket() 进一步解析数据
 	 * @arg {String|Buffer} packet
 	 */
-	handlePacket: function(packet, isText) {
-		var data = DataFormater.parse(packet, isText);
+	handlePacket: async function(packet, isText) {
+		var data = await DataFormater.parse(packet, isText, this.isGzip);
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPing.trigger();
 		} else if (data.isValidEXT()) { // Extension protocol
 			if (data.isBind()) { // 绑定服务消息
-				this._bind([data.service]).catch(console.error);
+				this._bind([data.service]).catch(console.warn);
 			} else {
 				var service = this.m_services[data.service || this.m_default_service];
 				if (service) {
@@ -254,6 +257,15 @@ var Conversation = utils.class('Conversation', {
 	 * @arg {Object} data
 	 */
 	send: function(data) {},
+
+	/**
+	 * @func sendData
+	 */
+	sendFormattedData: function(data) {
+		data = new DataFormater(data);
+		data.toBuffer(this.isGzip).then(e=>this.send(e));
+		return data;
+	},
 
 	/**
 	 * @func pong()

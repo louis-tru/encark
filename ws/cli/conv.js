@@ -90,6 +90,7 @@ class Conversation {
 		this.m_token = '';
 		this.m_message = [];
 		this.m_signer = null;
+		this.isGzip = false;
 		this.onError.on(e=>this.m_connect = false);
 	}
 
@@ -115,7 +116,7 @@ class Conversation {
 				this.m_default_service = name;
 			this.m_clients_count++;
 			if (this.m_is_open) {
-				this.send(new DataFormater({ service: name, type: T_BIND }).toBuffer());
+				this.sendFormattedData({ service: name, type: T_BIND });
 			} else {
 				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
@@ -130,7 +131,7 @@ class Conversation {
 	}
 
 	_service(service) {
-		return self.m_clients_count == 1 ? undefined: service;
+		return this.m_clients_count == 1 ? undefined: service;
 	}
 
 	_open() {
@@ -169,8 +170,8 @@ class Conversation {
 	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg packet {String|Buffer}
 	 */
-	handlePacket(packet, isText) {
-		var data = DataFormater.parse(packet, isText);
+	async handlePacket(packet, isText) {
+		var data = await DataFormater.parse(packet, isText, this.isGzip);
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPong.trigger();
 		} else if (data.isValidEXT()) { // Extension protocol
@@ -225,6 +226,15 @@ class Conversation {
 	 * @arg [data] {Object}
 	 */
 	send(data) {}
+
+	/**
+	 * @func sendFormattedData
+	 */
+	sendFormattedData(data) {
+		data = new DataFormater(data);
+		data.toBuffer(this.isGzip).then(e=>this.send(e));
+		return data;
+	}
 
 	/**
 	 * @func ping()
@@ -287,9 +297,11 @@ class WebConversation extends WSConversationBasic {
 
 			req.onmessage = function(e) {
 				var data = e.data;
-				if (data instanceof ArrayBuffer) {
+				if (data instanceof Blob) {
+					data.arrayBuffer().then(e=>self.handlePacket(new Uint8Array(e), 0));
+				} else if (data instanceof ArrayBuffer) {
 					self.handlePacket(data, 0);
-				} else { // string
+				}	else { // string
 					self.handlePacket(data, 1);
 				}
 			};
@@ -364,6 +376,11 @@ class NodeConversation extends WSConversationBasic {
 	// get response() { return this.m_response }
 	// get socket() { return this.m_socket }
 
+	constructor(path) {
+		super(path);
+		this.isGzip = true; // enable gzip
+	}
+
 	/** 
 	 * @ovrewrite 
 	 */
@@ -391,6 +408,7 @@ class NodeConversation extends WSConversationBasic {
 			'Sec-Websocket-Origin': origin,
 			'Sec-Websocket-Version': 13,
 			'Sec-Websocket-Key': key,
+			'Use-Gzip': this.isGzip ? 'on': 'off',
 		});
 
 		if (this.m_signer) {

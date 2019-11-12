@@ -31,7 +31,7 @@
 var util = require('../../util');
 var errno = require('../../errno');
 var { Notification } = require('../../event');
-var { DataFormater,T_CALLBACK,T_CALL} = require('../data');
+var { T_CALLBACK,T_CALL} = require('../data');
 var conv = require('./conv');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
@@ -54,13 +54,15 @@ async function callFunction(self, msg) {
 			console.warn(err);
 		return;
 	}
-	var rev = new DataFormater({ service: self.conv._service(self.name), type: T_CALLBACK, cb });
+	var rev = {
+		service: self.conv._service(self.name), type: T_CALLBACK, cb
+	};
 	if (err) {
 		rev.error = err; // Error.toJSON(err);
 	} else {
 		rev.data = r;
 	}
-	self.conv.send(rev.toBuffer());
+	self.conv.sendFormattedData(rev);
 }
 
 /**
@@ -91,7 +93,7 @@ class WSClient extends Notification {
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var cb in Object.values(callbacks)) {
+			for (var cb of Object.values(callbacks)) {
 				// cb.cancel = true;
 				cb.err(err);
 			}
@@ -142,7 +144,7 @@ class WSClient extends Notification {
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return new Promise((resolve, reject)=>{
 			var cb = util.id;
-			var timeid, msg = new DataFormater({
+			var timeid, msg = {
 				service: this.conv._service(this.name),
 				type: T_CALL,
 				name: method,
@@ -158,7 +160,7 @@ class WSClient extends Notification {
 						clearTimeout(timeid);
 					reject(e);
 				},
-			});
+			};
 			if (timeout) {
 				timeid = setTimeout(e=>{
 					// console.error(`method call timeout, ${this.name}/${method}`);
@@ -168,7 +170,7 @@ class WSClient extends Notification {
 					delete this.m_callbacks[cb];
 				}, timeout);
 			}
-			this.m_conv.send(msg.toBuffer());
+			this.m_conv.sendFormattedData(msg);
 			this.m_callbacks[cb] = msg;
 		});
 	}
@@ -177,12 +179,12 @@ class WSClient extends Notification {
 	 * @func weakCall(method, data) no callback, no return data
 	 */
 	weakCall(method, data) {
-		this.m_conv.send(new DataFormater({
+		this.m_conv.sendFormattedData({
 			service: this.conv._service(this.name),
 			type: T_CALL,
 			name: method,
 			data: data,
-		}).toBuffer());
+		});
 	}
 
 }

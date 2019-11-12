@@ -28,9 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var { decodeUTF8,encodeUTF8 } = require('../_codec');
 var jsonb = require('../jsonb');
-
 var EXT_PING_MARK = '\ufffe';
 var TYPES = {
 	T_BIND: 0xf1,
@@ -39,8 +37,36 @@ var TYPES = {
 	T_CALLBACK: 0xf4,
 };
 
+if (require('../util').haveNode) {
+	var zlib = require('zlib');
+}
+
 function isValidEXT(type) {
-	type >= TYPES.T_BIND && type < 0xff;
+	return type >= TYPES.T_BIND && type < 0xff;
+}
+
+function ungzip(buffer) {
+	return zlib ? new Promise((resolve, reject)=>{
+		zlib.inflateRaw(buffer, function (err, data) {
+			if (err) {
+				reject(err);
+			} else {
+				resolve(data);
+			}
+		});
+	}): buffer;
+}
+
+function gzip(buffer) {
+	return zlib ? new Promise((resolve, reject)=>{
+		zlib.deflateRaw(buffer, function (err, data) {    
+			if (err) {
+				reject(err);
+			} else {
+				resolve(data);
+			}
+		});
+	}): buffer;
 }
 
 /**
@@ -50,24 +76,27 @@ class DataFormater {
 	constructor(data) {
 		Object.assign(this, data);
 	}
-	static parse(packet, isText) {
+	static async parse(packet, isText, isGzip = false) {
 		if (isText) { // JSON data
 			if (packet.length == 1 && packet == EXT_PING_MARK) {
 				return Object.assign(new DataFormater(), {ping: true});
 			}
 		}
 		try {
-			var [type,service,name,data,error,cb] = isText ? JSON.parse(packet): jsonb.parse(packet);
+			var [type,service,name,data,error,cb] = isText ? 
+				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
 			return Object.assign(new DataFormater(), {type,service,name,data,error,cb});
 		} catch(err) {
-			console.warn('no parse EXT buffer data', err);
+			console.warn('no parse EXT buffer data', err, packet);
+			return new DataFormater();
 		}
 	}
-	toBuffer() {
-		return jsonb.binaryify([
+	async toBuffer(isGzip = false) {
+		var buffer = jsonb.binaryify([
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb,
 		]);
+		return isGzip ? await gzip(buffer): buffer;
 	}
 	toJSON() {
 		return [

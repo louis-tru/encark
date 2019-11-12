@@ -137,10 +137,13 @@ var Service = util.class('Service', {
 
 	get headers() {
 		if (!this.m_headers) {
-			var _headers;
+			var _headers = {};
 			try {
-				if (this.params._headers)
-					_headers = JSON.parse(this.params._headers);
+				if (this.params._headers) {
+					for ( var [key, value] of Object.entries(JSON.parse(this.params._headers)) ) {
+						_headers[key.toLowerCase()] = value;
+					}
+				}
 			} catch(e) {
 				console.error(e);
 			}
