@@ -41,9 +41,9 @@ var METHOD_CALL_TIMEOUT = 12e4; // 120s
 */
 async function callFunction(self, msg) {
 	var { data = {}, name, cb } = msg;
-	if (self.server.printLog) {
-		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
-	}
+	// if (util.dev) {
+	// 	console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
+	// }
 	var err, r;
 	try {
 		r = await self.handleCall(name, data);
@@ -89,14 +89,18 @@ class WSClient extends Notification {
 		util.assert(service_name);
 		util.assert(this.m_conv);
 
+		this.m_conv.onOpen.on(e=>{
+			this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
+		});
 		this.m_conv.onClose.on(async e=>{
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var cb of Object.values(callbacks)) {
-				// cb.cancel = true;
-				cb.err(err);
+			for (var handle of Object.values(callbacks)) {
+				// handle.send.cancel = true;
+				handle.err(err);
 			}
+			clearInterval(this.m_Intervalid);
 		});
 		this.m_conv.bind(this);
 	}
@@ -138,40 +142,41 @@ class WSClient extends Notification {
 		return fn.call(this, data);
 	}
 
+	_checkTimeout() {
+		var now = Date.now();
+		var callbacks = this.m_callbacks;
+		for (var cb in callbacks) {
+			var handle = callbacks[cb];
+			if (handle.timeout) {
+				if (handle.timeout < now) { // timeouted
+					handle.err(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
+						`Method call timeout, ${this.name}/${handle.method}`]));
+					handle.send.cancel = true;
+					delete callbacks[cb];
+				}
+			}
+		}
+	}
+
 	/**
 	 * @func call(method, data, timeout)
 	 */
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return new Promise((resolve, reject)=>{
+		return util.promise(async (resolve, reject)=>{
 			var cb = util.id;
-			var timeid, msg = {
-				service: this.conv._service(this.name),
-				type: T_CALL,
-				name: method,
-				data: data,
-				cb: cb,
-				ok: (e)=>{
-					if (timeid)
-						clearTimeout(timeid);
-					resolve(e);
-				},
-				err: (e)=>{
-					if (timeid)
-						clearTimeout(timeid);
-					reject(e);
-				},
+			this.m_callbacks[cb] = {
+				timeout: timeout ? timeout + Date.now(): 0,
+				method: method,
+				ok: resolve,
+				err: reject,
+				send: await this.m_conv.sendFormattedData({
+					service: this.conv._service(this.name),
+					type: T_CALL,
+					name: method,
+					data: data,
+					cb: cb,
+				}),
 			};
-			if (timeout) {
-				timeid = setTimeout(e=>{
-					// console.error(`method call timeout, ${this.name}/${method}`);
-					reject(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
-						`method call timeout, ${this.name}/${method}`]));
-					msg.cancel = true;
-					delete this.m_callbacks[cb];
-				}, timeout);
-			}
-			this.m_conv.sendFormattedData(msg);
-			this.m_callbacks[cb] = msg;
 		});
 	}
 
@@ -189,7 +194,7 @@ class WSClient extends Notification {
 
 }
 
-exports = module.exports = Object.assign({
+module.exports = exports = Object.assign({
 	METHOD_CALL_TIMEOUT,
 	WSClient,
 }, conv);

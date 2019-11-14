@@ -38,7 +38,7 @@ var crypto = require('crypto');
 var errno = require('../errno');
 var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
 var {DataFormater} = require('./data');
-var KEEP_ALIVE_TIME = 5e4;
+var KEEP_ALIVE_TIME = 5e4; // 50s
 
 /**
  * @class Conversation
@@ -83,7 +83,7 @@ var Conversation = utils.class('Conversation', {
 	 * @param {String}   bind_services
 	 * @constructor
 	 */
-	constructor: function(req, bind_services_name) {
+	constructor: function(req, bind_services) {
 		event.initEvents(this, 'Open', 'Message', 'Ping', 'Close');
 
 		this.server = req.socket.server.wrap;
@@ -93,15 +93,20 @@ var Conversation = utils.class('Conversation', {
 		this.m_services = {};
 		this.m_services_count = 0;
 		var self = this;
+
 		// initialize
-		utils.nextTick(function() {
-			self._bind(bind_services_name.split(',')).then(function() {
+		(async function() {
+			try {
+				var services = bind_services.split(',');
+				utils.assert(services[0], 'bind service undefined');
 				self._initialize();
-			}).catch(function(e) {
+				if (self.isOpen)
+					await self._bind(services);
+			} catch(e) {
 				self.socket.destroy();  // 关闭连接
 				console.warn(e);
-			});
-		});
+			}
+		}());
 	},
 
 	_initialize: function() {
@@ -113,9 +118,10 @@ var Conversation = utils.class('Conversation', {
 		self.server.m_ws_conversations[self.token] = self; // TODO private visit
 		self.m_isOpen = true;
 
-		self.onClose.once(function() {
+		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
 			delete self.server.m_ws_conversations[self.token]; // private visit
+
 			self.m_isOpen = false;
 			self.request = null;
 			self.socket = null;
@@ -142,17 +148,15 @@ var Conversation = utils.class('Conversation', {
 	 * @func _bind() 绑定服务
 	*/
 	_bind: async function(bind_services) {
-		utils.assert(bind_services[0], 'bind service undefined');
 		var self = this;
-
 		for (var name of bind_services) {
 			var cls = service.get(name);
-
 			utils.assert(cls, name + ' not found');
 			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
 
-			var ser = new cls(self);
+			var ser;
+			ser = new cls(self);
 			ser.name = name;
 			utils.assert(await ser.requestAuth(null), 'request auth fail');
 			self.m_services[name] = ser;
@@ -162,7 +166,7 @@ var Conversation = utils.class('Conversation', {
 				self.m_default_service = name;
 				self.isGzip = ser.headers['use-gzip'] == 'on';
 			}
-			utils.nextTick(e=>ser.loaded());
+			ser.loaded();
 		}
 	},
 
@@ -189,7 +193,6 @@ var Conversation = utils.class('Conversation', {
 		if (origin == 'null') {
 			origin = '*';
 		}
-
 		if (origins.indexOf('*:*') != -1) {
 			return true;
 		}
@@ -219,7 +222,7 @@ var Conversation = utils.class('Conversation', {
 	 * 获取绑定的服务
 	 */
 	get wsServices() {
-		return this.m_services;
+		return {...this.m_services};
 	},
 
 	/**
@@ -230,7 +233,8 @@ var Conversation = utils.class('Conversation', {
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPing.trigger();
-		} else if (data.isValidEXT()) { // Extension protocol
+		}
+		else if (data.isValidEXT()) { // Extension protocol
 			if (data.isBind()) { // 绑定服务消息
 				this._bind([data.service]).catch(console.warn);
 			} else {
@@ -261,10 +265,10 @@ var Conversation = utils.class('Conversation', {
 	/**
 	 * @func sendData
 	 */
-	sendFormattedData: function(data) {
+	sendFormattedData: async function(data) {
 		data = new DataFormater(data);
-		data.toBuffer(this.isGzip).then(e=>this.send(e));
-		return data;
+		data = await data.toBuffer(this.isGzip);
+		return this.send(data);
 	},
 
 	/**
@@ -331,8 +335,7 @@ class Hybi extends Conversation {
 
 		try {
 			socket.write(headers.concat('', '').join('\r\n'));
-		}
-		catch (e) {
+		} catch (e) {
 			console.error(e);
 			return false;
 		}
@@ -351,7 +354,7 @@ class Hybi extends Conversation {
 		var socket = this.socket;
 		var parser = new PacketParser();
 
-		//socket.setNoDelay(true);
+		// socket.setNoDelay(true);
 		socket.setTimeout(0);
 		socket.setKeepAlive(true, KEEP_ALIVE_TIME);
 
@@ -360,10 +363,10 @@ class Hybi extends Conversation {
 		socket.on('close', e=>self.close());
 		socket.on('data', e=>parser.add(e));
 		socket.on('error', function (e) {
-			var socket = self.socket;
+			var s = self.socket;
 			self.close();
-			if (socket)
-				socket.destroy();
+			if (s)
+				s.destroy();
 		});
 
 		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
@@ -379,16 +382,15 @@ class Hybi extends Conversation {
 	 * @overwrite
 	 */
 	send(data) {
-		if (this.isOpen) {
-			try {
-				sendDataPacket(this.socket, data);
-			} catch (e) {
-				console.error(e);
-				this.close();
-			}
-		} else {
-			throw Error.new(errno.ERR_CONNECTION_CLOSE_STATUS);
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		try {
+			sendDataPacket(this.socket, data);
+			// sendPingPacket(this.socket);
+		} catch (err) {
+			this.close();
+			throw err;
 		}
+		return {};
 	}
 
 	pong() {
@@ -414,6 +416,7 @@ class Hybi extends Conversation {
 			if (socket.writable) 
 				socket.end();
 			this.onClose.trigger();
+			console.log('Hybi Conversation Close');
 		}
 	}
 

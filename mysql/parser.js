@@ -343,7 +343,7 @@ var Parser = util.class('Parser', {
 					break;
 				case 5: // GREETING_SCRAMBLE_BUFF_1:
 					if (packet.index == 0) {
-						packet.scrambleBuffer = new Buffer(8 + 12);
+						packet.scrambleBuffer = Buffer.alloc(8 + 12);
 					}
 
 					// 8 bytes
@@ -721,7 +721,7 @@ var Parser = util.class('Parser', {
 					packet.columnLength = lengthCoded(packet.columnLength);
 
 					if (!packet.columnLength && !this._lengthCodedLength) {
-						packet.ondata.trigger({ buffer: packet.columnLength === null ? null : new Buffer(0), remaining: 0 });
+						packet.ondata.trigger({ buffer: packet.columnLength === null ? null : Buffer.alloc(0), remaining: 0 });
 						if (packet.received < packet.length) {
 							advance(exports.COLUMN_VALUE_LENGTH);
 						} else {

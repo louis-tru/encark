@@ -182,24 +182,38 @@ function write_bigint(o, out) {
 	return 1 + write_buffer(bytes.reverse(), out);
 }
 
-function write_array(o, out) {
+function write_array(o, out, set) {
+	if (set.has(o))
+		return write_flag(F_NULL, out);
+	set.add(o);
 	var l = 0;
 	for (var val of o) {
-		l += serialize(val, out);
+		l += serialize(val, out, set);
 	}
+	set.delete(o);
 	return l;
 }
 
-function write_object(o, out) {
+function write_object(o, out, set) {
+	if (set.has(o))
+		return write_flag(F_NULL, out);
+	set.add(o);
 	var l = 0;
-	for (var key in o) {
-		l += serialize(key, out);
-		l += serialize(o[key], out);
+	if (o.toJSON) {
+		l = serialize(o.toJSON(), out, set);
+	} else {
+		l += write_flag(F_OBJECT, out);	
+		for (var key in o) {
+			l += serialize(key, out, set);
+			l += serialize(o[key], out, set);
+		}
+		l += write_flag(F_OBJECT_END, out);
 	}
+	set.delete(o);
 	return l;
 }
 
-function serialize(o, out) {
+function serialize(o, out, set) {
 	switch (typeof o) {
 		case 'string':
 			return write_flag(F_STRING, out) + write_buffer(codec.encodeUTF8(o), out);
@@ -221,7 +235,7 @@ function serialize(o, out) {
 			if (!o) {
 				return write_flag(F_NULL, out);
 			} else if (Array.isArray(o)) {
-				return write_flag(F_ARRAY, out) + write_array(o, out) + write_flag(F_ARRAY_END, out);
+				return write_flag(F_ARRAY, out) + write_array(o, out, set) + write_flag(F_ARRAY_END, out);
 			} else if (o instanceof Uint8Array) {
 				return write_flag(F_BUFFER, out) + write_buffer(o, out);
 			} else if (o instanceof TypedArray) {
@@ -231,7 +245,7 @@ function serialize(o, out) {
 			} else if (o instanceof Date) {
 				return write_flag(F_DATE, out) + write_num(o.valueOf(), 'writeInt48BE', 6, out);
 			} else {
-				return write_flag(F_OBJECT, out) + write_object(o, out) + write_flag(F_OBJECT_END, out);
+				return write_object(o, out, set);
 			}
 		case 'undefined':
 			return write_flag(F_UNDEFAULT, out);
@@ -242,7 +256,7 @@ function serialize(o, out) {
 
 function binaryify(o) {
 	var output = [];
-	var byteLen = serialize(o, output);
+	var byteLen = serialize(o, output, new Set);
 	var offset = 0;
 	var rev = new Uint8Array(byteLen);
 	for (var bytes of output) {

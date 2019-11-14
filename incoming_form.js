@@ -235,10 +235,10 @@ var MultipartParser = util.class('MultipartParser', {
 	},
 
 	init_with_boundary: function (str) {
-		this.boundary = new Buffer(str.length + 4);
+		this.boundary = Buffer.alloc(str.length + 4);
 		this.boundary.write('\r\n--', 0, 'ascii');
 		this.boundary.write(str, 4, 'ascii');
-		this.lookbehind = new Buffer(this.boundary.length + 8);
+		this.lookbehind = Buffer.alloc(this.boundary.length + 8);
 		this.state = S.START;
 
 		this.boundaryChars = {};

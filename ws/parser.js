@@ -245,7 +245,7 @@ class PacketParser {
 		this.expectOffset += toRead;
 		if (toRead < data.length) {
 			// at this point the overflow buffer shouldn't at all exist
-			this.overflow = new Buffer(data.length - toRead);
+			this.overflow = Buffer.alloc(data.length - toRead);
 			data.copy(this.overflow, 0, toRead, toRead + this.overflow.length);
 		}
 		if (this.expectOffset == this.expectBuffer.length) {
@@ -265,7 +265,7 @@ class PacketParser {
 		if (this.overflow == null) this.overflow = data;
 		else {
 			var prevOverflow = this.overflow;
-			this.overflow = new Buffer(this.overflow.length + data.length);
+			this.overflow = Buffer.alloc(this.overflow.length + data.length);
 			prevOverflow.copy(this.overflow, 0);
 			data.copy(this.overflow, prevOverflow.length);
 		}
@@ -277,7 +277,7 @@ class PacketParser {
 	 * @api private
 	 */
 	expect(what, length, handler) {
-		this.expectBuffer = new Buffer(length);
+		this.expectBuffer = Buffer.alloc(length);
 		this.expectOffset = 0;
 		this.expectHandler = handler;
 		if (this.overflow != null) {
@@ -385,7 +385,7 @@ class PacketParser {
 		for (var i = 0, l = buffers.length; i < l; ++i) {
 			length += buffers[i].length;
 		}
-		var mergedBuffer = new Buffer(length);
+		var mergedBuffer = Buffer.alloc(length);
 		var offset = 0;
 		for (var i = 0, l = buffers.length; i < l; ++i) {
 			buffers[i].copy(mergedBuffer, offset);
@@ -415,9 +415,10 @@ function sendDataPacket(socket, data) {
 
 	if (data instanceof Uint8Array) {
 		opcode = 0x82;
+		// data = Buffer.from(data.buffer);
 	} else { // send json string message
 		data = JSON.stringify(data);
-		data = new Buffer(data);
+		data = Buffer.from(data);
 	}
 
 	var dataLength = data.length;
@@ -446,7 +447,7 @@ function sendDataPacket(socket, data) {
 		secondByte = 126;
 	}
 
-	var header = new Buffer(headerLength);
+	var header = Buffer.alloc(headerLength);
 
 	header[0] = opcode;
 	header[1] = secondByte;
@@ -473,7 +474,7 @@ function sendDataPacket(socket, data) {
  * @static
  */
 function sendPingPacket(socket) {
-	var header = new Buffer(2);
+	var header = Buffer.alloc(2);
 	header[0] = 0x89;
 	header[1] = 0;
 	socket.write(header);

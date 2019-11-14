@@ -97,7 +97,7 @@ var parsers = {
 				dataSet = JSON.parse(dataSet);
 				break;
 			case FLAG_BINARY:
-				tmp = new Buffer(dataSet.length);
+				tmp = Buffer.alloc(dataSet.length);
 				tmp.write(dataSet, 0, 'binary');
 				dataSet = tmp;
 				break;

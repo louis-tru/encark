@@ -33,24 +33,50 @@ var event = require('../event');
 var cli = require('../ws/cli');
 var uuid = require('../hash/uuid');
 var errno = require('../errno');
+var utils = require('../util');
 
 /**
  * @class Client
  */
 class WSClient extends cli.WSClient {
 
+	get autoConnect() {
+		return this.m_autoConnect;
+	}
+
+	set autoConnect(value) {
+		this.m_autoConnect = value;
+	}
+
 	constructor(host) {
 		var url = host.m_url;
 		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
 				s += '//' + url.host + url.path;
-		super('_fmt', new cli.Conversation(s));
+		super('_fmt', new cli.WSConversation(s));
 		this.m_host = host;
+		this.m_autoConnect = true;
+
 		this.conv.onOpen.on(e=>{
+			console.log('open ok', host.id);
 			if (host.m_subscribe.size) {
 				var events = [];
 				for (var i of host.m_subscribe)
 					events.push(i);
 				this.weakCall('subscribe', {events});
+			}
+		});
+
+		this.conv.onClose.on(e=>{
+			if (this.m_autoConnect) { // auto connect
+				console.log('reconnect Clo..', host.id);
+				utils.sleep(500).then(e=>this.conv.connect());
+			}
+		});
+
+		this.conv.onError.on(e=>{
+			if (this.m_autoConnect) { // auto connect
+				console.log('reconnect Err..', host.id);
+				utils.sleep(500).then(e=>this.conv.connect());
 			}
 		});
 	}
@@ -92,7 +118,7 @@ class FMTClient extends event.Notification {
 		super();
 		url = new path.URL(url);
 		url.setParam('id', id);
-		this.m_id = id;
+		this.m_id = String(id);
 		this.m_url = url;
 		this.m_subscribe = new Set();
 		this.m_cli = new WSClient(this, url);
@@ -138,19 +164,19 @@ class ThatClient {
 	}
 	constructor(host, id) {
 		this.m_host = host;
-		this.m_id = id;
+		this.m_id = String(id);
 	}
 	hasOnline() {
-		return this.m_host.call('hasOnline', { id: this.m_id });
+		return this.m_host.m_cli.call('hasOnline', [this.m_id]);
 	}
 	trigger(event, data) {
-		this.m_host.weakCall('triggerTo', { id: this.m_id, event, data });
+		this.m_host.m_cli.weakCall('triggerTo', [this.m_id, event, data]);
 	}
 	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
-		return this.m_host.call('callTo', { id: this.m_id, method, data, timeout }, timeout);
+		return this.m_host.m_cli.call('callTo', [this.m_id, method, data, timeout], timeout);
 	}
 	weakCall(method, data) {
-		this.m_host.weakCall('weakCallTo', { id: this.m_id, method, data });
+		this.m_host.m_cli.weakCall('weakCallTo', [this.m_id, method, data]);
 	}
 }
 

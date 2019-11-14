@@ -94,7 +94,7 @@ class NotificationCenter extends Notification {
 	}
 
 	publish(event, data) {
-		data = new Buffer(JSON.stringify(data) || '');
+		data = Buffer.from(JSON.stringify(data) || '');
 		return this.m_mqtt.publish(this.m_topic + '/' + event, data);
 	}
 

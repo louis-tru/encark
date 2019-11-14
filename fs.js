@@ -206,7 +206,7 @@ function inl_copy_file_sync(path, target, options, check) {
 	var wfd = fs.openSync(target, 'w');
 	
 	var size = 1024 * 100;
-	var buff = new Buffer(size); // 100kb
+	var buff = Buffer.alloc(size); // 100kb
 	var len = 0;
 	
 	do {

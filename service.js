@@ -140,9 +140,8 @@ var Service = util.class('Service', {
 			var _headers = {};
 			try {
 				if (this.params._headers) {
-					for ( var [key, value] of Object.entries(JSON.parse(this.params._headers)) ) {
+					for ( var [key, value] of Object.entries(JSON.parse(this.params._headers)) )
 						_headers[key.toLowerCase()] = value;
-					}
 				}
 			} catch(e) {
 				console.error(e);

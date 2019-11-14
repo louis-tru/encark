@@ -28,10 +28,11 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+var util = require('../util');
 var Service = require('../service').Service;
 var Session = require('../session').Session;
 var errno = require('../errno');
-var {DataFormater,T_CALLBACK,T_CALL,T_EVENT} = require('./data');
+var {T_CALLBACK,T_CALL,T_EVENT} = require('./data');
 
 var METHOD_CALL_TIMEOUT = 12e4; // 120s
 
@@ -40,9 +41,9 @@ var METHOD_CALL_TIMEOUT = 12e4; // 120s
 */
 async function callFunction(self, msg) {
 	var { data = {}, name, cb } = msg;
-	if (self.server.printLog) {
-		console.log('Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
-	}
+	// if (util.dev) {
+	// 	console.log('WSService.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
+	// }
 	var err, r;
 	try {
 		r = await self.handleCall(name, data);
@@ -92,6 +93,7 @@ class WSService extends Service {
 		super(conv.request);
 		this.m_callbacks = {};
 		this.m_conv = conv;
+		this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
 		this.m_conv.onClose.on(async e=>{
 			var callbacks = this.m_callbacks;
 			this.m_callbacks = {};
@@ -100,6 +102,7 @@ class WSService extends Service {
 				// cb.cancel = true;
 				cb.err(err);
 			}
+			clearInterval(this.m_Intervalid);
 		});
 		this.m_session = new Session(this);
 	}
@@ -143,44 +146,41 @@ class WSService extends Service {
 		return fn.call(this, data);
 	}
 
+	_checkTimeout() {
+		var now = Date.now();
+		var callbacks = this.m_callbacks;
+		for (var cb in callbacks) {
+			var handle = callbacks[cb];
+			if (handle.timeout) {
+				if (handle.timeout < now) { // timeouted
+					handle.err(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
+						`Method call timeout, ${this.name}/${handle.method}`]));
+					handle.send.cancel = true;
+					delete callbacks[cb];
+				}
+			}
+		}
+	}
+
 	/**
 	 * @func call(method, data)
 	 */
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return new Promise((resolve, reject)=>{
+		return util.promise(async (resolve, reject)=>{
 			var cb = util.id;
-			var timeid, msg = {
-				service: this.m_conv._service(this.name),
-				type: T_CALL,
-				name: method,
-				data: data,
-				cb: cb,
-				ok: (e)=>{
-					if (timeid)
-						clearTimeout(timeid);
-					resolve(e);
-				},
-				err: (e)=>{
-					if (timeid)
-						clearTimeout(timeid);
-					reject(e);
-				},
+			this.m_callbacks[cb] = {
+				timeout: timeout ? timeout + Date.now(): 0,
+				method: method,
+				ok: resolve,
+				err: reject,
+				send: await this.m_conv.sendFormattedData({
+					service: this.conv._service(this.name),
+					type: T_CALL,
+					name: method,
+					data: data,
+					cb: cb,
+				}),
 			};
-			if (timeout) {
-				timeid = setTimeout(e=>{
-					// console.error(`method call timeout, ${this.name}/${method}`);
-					reject(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
-						`method call timeout, ${this.name}/${method}`]));
-					msg.cancel = true;
-					delete this.m_callbacks[cb];
-				}, timeout);
-			}
-			try {
-				this.m_conv.sendFormattedData(msg);
-				this.m_callbacks[cb] = msg;
-			} catch(err) {
-				msg.err(err);
-			}
 		});
 	}
 

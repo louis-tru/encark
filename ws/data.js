@@ -28,6 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+var utils = require('../util');
 var jsonb = require('../jsonb');
 var EXT_PING_MARK = '\ufffe';
 var TYPES = {
@@ -59,7 +60,7 @@ function ungzip(buffer) {
 
 function gzip(buffer) {
 	return zlib ? new Promise((resolve, reject)=>{
-		zlib.deflateRaw(buffer, function (err, data) {    
+		zlib.deflateRaw(buffer, function (err, data) {
 			if (err) {
 				reject(err);
 			} else {
@@ -91,12 +92,15 @@ class DataFormater {
 			return new DataFormater();
 		}
 	}
-	async toBuffer(isGzip = false) {
+	toBuffer(isGzip = false) {
 		var buffer = jsonb.binaryify([
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb,
 		]);
-		return isGzip ? await gzip(buffer): buffer;
+		if (isGzip) {
+			return gzip(buffer);
+		}
+		return buffer;
 	}
 	toJSON() {
 		return [

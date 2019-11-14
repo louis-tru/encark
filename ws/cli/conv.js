@@ -88,10 +88,9 @@ class Conversation {
 		this.m_clients = {};
 		this.m_clients_count = 0;
 		this.m_token = '';
-		this.m_message = [];
+		this.m_msgs = [];
 		this.m_signer = null;
 		this.isGzip = false;
-		this.onError.on(e=>this.m_connect = false);
 	}
 
 	/**
@@ -137,17 +136,18 @@ class Conversation {
 	_open() {
 		util.assert(!this.m_is_open);
 		util.assert(this.m_connect);
-		var message = this.m_message;
+		var msgs = this.m_msgs;
 		this.m_is_open = true;
 		this.m_connect = false;
-		this.m_message = [];
+		this.m_msgs = [];
 		this.onOpen.trigger();
-		message.forEach(e=>e.cancel||this.send(e));
+		msgs.forEach(e=>e.cancel||this.send(e.data));
 	}
 
 	_error(err) {
-		this.m_connect = false;
-		this.onError.trigger(err);
+		if (this.m_connect)
+			this.close();
+		util.nextTick(e=>this.onError.trigger(err));
 	}
 
 	/**
@@ -155,13 +155,10 @@ class Conversation {
 	 */
 	connect() {
 		if (!this.m_is_open && !this.m_connect) {
-			for (var i in this.m_clients) {
-				this.m_connect = true;
-				this.initialize();
-				return;
-			}
-			// 连接必需要绑定服务才能使用
-			throw new Error('connection must bind service');
+			util.assert(this.m_default_service, 'connection must bind service'); // 连接必需要绑定服务才能使用
+			console.log('Connection..', this.m_url.href, this.m_connect);
+			this.m_connect = true;
+			this.initialize();
 		}
 	}
 
@@ -174,7 +171,8 @@ class Conversation {
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPong.trigger();
-		} else if (data.isValidEXT()) { // Extension protocol
+		}
+		else if (data.isValidEXT()) { // Extension protocol
 			var client = this.m_clients[data.service || this.m_default_service];
 			if (client) {
 				client.receiveMessage(data);
@@ -212,12 +210,15 @@ class Conversation {
 	 * @fun close # close conversation connection
 	 */
 	close() {
-		if (this.m_connect)
+		if (this.m_connect) {
+			// console.log('**** close conversation connection');
 			this.m_connect = false;
+		}
 		if (this.m_is_open) {
 			this.m_is_open = false;
 			this.m_token = '';
 			this.onClose.trigger();
+			console.log('CLI Conversation Close', this.m_url.href);
 		}
 	}
 
@@ -230,10 +231,10 @@ class Conversation {
 	/**
 	 * @func sendFormattedData
 	 */
-	sendFormattedData(data) {
+	async sendFormattedData(data) {
 		data = new DataFormater(data);
-		data.toBuffer(this.isGzip).then(e=>this.send(e));
-		return data;
+		data = await data.toBuffer(this.isGzip);
+		return this.send(data);
 	}
 
 	/**
@@ -290,6 +291,8 @@ class WebConversation extends WSConversationBasic {
 		var req = this.m_req = new WebSocket(url.href);
 
 		req.onopen = function(e) {
+			console.log('CLI WebConversation Upgrade', self.m_url.href);
+
 			if (!self.m_connect) {
 				self.close(); return;
 			}
@@ -314,9 +317,12 @@ class WebConversation extends WSConversationBasic {
 		};
 
 		req.onerror = function(e) {
+			console.log('CLI WebConversation error', self.m_url.href);
 			self._error(e);
 			self.close();
 		};
+
+		console.log('CLI WebConversation init', self.m_url.href, self.m_connect);
 	}
 
 	/**
@@ -347,9 +353,12 @@ class WebConversation extends WSConversationBasic {
 			} else { // send json string message
 				this.m_req.send(JSON.stringify(data));
 			}
+			return {};
 		} else {
-			this.m_message.push(data);
+			var msg = { data };
+			this.m_msgs.push(msg);
 			this.connect(); // 尝试连接
+			return msg;
 		}
 	}
 
@@ -371,10 +380,6 @@ class NodeConversation extends WSConversationBasic {
 	// @private:
 	// m_req: null,
 	// m_socket: null, // web socket connection
-	// m_response: null,
-	// @public:
-	// get response() { return this.m_response }
-	// get socket() { return this.m_socket }
 
 	constructor(path) {
 		super(path);
@@ -382,7 +387,7 @@ class NodeConversation extends WSConversationBasic {
 	}
 
 	/** 
-	 * @ovrewrite 
+	 * @ovrewrite
 	 */
 	initialize() {
 		util.assert(!this.m_req, 'No need to repeat open');
@@ -441,16 +446,19 @@ class NodeConversation extends WSConversationBasic {
 		}
 
 		req.on('upgrade', function(res, socket, upgradeHead) {
+			console.log('CLI NodeConversation Upgrade', self.m_url.href);
+
 			if ( !self.m_connect || !handshakes(res, key) ) {
 				socket.end();
 				self.close(); return;
 			}
-			self.m_response = res;
+
 			self.m_socket = socket;
 			self.m_token = res.headers['session-token'] || '';
 
 			var parser = new PacketParser();
 
+			// socket.setNoDelay(true);
 			socket.setTimeout(0);
 			socket.setKeepAlive(true, KEEP_ALIVE_TIME);
 
@@ -476,13 +484,15 @@ class NodeConversation extends WSConversationBasic {
 		});
 
 		req.on('error', function(e) {
+			console.log('CLI NodeConversation error', self.m_url.href);
 			self._error(e);
 			self.close();
 		});
+		console.log('CLI NodeConversation init', self.m_url.href, self.m_connect);
 
 		req.end();
 	}
-	
+
 	/**
 	 * @ovrewrite 
 	 */
@@ -497,7 +507,8 @@ class NodeConversation extends WSConversationBasic {
 			if (socket.writable)
 				socket.end();
 			if (!this.isOpen) {
-				this._error(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
+				this.onError.trigger(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
+				// this._error(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
 			}
 		} else {
 			if (this.m_req) {
@@ -506,23 +517,21 @@ class NodeConversation extends WSConversationBasic {
 		}
 		this.m_req = null;
 		this.m_socket = null;
-		this.m_response = null;
 		super.close();
 	}
-	
+
 	/**
 	 * @ovrewrite
 	 */
 	send(data) {
 		if (this.isOpen) {
-			if (this.m_socket) {
-				sendDataPacket(this.m_socket, data);
-			} else {
-				console.error('cannot call function `this.m_socket`');
-			}
+			sendDataPacket(this.m_socket, data);
+			return {};
 		} else {
-			this.m_message.push(data);
+			var msg = { data };
+			this.m_msgs.push(msg);
 			this.connect(); // 尝试连接
+			return msg;
 		}
 	}
 
@@ -531,11 +540,7 @@ class NodeConversation extends WSConversationBasic {
 	 */
 	ping() {
 		if (this.isOpen) {
-			if (this.m_socket) {
-				sendPingPacket(this.m_socket);
-			} else {
-				console.error('cannot find function `this.m_socket`');
-			}
+			sendPingPacket(this.m_socket);
 		} else {
 			this.connect(); // 尝试连接
 		}

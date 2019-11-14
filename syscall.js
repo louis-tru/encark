@@ -109,7 +109,7 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 		var on_stdin;
 		var r_stdout = [];
 		var r_stderr = [];
-		var empty = new Buffer(0);
+		var empty = Buffer.alloc(0);
 
 		var data_tmp = {
 			stdout: empty,

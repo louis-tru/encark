@@ -55,7 +55,7 @@ module.exports = {
 
 	token: function (password, scramble) {
 		if (!password) {
-			return new Buffer(0);
+			return Buffer.alloc(0);
 		}
 		// password must be in binary format, not utf8
 		var stage1 = sha1((Buffer.from(password, 'utf8')).toString('binary'));
@@ -70,10 +70,10 @@ module.exports = {
 		var nr = [0x5030, 0x5735],
 			add = 7,
 			nr2 = [0x1234, 0x5671],
-			result = new Buffer(8);
+			result = Buffer.alloc(8);
 
 		if (typeof password == 'string') {
-			password = new Buffer(password);
+			password = Buffer.from(password);
 		}
 
 		for (var i = 0; i < password.length; i++) {
@@ -119,7 +119,7 @@ module.exports = {
 	},
 
 	scramble323: function (message, password) {
-		var to = new Buffer(8),
+		var to = Buffer.alloc(8),
 			hashPass = this.hashPassword(password),
 			hashMessage = this.hashPassword(message.slice(0, 8)),
 			seed1 = this.int32Read(hashPass, 0) ^ this.int32Read(hashMessage, 0),

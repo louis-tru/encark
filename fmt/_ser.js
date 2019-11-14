@@ -28,7 +28,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var _fmtc = require('../_fmtc');
+var utils = require('../util');
+var fmtc = require('./_fmtc');
 var service = require('../service');
 var wsservice = require('../ws/service');
 
@@ -51,11 +52,17 @@ class FMTService extends wsservice.WSService {
 		this.m_subscribe = new Set();
 	}
 
+	requestAuth() {
+		var center = fmtc._fmtc(this.conv.server);
+		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
+		return center.host.clientAuth(this);
+	}
+
 	/**
 	 * @overwrite
 	 */
 	async loaded() {
-		var center = _fmtc._fmtc(this.conv.server);
+		var center = fmtc._fmtc(this.conv.server);
 		if (center) {
 			await center.loginFrom(this);
 			this.m_center = center;
@@ -69,12 +76,10 @@ class FMTService extends wsservice.WSService {
 	 * @overwrite
 	 */
 	async destroy() {
-		var center = _fmtc._fmtc(this.conv.server);
+		var center = this.m_center;
 		if (center) {
 			await center.logoutFrom(this);
 			this.m_center = null;
-		} else {
-			console.error('FMTService.destroy()', 'FMTC No found');
 		}
 	}
 
@@ -107,19 +112,14 @@ class FMTService extends wsservice.WSService {
 		return this.m_subscribe.has('*') || this.m_subscribe.has(event);
 	}
 
-	async hasOnline({ id }) {
-		try {
-			await this.m_center.exec(id);
-		} catch(err) {
-			return false;
-		}
-		return true;
+	hasOnline({ id }) {
+		return this.hasOnline(id);
 	}
 
 	/**
 	 * @func triggerTo() event message
 	 */
-	triggerTo({ id, event, data }) {
+	triggerTo([id, event, data]) {
 		return this.m_center.exec(id, [event, data], 'triggerTo');
 	}
 
@@ -132,7 +132,7 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @func callTo()
 	 */
-	callTo({ id, method, data, timeout }) {
+	callTo([id, method, data, timeout]) {
 		return this.m_center.exec(id, [method, data, timeout], 'callTo');
 	}
 

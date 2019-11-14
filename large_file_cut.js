@@ -39,7 +39,7 @@ function cut(filename, count) {
 	var wfd = fs.openSync(filename + '.0', 'w');
 	var index = 0;
 
-	var buff = new Buffer(1024 * 100); // 100kb
+	var buff = Buffer.alloc(1024 * 100); // 100kb
 	var len = 0;
 	var total = 0;
 	
@@ -66,7 +66,7 @@ function merge(filename, options) {
 	}, options);
 	
 	var wfd = fs.openSync(options.target, 'w');
-	var buff = new Buffer(1024 * 100); // 100kb
+	var buff = Buffer.alloc(1024 * 100); // 100kb
 	var len = 0;
 	var i = 0;
 

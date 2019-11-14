@@ -46,7 +46,7 @@ exports.OutgoingPacket = util.class('OutgoingPacket', {
 	 * @constructor
 	 */
 	constructor: function (size, num) {
-		this.buffer = new Buffer(size + 3 + 1);
+		this.buffer = Buffer.alloc(size + 3 + 1);
 		this.writeNumber(3, size);
 		this.writeNumber(1, num || 0);
 	},
