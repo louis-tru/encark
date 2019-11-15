@@ -61,13 +61,13 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @overwrite
 	 */
-	async loaded() {
+	async load() {
 		var center = fmtc._fmtc(this.conv.server);
 		if (center) {
 			await center.loginFrom(this);
 			this.m_center = center;
 		} else {
-			console.error('FMTService.loaded()', 'FMTC No found');
+			console.error('FMTService.load()', 'FMTC No found');
 			this.conv.close();
 		}
 	}
@@ -113,13 +113,14 @@ class FMTService extends wsservice.WSService {
 	}
 
 	hasOnline({ id }) {
-		return this.hasOnline(id);
+		return this.m_center.hasOnline(id);
 	}
 
 	/**
 	 * @func triggerTo() event message
 	 */
 	triggerTo([id, event, data]) {
+		console.log('-----', ...[id, event, data]);
 		return this.m_center.exec(id, [event, data], 'triggerTo');
 	}
 
@@ -132,15 +133,8 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @func callTo()
 	 */
-	callTo([id, method, data, timeout]) {
+	callTo([id, method, data, timeout]) { //
 		return this.m_center.exec(id, [method, data, timeout], 'callTo');
-	}
-
-	/**
-	 * @func weakCallTo()
-	 */
-	weakCallTo({ id, method, data }) {
-		return this.m_center.exec(id, [method, data], 'weakCallTo');
 	}
 
 }
@@ -167,9 +161,6 @@ class FMTServerClient {
 		return this.m_center.exec(this.m_id, [method, data, timeout], 'callTo');
 	}
 
-	weakCall(method, data) {
-		return this.m_center.exec(this.m_id, [method, data], 'weakCallTo');
-	}
 }
 
 service.set('_fmt', FMTService);

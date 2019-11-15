@@ -76,7 +76,9 @@ class Conversation {
 	/**
 	 * @get token
 	 */
-	get token() { return this.m_token }
+	get token() {
+		return this.m_token;
+	}
 
 	/**
 	 * @constructor
@@ -133,15 +135,16 @@ class Conversation {
 		return this.m_clients_count == 1 ? undefined: service;
 	}
 
-	_open() {
+	/*async */_open() {
 		util.assert(!this.m_is_open);
 		util.assert(this.m_connect);
+		// await util.sleep(1e2); // 100ms
 		var msgs = this.m_msgs;
 		this.m_is_open = true;
 		this.m_connect = false;
 		this.m_msgs = [];
 		this.onOpen.trigger();
-		msgs.forEach(e=>e.cancel||this.send(e.data));
+		msgs.forEach(e=>this.send(e));
 	}
 
 	_error(err) {
@@ -169,13 +172,15 @@ class Conversation {
 	 */
 	async handlePacket(packet, isText) {
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
+		if (!this.isOpen)
+			return console.warn('CLI Conversation.handlePacket, connection close status');
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPong.trigger();
 		}
 		else if (data.isValidEXT()) { // Extension protocol
-			var client = this.m_clients[data.service || this.m_default_service];
-			if (client) {
-				client.receiveMessage(data);
+			var handle = this.m_clients[data.service || this.m_default_service];
+			if (handle) {
+				handle.receiveMessage(data).catch(e=>console.error(e));
 			} else {
 				console.error('Could not find the message handler, '+
 											'discarding the message, ' + data.service);
@@ -233,8 +238,8 @@ class Conversation {
 	 */
 	async sendFormattedData(data) {
 		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip);
-		return this.send(data);
+		data = await data.toBuffer(this.isGzip)
+		this.send(data);
 	}
 
 	/**
@@ -353,12 +358,9 @@ class WebConversation extends WSConversationBasic {
 			} else { // send json string message
 				this.m_req.send(JSON.stringify(data));
 			}
-			return {};
 		} else {
-			var msg = { data };
-			this.m_msgs.push(msg);
+			this.m_msgs.push(data);
 			this.connect(); // 尝试连接
-			return msg;
 		}
 	}
 
@@ -466,13 +468,7 @@ class NodeConversation extends WSConversationBasic {
 			socket.on('end', e=>self.close());
 			socket.on('close', e=>self.close());
 			socket.on('data', d=>parser.add(d));
-			socket.on('error', function(e) {
-				var s = self.m_socket;
-				self._error(e);
-				self.close();
-				if (s)
-					s.destroy();
-			});
+			socket.on('error', e=>(self._error(e),self.close()));
 
 			parser.onText.on(e=>self.handlePacket(e.data, 1));
 			parser.onData.on(e=>self.handlePacket(e.data, 0));
@@ -526,12 +522,9 @@ class NodeConversation extends WSConversationBasic {
 	send(data) {
 		if (this.isOpen) {
 			sendDataPacket(this.m_socket, data);
-			return {};
 		} else {
-			var msg = { data };
-			this.m_msgs.push(msg);
+			this.m_msgs.push(data);
 			this.connect(); // 尝试连接
-			return msg;
 		}
 	}
 

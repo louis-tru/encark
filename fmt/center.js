@@ -232,8 +232,7 @@ class FastMessageTransferCenter_INL {
 	async exec(id, args = [], method = null) {
 		var fnodeId = this.m_cli_route.get(id);
 		if (fnodeId) {
-			var fnode = this.m_fnodes[fnodeId];
-			utils.assert(fnode);
+			var fnode = this.m_fnodes[fnodeId]; utils.assert(fnode);
 			try {
 				if (method)
 					return await fnode[method](id, ...args);
@@ -250,7 +249,7 @@ class FastMessageTransferCenter_INL {
 		var fnode = await utils.promise((resolve, reject)=>{
 			var i = 0;
 			Object.values(this.m_fnodes).forEach((fnode,i,fnodes)=>{
-				utils.assert(fnodes.length);
+				// utils.assert(fnodes.length);
 				fnode.query(id).then(e=>{
 					i++;
 					if (e) {
@@ -259,11 +258,11 @@ class FastMessageTransferCenter_INL {
 						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
 					}
 				}).catch(e=>{
-					console.error(err);
 					i++;
 					if (fnodes.length == i) {
 						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
 					}
+					// console.error(e);
 				});
 			});
 		});
@@ -271,7 +270,11 @@ class FastMessageTransferCenter_INL {
 		this.m_cli_route.set(id, fnode.id);
 
 		if (!fnodeId) { // Trigger again
-			this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id });
+			try {
+				this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id });
+			} catch(err) {
+				console.error(err);
+			}
 		}
 		if (method)
 			return await fnode[method](id, ...args);
@@ -279,7 +282,7 @@ class FastMessageTransferCenter_INL {
 
 	publish(event, data) {
 		for (var fnode of Object.values(this.m_fnodes)) {
-			fnode.publish(event, data);
+			fnode.publish(event, data).catch(console.error);
 		}
 	}
 
@@ -292,7 +295,7 @@ class FastMessageTransferCenter_INL {
 			this.m_broadcast_mark.add(id);
 			for (var fnode of Object.values(this.m_fnodes)) {
 				if (!source || source !== fnode)
-					fnode.broadcast(event, data, id);
+					fnode.broadcast(event, data, id).catch(console.error);
 			}
 		}
 	}
@@ -328,13 +331,6 @@ class FastMessageTransferCenter_INL {
 	getFnodeFrom(url) {
 		return Object.values(this.m_fnodes)
 			.find(e=>e.publishURL&&e.publishURL.href==url);
-	}
-
-	/**
-	 * @func getFnode() get fnode by id
-	 */
-	getFnode(id) {
-		return this.m_fnodes[id];
 	}
 
 	/**

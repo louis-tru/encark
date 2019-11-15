@@ -48,10 +48,9 @@ class FNode {
 	initialize() { return this.m_center.addNode(this)}
 	destroy() { return this.m_center.deleteNode(this)}
 	publish(event, data) {}
-	broadcast(event, data) {}
+	broadcast(event, data, id) {}
 	triggerTo(id, event, data) {}
 	callTo(id, name, data, timeout) {}
-	weakCallTo(id, name, data) {}
 	query(id) {}
 }
 
@@ -65,10 +64,10 @@ class FNodeLocal extends FNode {
 	get publishURL() {
 		return this.m_center.publishURL;
 	}
-	publish(event, data) {
+	async publish(event, data) {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
-	broadcast(event, data, id) {
+	async broadcast(event, data, id) {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
 	triggerTo(id, event, data) {
@@ -76,9 +75,6 @@ class FNodeLocal extends FNode {
 	}
 	callTo(id, method, data, timeout) {
 		return this.m_center.getFMTService(id).call(method, data, timeout); // call method
-	}
-	weakCallTo(id, method, data) {
-		return this.m_center.getFMTService(id).weakCall(method, data); // weak call method
 	}
 	async query(id) {
 		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
@@ -143,27 +139,23 @@ class FNodeRemote extends FNode {
 		await this.m_center.deleteNode(this);
 	}
 
-	publish(event, data) {
-		this.m_impl.weakCall('publish', [event,data]);
+	publish(event, data) { // publish event to fnode
+		return this.m_impl.call('publish', [event,data]);
 	}
 
-	broadcast(event, data, id) {
-		this.m_impl.weakCall('broadcast', [event,data,id]);
+	broadcast(event, data, id) { // broadcast event to fnode
+		return this.m_impl.call('broadcast', [event,data,id]);
 	}
 
-	triggerTo(id, event, data) {
+	triggerTo(id, event, data) { // trigger event to client
 		return this.m_impl.call('triggerTo', [id, event, data]); // trigger event
 	}
 
-	callTo(id, method, data, timeout) {
+	callTo(id, method, data, timeout) { // call client
 		return this.m_impl.call('callTo', [id, method, data, timeout], timeout); // call method
 	}
 
-	weakCallTo(id, method, data) {
-		return this.m_impl.call('weakCallTo', [id, method, data]); // weak call method
-	}
-
-	query(id) {
+	query(id) { // query client
 		return this.m_impl.call('query', [id]);
 	}
 }
@@ -177,27 +169,23 @@ class FNodeRemoteIMPL {
 		return this.m_that_fnode;
 	}
 
-	publish([event, data]) {
+	publish([event, data]) { // publish event to fnode
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
 
-	broadcast([event, data, id]) {
+	broadcast([event, data, id]) { // broadcast event to fnode
 		this.m_center._forwardBroadcast(event, data, id, this.m_fnode);
 	}
 
-	triggerTo([id, event, data]) {
-		this.m_center.getFMTService(id).trigger(event, data);
+	triggerTo([id, event, data]) { // trigger event to client
+		return this.m_center.getFMTService(id).trigger(event, data);
 	}
 
-	callTo([id, method, data, timeout]) {
+	callTo([id, method, data, timeout]) { // call client
 		return this.m_center.getFMTService(id).call(method, data, timeout);
 	}
 
-	weakCallTo([id, method, data]) {
-		this.m_center.getFMTService(id).weakCall(method, data);
-	}
-
-	query([id]) {
+	query([id]) { // query client
 		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
 	}
 }
@@ -217,7 +205,7 @@ class FNodeRemoteService extends wsservice.WSService {
 		return true;
 	}
 
-	async loaded() {
+	async load() {
 		try {
 			var {id,publish} = this.params;
 			this.m_that_fnode = publish ? new path.URL(decodeURIComponent(publish)): null;
@@ -225,9 +213,9 @@ class FNodeRemoteService extends wsservice.WSService {
 			await this.m_fnode.initialize();
 			await utils.sleep(100); // 在同一个node进程中同时开启多个节点时socket无法写入
 			this.trigger('InitComplete', { id: this.m_center.id, time: this.m_fnode.initTime });
-			console.log('FNodeRemoteService.loaded', id, this.m_that_fnode && this.m_that_fnode.href);
+			console.log('FNodeRemoteService.load', id, this.m_that_fnode && this.m_that_fnode.href);
 		} catch(err) {
-			console.error('FNodeRemoteService.loaded, err', err);
+			console.error('FNodeRemoteService.load, err', err);
 			this.conv.close();
 		}
 	}

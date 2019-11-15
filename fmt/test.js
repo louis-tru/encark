@@ -2,6 +2,12 @@
 var server = require('../server');
 var fmt = require('.');
 
+var error = console.error;
+
+console.error = function(...args) {
+	error(...args);
+}
+
 var server_1 = 8091;
 var server_2 = 8092;
 var server_3 = 8093;

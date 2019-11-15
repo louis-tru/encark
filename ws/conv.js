@@ -95,24 +95,29 @@ var Conversation = utils.class('Conversation', {
 		var self = this;
 
 		// initialize
-		(async function() {
-			try {
-				var services = bind_services.split(',');
-				utils.assert(services[0], 'bind service undefined');
-				self._initialize();
-				if (self.isOpen)
-					await self._bind(services);
-			} catch(e) {
-				self.socket.destroy();  // 关闭连接
-				console.warn(e);
-			}
-		}());
+		self._initialize(bind_services).catch(err=>{
+			self.close();
+			self._safeDestroy();  // 关闭连接
+			console.warn(err);
+		});
 	},
 
-	_initialize: function() {
+	_safeDestroy: function() {
+		try {
+			if (this.socket)
+				this.socket.destroy();  // 关闭连接
+		} catch(err) {
+			console.warn(err);
+		}
+	},
+
+	_initialize: async function(bind_services) {
 		var self = this;
+		var services = bind_services.split(',');
+		utils.assert(services[0], 'Bind Service undefined');
+
 		if (!self.initialize())
-			return self.socket.destroy();  // 关闭连接
+			return self._safeDestroy();  // 关闭连接
 
 		utils.assert(!self.m_isOpen);
 		self.server.m_ws_conversations[self.token] = self; // TODO private visit
@@ -131,7 +136,8 @@ var Conversation = utils.class('Conversation', {
 			// self.onError.off();
 			try {
 				for (var s of Object.values(self.m_services))
-					s.destroy();
+					if (s.loaded) 
+						s.destroy();
 				self.server.trigger('WSConversationClose', self);
 			} catch(err) {
 				console.error(err);
@@ -142,14 +148,16 @@ var Conversation = utils.class('Conversation', {
 
 		self.onOpen.trigger();
 		self.server.trigger('WSConversationOpen', self);
+
+		await self._bind(services);
 	},
 
 	/** 
 	 * @func _bind() 绑定服务
 	*/
-	_bind: async function(bind_services) {
+	_bind: async function(services) {
 		var self = this;
-		for (var name of bind_services) {
+		for (var name of services) {
 			var cls = service.get(name);
 			utils.assert(cls, name + ' not found');
 			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
@@ -158,7 +166,7 @@ var Conversation = utils.class('Conversation', {
 			var ser;
 			ser = new cls(self);
 			ser.name = name;
-			utils.assert(await ser.requestAuth(null), 'request auth fail');
+			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
 			self.m_services[name] = ser;
 			self.m_services_count++;
 
@@ -166,7 +174,12 @@ var Conversation = utils.class('Conversation', {
 				self.m_default_service = name;
 				self.isGzip = ser.headers['use-gzip'] == 'on';
 			}
-			ser.loaded();
+
+			await ser.load();
+			ser.m_loaded = true;
+			await utils.sleep(100); // 在同一个node进程中同时开启多个服务时socket无法写入
+			await ser._trigger('Load', {token:this.token});
+			console.log('SER Load', this.request.url);
 		}
 	},
 
@@ -187,16 +200,13 @@ var Conversation = utils.class('Conversation', {
 	 * @return {Boolean}
 	 */
 	verifyOrigin: function(origin) {
-
 		var origins = this.server.origins;
-
 		if (origin == 'null') {
 			origin = '*';
 		}
 		if (origins.indexOf('*:*') != -1) {
 			return true;
 		}
-
 		if (origin) {
 			try {
 				var parts = url.parse(origin);
@@ -231,6 +241,8 @@ var Conversation = utils.class('Conversation', {
 	 */
 	handlePacket: async function(packet, isText) {
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
+		if (!this.isOpen)
+			return console.warn('SER Conversation.handlePacket, connection close status');
 		if (data.isPing()) { // ping, browser web socket, Extension protocol 
 			this.onPing.trigger();
 		}
@@ -238,9 +250,9 @@ var Conversation = utils.class('Conversation', {
 			if (data.isBind()) { // 绑定服务消息
 				this._bind([data.service]).catch(console.warn);
 			} else {
-				var service = this.m_services[data.service || this.m_default_service];
-				if (service) {
-					service.receiveMessage(data);
+				var handle = this.m_services[data.service || this.m_default_service];
+				if (handle) {
+					handle.receiveMessage(data).catch(e=>console.error(e));
 				} else {
 					console.error('Could not find the message handler, '+
 												'discarding the message, ' + data.service);
@@ -267,8 +279,8 @@ var Conversation = utils.class('Conversation', {
 	 */
 	sendFormattedData: async function(data) {
 		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip);
-		return this.send(data);
+		data = await data.toBuffer(this.isGzip)
+		this.send(data);
 	},
 
 	/**
@@ -289,17 +301,15 @@ var Conversation = utils.class('Conversation', {
  */
 class Hybi extends Conversation {
 
-	constructor(req, upgradeHead, bind_services_name) {
-		super(req, bind_services_name);
+	constructor(req, upgradeHead, bind_services) {
+		super(req, bind_services);
 	}
 
 	/**
 	 * @func _handshakes()
 	 */
 	_handshakes() {
-		var self = this;
-		var req = self.request;
-		var socket = self.socket;
+		var req = this.request;
 		var key = req.headers['sec-websocket-key'];
 		var origin = req.headers['sec-websocket-origin'];
 		// var location = (socket.encrypted ? 'wss' : 'ws') + '://' + req.headers.host + req.url;
@@ -310,7 +320,7 @@ class Hybi extends Conversation {
 			return false;
 		}
 		
-		if (!self.verifyOrigin(origin)) {
+		if (!this.verifyOrigin(origin)) {
 			console.error('connection invalid: origin mismatch');
 			return false;
 		}
@@ -320,27 +330,30 @@ class Hybi extends Conversation {
 			return false;
 		}
 
-		// calc key
-		var shasum = crypto.createHash('sha1');
-		shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
-		key = shasum.digest('base64');
-
-		var headers = [
-			'HTTP/1.1 101 Switching Protocols',
-			'Upgrade: websocket',
-			'Connection: Upgrade',
-			'Session-Token: ' + self.token,
-			'Sec-WebSocket-Accept: ' + key,
-		];
-
 		try {
-			socket.write(headers.concat('', '').join('\r\n'));
-		} catch (e) {
-			console.error(e);
+			this._upgrade();
+		} catch(err) {
+			console.error(err);
 			return false;
 		}
 
 		return true;
+	}
+
+	_upgrade() {
+		// calc key
+		var key = this.request.headers['sec-websocket-key'];
+		var shasum = crypto.createHash('sha1');
+		shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
+		key = shasum.digest('base64');
+		var headers = [
+			'HTTP/1.1 101 Switching Protocols',
+			'Upgrade: websocket',
+			'Connection: Upgrade',
+			'Session-Token: ' + this.token,
+			'Sec-WebSocket-Accept: ' + key,
+		];
+		this.socket.write(headers.concat('', '').join('\r\n'));
 	}
 
 	/**
@@ -361,13 +374,8 @@ class Hybi extends Conversation {
 		socket.on('timeout', e=>self.close());
 		socket.on('end', e=>self.close());
 		socket.on('close', e=>self.close());
+		socket.on('error', e=>self.close());
 		socket.on('data', e=>parser.add(e));
-		socket.on('error', function (e) {
-			var s = self.socket;
-			self.close();
-			if (s)
-				s.destroy();
-		});
 
 		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
 		parser.onData.on(e=>self.handlePacket(e.data, 0));
@@ -385,12 +393,10 @@ class Hybi extends Conversation {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		try {
 			sendDataPacket(this.socket, data);
-			// sendPingPacket(this.socket);
 		} catch (err) {
 			this.close();
 			throw err;
 		}
-		return {};
 	}
 
 	pong() {

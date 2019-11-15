@@ -28,46 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var Service = require('../service').Service;
-var Session = require('../session').Session;
-var errno = require('../errno');
-var {T_CALLBACK,T_CALL,T_EVENT} = require('./data');
+const util = require('../util');
+const Service = require('../service').Service;
+const Session = require('../session').Session;
+const errno = require('../errno');
+const {T_CALLBACK,T_CALL,T_EVENT} = require('./data');
 
-var METHOD_CALL_TIMEOUT = 12e4; // 120s
-
-/** 
- * @func callFunction()
-*/
-async function callFunction(self, msg) {
-	var { data = {}, name, cb } = msg;
-	// if (util.dev) {
-	// 	console.log('WSService.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
-	// }
-	var err, r;
-	try {
-		r = await self.handleCall(name, data);
-	} catch(e) { err = e }
-
-	if (!cb) { // No callback
-		if (err)
-			console.warn(err);
-		return;
-	}
-	var rev = {
-		service: self.m_conv._service(self.name), type: T_CALLBACK, cb
-	};
-	if (self.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
-		if (err) {
-			rev.error = err; // Error.toJSON(err);
-		} else {
-			rev.data = r;
-		}
-		self.m_conv.sendFormattedData(rev);
-	} else {
-		console.error('connection dropped, cannot callback');
-	}
-}
+const METHOD_CALL_TIMEOUT = 12e4; // 120s
+const print_log = false; // util.dev
 
 /**
  * @class WSService
@@ -75,7 +43,7 @@ async function callFunction(self, msg) {
 class WSService extends Service {
 	// m_conv: null,
 	// m_session: null,
-	// m_callbacks: null,
+	// m_calls: null,
 	
 	get conv() {
 		return this.m_conv;
@@ -85,132 +53,151 @@ class WSService extends Service {
 		return this.m_session;
 	}
 
+	get loaded() {
+		return this.m_loaded;
+	}
+
 	/**
 	 * @arg conv {Conversation}
 	 * @constructor
 	 */
 	constructor(conv) {
 		super(conv.request);
-		this.m_callbacks = {};
+		this.m_calls = {};
 		this.m_conv = conv;
+		this.m_loaded = false;
 		this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
+
 		this.m_conv.onClose.on(async e=>{
-			var callbacks = this.m_callbacks;
-			this.m_callbacks = {};
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var cb of Object.values(callbacks)) {
-				// cb.cancel = true;
-				cb.err(err);
+			for (var handle of Object.values(this.m_calls)) {
+				handle.cancel = true;
+				handle.err(err);
 			}
 			clearInterval(this.m_Intervalid);
 		});
+
 		this.m_session = new Session(this);
 	}
 
-	loaded() {}
+	load() {}
 	destroy() {}
 
 	/**
-	 * @fun receiveMessage # 消息处理器
-	 * @arg data {Object}
+	 * @fun receiveMessage() # 消息处理器
 	 */
-	receiveMessage(msg) {
-		if (msg.isCall()) {
-			callFunction(this, msg);
-		} else if (msg.isCallback()) {
-			var cb = this.m_callbacks[msg.cb];
-			delete this.m_callbacks[msg.cb];
-			if (cb) {
+	async receiveMessage(msg) {
+		var self = this;
+		var { data = {}, name, cb } = msg;
+
+		if (msg.isCallback()) {
+			var handle = this.m_calls[cb];
+			if (handle) {
 				if (msg.error) { // throw error
-					cb.err(Error.new(msg.error));
+					handle.err(Error.new(msg.error));
 				} else {
-					cb.ok(msg.data);
+					handle.ok(data);
 				}
-			} else {
-				console.error('Unable to callback, no callback context can be found');
+			}
+		} else {
+			var r = {};
+			if (msg.isCall()) {
+				if (print_log) 
+					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
+				try {
+					r.data = await self.handleCall(name, data);
+				} catch(e) {
+					r.error = e;
+				}
+			} /*else if (msg.isEvent()) { // none event
+				try {
+					this.trigger(name, data);
+				} catch(err) {
+					console.error(err);
+				}
+			} */ else {
+				return;
+			}
+
+			if (cb) {
+				self.m_conv.sendFormattedData(Object.assign(r, {
+					service: self.m_conv._service(self.name),
+					type: T_CALLBACK, 
+					cb: cb,
+				})).catch(console.warn); // callback
 			}
 		}
 	}
 
 	/**
-	 * @class handleCall
+	 * @func handleCall
 	 */
 	handleCall(method, data) {
-		if (method in WSService.prototype) {
+		if (method in WSService.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
-		}	
 		var fn = this[method];
-		if (typeof fn != 'function') {
+		if (typeof fn != 'function')
 			throw Error.new('"{0}" no defined function'.format(name));
-		}
 		return fn.call(this, data);
+	}
+
+	async _send(data) {
+		await this.m_conv.sendFormattedData(data);
+		delete data.data;
+		return data;
 	}
 
 	_checkTimeout() {
 		var now = Date.now();
-		var callbacks = this.m_callbacks;
-		for (var cb in callbacks) {
-			var handle = callbacks[cb];
+		var calls = this.m_calls;
+		for (var id in calls) {
+			var handle = calls[id];
 			if (handle.timeout) {
 				if (handle.timeout < now) { // timeouted
 					handle.err(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
-						`Method call timeout, ${this.name}/${handle.method}`]));
-					handle.send.cancel = true;
-					delete callbacks[cb];
+						`Method call timeout, ${this.name}/${handle.name}`]));
+					handle.cancel = true;
 				}
 			}
 		}
 	}
 
-	/**
-	 * @func call(method, data)
-	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+	_call(type, name, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return util.promise(async (resolve, reject)=>{
-			var cb = util.id;
-			this.m_callbacks[cb] = {
+			var id = util.id;
+			var calls = this.m_calls;
+			calls[id] = await this._send({
 				timeout: timeout ? timeout + Date.now(): 0,
-				method: method,
-				ok: resolve,
-				err: reject,
-				send: await this.m_conv.sendFormattedData({
-					service: this.conv._service(this.name),
-					type: T_CALL,
-					name: method,
-					data: data,
-					cb: cb,
-				}),
-			};
+				ok: e=>(delete calls[id],resolve(e)),
+				err: e=>(delete calls[id],reject(e)),
+				service: this.conv._service(this.name),
+				type: type,
+				name: name,
+				data: data,
+				cb: id,
+			});
+			// console.log('SER send', name);
 		});
 	}
 
-	/**
-	 * @func weakCall(method, data) no callback, no return data
-	 */
-	weakCall(method, data) {
-		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
-			this.m_conv.sendFormattedData({
-				service: this.m_conv._service(this.name),
-				type: T_CALL,
-				name: method,
-				data: data,
-			});
-		} else {
-			console.error('connection dropped, cannot call method');
-		}
+	_trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT);
 	}
 
 	/**
-	 * @func trigger(event, data)
+	 * @func call(method, data)
+	 * @async
 	 */
-	trigger(event, data) {
-		if (this.m_conv.isOpen) {  // 如果连接断开,将这个数据丢弃
-			this.m_conv.sendFormattedData({
-				service: this.m_conv._service(this.name), type: T_EVENT, name: event, data: data,
-			});
-		} else {
-			console.error('connection dropped, cannot send event');
-		}
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+		return this._call(T_CALL, method, data, timeout);
+	}
+
+	/**
+	 * @func  trigger(event, data)
+	 * @async
+	 */
+	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+		return this._trigger(event, data, timeout);
 	}
 
 	// @end
@@ -218,7 +205,7 @@ class WSService extends Service {
 
 WSService.type = 'event';
 
-module.exports = {
+module.exports = exports = {
 	WSService,
 	METHOD_CALL_TIMEOUT,
 };

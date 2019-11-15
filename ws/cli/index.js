@@ -28,168 +28,185 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../../util');
-var errno = require('../../errno');
-var { Notification } = require('../../event');
-var { T_CALLBACK,T_CALL} = require('../data');
-var conv = require('./conv');
+const util = require('../../util');
+const errno = require('../../errno');
+const { Notification } = require('../../event');
+const { T_CALLBACK,T_CALL} = require('../data');
+const conv = require('./conv');
 
-var METHOD_CALL_TIMEOUT = 12e4; // 120s
-
-/** 
- * @func callFunction()
-*/
-async function callFunction(self, msg) {
-	var { data = {}, name, cb } = msg;
-	// if (util.dev) {
-	// 	console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
-	// }
-	var err, r;
-	try {
-		r = await self.handleCall(name, data);
-	} catch(e) { err = e }
-
-	if (!cb) { // No callback
-		if (err)
-			console.warn(err);
-		return;
-	}
-	var rev = {
-		service: self.conv._service(self.name), type: T_CALLBACK, cb
-	};
-	if (err) {
-		rev.error = err; // Error.toJSON(err);
-	} else {
-		rev.data = r;
-	}
-	self.conv.sendFormattedData(rev);
-}
+const METHOD_CALL_TIMEOUT = 12e4; // 120s
+const print_log = false; // util.dev
 
 /**
  * @class WSClient
  */
 class WSClient extends Notification {
 	// @private:
-	// m_callbacks: null,
+	// m_calls: null,
 	// m_service_name: '',
 	// m_conv: null,   // conversation
 
 	// @public:
 	get name() { return this.m_service_name }
 	get conv() { return this.m_conv }
+	get loaded() { return this.m_loaded }
 
 	/**
 	 * @constructor constructor(service_name, conv)
 	 */
 	constructor(service_name, conv) {
 		super();
-		this.m_callbacks = {};
+
+		this.m_calls = {};
 		this.m_service_name = service_name;
 		this.m_conv = conv || new WSConversation();
+		this.m_loaded = false;
+		this.m_sends = [];
+
 		util.assert(service_name);
 		util.assert(this.m_conv);
 
 		this.m_conv.onOpen.on(e=>{
 			this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
 		});
+
 		this.m_conv.onClose.on(async e=>{
-			var callbacks = this.m_callbacks;
-			this.m_callbacks = {};
+			this.m_loaded = false;
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var handle of Object.values(callbacks)) {
-				// handle.send.cancel = true;
+			for (var handle of Object.values(this.m_calls)) {
+				handle.cancel = true;
 				handle.err(err);
 			}
 			clearInterval(this.m_Intervalid);
+			this.m_sends = []; // clear calling
 		});
+
+		this.addEventListener('Load', async e=>{
+			console.log('CLI Load', conv.url.href);
+			this.m_conv.m_token = e.data.token; // TODO private visit
+			this.m_loaded = true;
+			var sends = this.m_sends;
+			this.m_sends = [];
+			// await util.sleep(1000); // 
+			for (var data of sends) {
+				if (!data.cancel) {
+					// console.log('CLI Load send');
+					this._send(data).catch(data.err);
+				}
+			}
+		});
+
 		this.m_conv.bind(this);
 	}
 
 	/**
 	 * @func receiveMessage(msg)
 	 */
-	receiveMessage(msg) {
-		if (msg.isCall()) {
-			callFunction(this, msg);
-		} else if (msg.isCallback()) {
-			var cb = this.m_callbacks[msg.cb];
-			delete this.m_callbacks[msg.cb];
-			if (cb) {
+	async receiveMessage(msg) {
+		var self = this;
+		var { data = {}, name, cb } = msg;
+
+		if (msg.isCallback()) {
+			var handle = this.m_calls[cb];
+			if (handle) {
 				if (msg.error) { // throw error
-					cb.err(Error.new(msg.error));
+					handle.err(Error.new(msg.error));
 				} else {
-					cb.ok(msg.data);
+					handle.ok(data);
+				}
+			}
+		} else {
+			var r = {};
+			if (msg.isCall()) {
+				if (print_log) 
+					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
+				try {
+					r.data = await self.handleCall(name, data);
+				} catch(e) {
+					r.error = e;
+				}
+			} else if (msg.isEvent()) {
+				// console.log('CLI Event receive', name);
+				try {
+					this.trigger(name, data);
+				} catch(err) {
+					console.error(err);
 				}
 			} else {
-				console.warn('Unable to callback, no callback context can be found');
+				return;
 			}
-		} else if (msg.isEvent()) {
-			this.trigger(msg.name, msg.data);
+
+			if (cb) {
+				self.m_conv.sendFormattedData(Object.assign(r, {
+					service: self.m_conv._service(self.name),
+					type: T_CALLBACK, 
+					cb: cb,
+				})).catch(console.warn); // callback
+			}
 		}
+
 	}
 
 	/**
 	 * @class handleCall
 	 */
 	handleCall(method, data) {
-		if (method in WSClient.prototype) {
+		if (method in WSClient.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
-		}
 		var fn = this[method];
-		if (typeof fn != 'function') {
+		if (typeof fn != 'function')
 			throw Error.new('"{0}" no defined function'.format(name));
-		}
 		return fn.call(this, data);
+	}
+
+	async _send(data) {
+		if (this.m_loaded) {
+			await this.m_conv.sendFormattedData(data);
+			delete data.data;
+		} else {
+			this.m_sends.push(data);
+		}
+		return data;
 	}
 
 	_checkTimeout() {
 		var now = Date.now();
-		var callbacks = this.m_callbacks;
-		for (var cb in callbacks) {
-			var handle = callbacks[cb];
+		var calls = this.m_calls;
+		for (var id in calls) {
+			var handle = calls[id];
 			if (handle.timeout) {
 				if (handle.timeout < now) { // timeouted
 					handle.err(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
-						`Method call timeout, ${this.name}/${handle.method}`]));
-					handle.send.cancel = true;
-					delete callbacks[cb];
+						`Method call timeout, ${this.name}/${handle.name}`]));
+					handle.cancel = true;
 				}
 			}
 		}
 	}
 
-	/**
-	 * @func call(method, data, timeout)
-	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+	_call(type, name, data, timeout = exports.METHOD_CALL_TIMEOUT) {
 		return util.promise(async (resolve, reject)=>{
-			var cb = util.id;
-			this.m_callbacks[cb] = {
+			var id = util.id;
+			var calls = this.m_calls;
+			calls[id] = await this._send({
 				timeout: timeout ? timeout + Date.now(): 0,
-				method: method,
-				ok: resolve,
-				err: reject,
-				send: await this.m_conv.sendFormattedData({
-					service: this.conv._service(this.name),
-					type: T_CALL,
-					name: method,
-					data: data,
-					cb: cb,
-				}),
-			};
+				ok: e=>(delete calls[id],resolve(e)),
+				err: e=>(delete calls[id],reject(e)),
+				service: this.m_conv._service(this.name),
+				type: type,
+				name: name,
+				data: data,
+				cb: id,
+			});
 		});
 	}
 
 	/**
-	 * @func weakCall(method, data) no callback, no return data
+	 * @func call(method, data, timeout)
+	 * @async
 	 */
-	weakCall(method, data) {
-		this.m_conv.sendFormattedData({
-			service: this.conv._service(this.name),
-			type: T_CALL,
-			name: method,
-			data: data,
-		});
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+		return this._call(T_CALL, method, data, timeout);
 	}
 
 }

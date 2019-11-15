@@ -62,7 +62,7 @@ class WSClient extends cli.WSClient {
 				var events = [];
 				for (var i of host.m_subscribe)
 					events.push(i);
-				this.weakCall('subscribe', {events});
+				this.call('subscribe', {events}).catch(console.error);
 			}
 		});
 
@@ -110,6 +110,10 @@ class FMTClient extends event.Notification {
 		return this.m_cli.conv;
 	}
 
+	get loaded() {
+		return this.m_cli.loaded;
+	}
+
 	close() {
 		this.conv.close();
 	}
@@ -125,17 +129,17 @@ class FMTClient extends event.Notification {
 	}
 
 	subscribeAll() {
-		this.m_cli.weakCall('subscribeAll');
+		this.m_cli.call('subscribeAll');
 	}
 
 	unsubscribe(events = []) {
 		events.forEach(e=>this.m_subscribe.delete(e));
-		this.m_cli.weakCall('unsubscribe', {events});
+		this.m_cli.call('unsubscribe', {events}).catch(console.error);
 	}
 
 	subscribe(events = []) {
 		events.forEach(e=>this.m_subscribe.add(e));
-		this.m_cli.weakCall('subscribe', {events});
+		this.m_cli.call('subscribe', {events}).catch(console.error);
 	}
 
 	that(id) {
@@ -147,7 +151,7 @@ class FMTClient extends event.Notification {
 	getNoticer(name) {
 		if (!this.hasNoticer(name)) {
 			this.m_subscribe.add(name);
-			this.m_cli.weakCall('subscribe', {events:[name]});
+			this.m_cli.call('subscribe', {events:[name]}).catch(console.error);
 			this.m_cli.addEventListener(name, super.getNoticer(name)); // Forward event
 		}
 		return super.getNoticer(name);
@@ -170,13 +174,10 @@ class ThatClient {
 		return this.m_host.m_cli.call('hasOnline', [this.m_id]);
 	}
 	trigger(event, data) {
-		this.m_host.m_cli.weakCall('triggerTo', [this.m_id, event, data]);
+		return this.m_host.m_cli.call('triggerTo', [this.m_id, event, data]);
 	}
 	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
 		return this.m_host.m_cli.call('callTo', [this.m_id, method, data, timeout], timeout);
-	}
-	weakCall(method, data) {
-		this.m_host.m_cli.weakCall('weakCallTo', [this.m_id, method, data]);
 	}
 }
 

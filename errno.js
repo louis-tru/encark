@@ -33,7 +33,7 @@ module.exports = {
 	ERR_MONITOR_NOT_BEEN_STARTED: [-30002, 'MONITOR NOT BEEN STARTED'],
 	ERR_FORBIDDEN_ACCESS : [-30003, 'FORBIDDEN ACCESS'],
 	ERR_CONNECTION_DISCONNECTION: [-30004, 'Connection accidental disconnection'],
-	ERR_CONNECTION_CLOSE_STATUS: [-30005, 'error connection close status'],
+	ERR_CONNECTION_CLOSE_STATUS: [-30005, 'Error connection close status'],
 	ERR_METHOD_CALL_TIMEOUT: [-30006, 'method call timeout'],
 	ERR_DOWNLOAD_FAIL: [-30007, 'Download fail'],
 	ERR_ILLEGAL_ACCESS: [-30008, 'Illegal access'],
@@ -46,4 +46,5 @@ module.exports = {
 	ERR_FMT_CLIENT_OFFLINE: [-10049, 'FMT CLIENT OFFLINE'],
 	ERR_UNABLE_PARSE_JSONB: [-10050, 'Unable to parse jsonb, data corrupted'],
 	ERR_FNODE_CONNECT_TIMEOUT: [-10051, 'FNODE CONNECT TIMEOUT'],
+	ERR_REQUEST_AUTH_FAIL: [-10052, 'REQUEST AUTH FAIL'],
 };
