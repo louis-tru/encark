@@ -46,4 +46,12 @@ var obj = jsonb.parse(bin);
 
 console.log(obj);
 
+var binerr = jsonb.binaryify(Error.new('ABCDEFG'));
+
+console.log(binerr);
+
+var objerr = jsonb.parse(binerr);
+
+console.log(objerr);
+
 console.log('OK');

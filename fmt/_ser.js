@@ -45,11 +45,16 @@ class FMTService extends wsservice.WSService {
 		return this.m_id;
 	}
 
+	get time() {
+		return this.m_time;
+	}
+
 	constructor(conv) {
 		super(conv);
 		this.m_center = null;
 		this.m_id = String(this.params.id);
 		this.m_subscribe = new Set();
+		this.m_time = Date.now();
 	}
 
 	requestAuth() {
@@ -119,8 +124,7 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @func triggerTo() event message
 	 */
-	triggerTo([id, event, data]) {
-		console.log('-----', ...[id, event, data]);
+	async triggerTo([id, event, data]) {
 		return this.m_center.exec(id, [event, data], 'triggerTo');
 	}
 

@@ -211,7 +211,7 @@ class FNodeRemoteService extends wsservice.WSService {
 			this.m_that_fnode = publish ? new path.URL(decodeURIComponent(publish)): null;
 			this.m_fnode = new FNodeRemote(this.m_center, this, id);
 			await this.m_fnode.initialize();
-			await utils.sleep(100); // 在同一个node进程中同时开启多个节点时socket无法写入
+			await utils.sleep(200); // 在同一个node进程中同时开启多个节点时socket无法写入
 			this.trigger('InitComplete', { id: this.m_center.id, time: this.m_fnode.initTime });
 			console.log('FNodeRemoteService.load', id, this.m_that_fnode && this.m_that_fnode.href);
 		} catch(err) {

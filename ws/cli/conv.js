@@ -63,8 +63,9 @@ class Conversation {
 	// m_clients: null, // client list
 	// m_default_service: '',
 	// m_token: '',
-	// m_message: null, 
+	// m_msgs: null, 
 	// m_signer: null,
+	// m_isGzip: false,
 
 	// @public:
 	// onOpen: null,
@@ -80,6 +81,15 @@ class Conversation {
 		return this.m_token;
 	}
 
+	get isGzip() {
+		return this.m_isGzip;
+	}
+
+	setGzip(value) {
+		util.assert(!this.m_is_open, 'Can only be set before opening');
+		this.m_isGzip = !!value;
+	}
+
 	/**
 	 * @constructor
 	 */
@@ -92,7 +102,7 @@ class Conversation {
 		this.m_token = '';
 		this.m_msgs = [];
 		this.m_signer = null;
-		this.isGzip = false;
+		this.m_isGzip = false;
 	}
 
 	/**
@@ -276,6 +286,10 @@ class WSConversationBasic extends Conversation {
 class WebConversation extends WSConversationBasic {
 	// m_req: null,
 
+	setGzip(value) {
+		// web disable gzip
+	}
+
 	/**
 	 * @ovrewrite 
 	 */
@@ -382,11 +396,6 @@ class NodeConversation extends WSConversationBasic {
 	// @private:
 	// m_req: null,
 	// m_socket: null, // web socket connection
-
-	constructor(path) {
-		super(path);
-		this.isGzip = true; // enable gzip
-	}
 
 	/** 
 	 * @ovrewrite
