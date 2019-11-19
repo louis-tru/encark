@@ -353,7 +353,7 @@ function read_num(bin, api, len) {
 function read_bigint(bin) {
 	assert(bin.length > bin.index + 8);
 	var bytes = read_buffer(bin);
-	if (_bigint) {
+	if (buffer.isBigInt) {
 		return buffer.readBigIntBE(bytes);
 	} else { // not support bigint
 		console.warn('Not support bigint');

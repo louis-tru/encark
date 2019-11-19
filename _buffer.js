@@ -28,22 +28,30 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+"use strict";
+
 const utils = require('./util');
 // Temporary buffers to convert numbers.
 const float32Array = new Float32Array(1);
 const uInt8Float32Array = new Uint8Array(float32Array.buffer);
 const float64Array = new Float64Array(1);
 const uInt8Float64Array = new Uint8Array(float64Array.buffer);
-const _bigint = global.BigInt ? function() {
-	if (utils.haveWeb) {
-		return import('./_bigint');
-	} else {
-		return eval('require("./_bigint")');
-	}
-}(): null;
+var _bigint = null;
 
-if (_bigint)
-	_bigint._set(checkInt);
+if (global.BigInt) {
+	(function(complete) {
+		if (utils.haveWeb) {
+			import('./_bigint').then(complete);
+		} else {
+			complete(utils._eval('require("./_bigint")'));
+		}
+	})(function(m) {debugger;
+		_bigint = m;
+		_bigint._set(checkInt);
+		exports.readBigIntBE = m._readBigIntBE;
+		exports.writeBigIntLE = m._writeBigIntLE;
+	});
+}
 
 // Check endianness.
 float32Array[0] = -1; // 0xBF800000
@@ -587,15 +595,13 @@ function writeDoubleBackwards(self, val, offset = 0) {
 	return offset;
 }
 
-var readBigIntBE = _bigint._readBigIntBE;
-var writeBigIntLE = _bigint._writeBigIntLE;
-
 var readFloatBE = bigEndian ? readFloatForwards : readFloatBackwards;
 var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
-module.exports = {
+module.exports = exports = {
+	get isBigInt() { return !!_bigint },
 	// read
 	readInt8, readUInt8,
 	readInt16BE, readUInt16BE,
@@ -605,7 +611,6 @@ module.exports = {
 	readBigInt64BE, readBigUInt64BE,
 	readIntBE, readUIntBE,
 	readFloatBE, readDoubleBE,
-	readBigIntBE,
 	// write
 	writeInt8, writeUInt8,
 	writeInt16BE, writeUInt16BE,
@@ -614,5 +619,4 @@ module.exports = {
 	writeBigInt64BE, writeBigUInt64BE,
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
-	writeBigIntLE,
 };
