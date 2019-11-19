@@ -43,7 +43,7 @@ if (global.BigInt) {
 		if (utils.haveWeb) {
 			import('./_bigint').then(complete);
 		} else {
-			complete(utils._eval('require("./_bigint")'));
+			complete(eval('require("./_bigint")'));
 		}
 	})(function(m) {
 		_bigint = m;
