@@ -45,7 +45,7 @@ if (global.BigInt) {
 		} else {
 			complete(utils._eval('require("./_bigint")'));
 		}
-	})(function(m) {debugger;
+	})(function(m) {
 		_bigint = m;
 		_bigint._set(checkInt);
 		exports.readBigIntBE = m._readBigIntBE;
