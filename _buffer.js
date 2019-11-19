@@ -28,11 +28,22 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+const utils = require('./util');
 // Temporary buffers to convert numbers.
 const float32Array = new Float32Array(1);
 const uInt8Float32Array = new Uint8Array(float32Array.buffer);
 const float64Array = new Float64Array(1);
 const uInt8Float64Array = new Uint8Array(float64Array.buffer);
+const _bigint = global.BigInt ? function() {
+	if (utils.haveWeb) {
+		return import('./_bigint');
+	} else {
+		return eval('require("./_bigint")');
+	}
+}(): null;
+
+if (_bigint)
+	_bigint._set(checkInt);
 
 // Check endianness.
 float32Array[0] = -1; // 0xBF800000
@@ -67,7 +78,7 @@ function checkInt(value, min, max, buf, offset, byteLength) {
 		const n = typeof min === 'bigint' ? 'n' : '';
 		let range;
 		if (byteLength > 3) {
-			if (min === 0 || min === 0n) {
+			if (min == 0) {
 				range = `>= 0${n} and < 2${n} ** ${(byteLength + 1) * 8}${n}`;
 			} else {
 				range = `>= -(2${n} ** ${(byteLength + 1) * 8 - 1}${n}) and < 2 ** ` +
@@ -225,15 +236,25 @@ function readBigInt64BE(self, offset = 0) {
 	if (first === undefined || last === undefined)
 		boundsError(offset, self.length - 8);
 
-	const val = (first << 24) + // Overflow
+	if (_bigint) {
+		return _bigint._readBigInt64BE(self, offset);
+	}
+
+	console.warn('Not support bigint');
+
+	const hi = 
+		(first << 24) + // Overflow
 		self[++offset] * 2 ** 16 +
 		self[++offset] * 2 ** 8 +
 		self[++offset];
-	return (BigInt(val) << 32n) +
-		BigInt(self[++offset] * 2 ** 24 +
+
+	const lo = 
+		self[++offset] * 2 ** 24 +
 		self[++offset] * 2 ** 16 +
 		self[++offset] * 2 ** 8 +
-		last);
+		last;
+
+	return hi * 2 ** 32 + lo;
 }
 
 function readBigUInt64BE(self, offset = 0) {
@@ -242,6 +263,12 @@ function readBigUInt64BE(self, offset = 0) {
 	const last = self[offset + 7];
 	if (first === undefined || last === undefined)
 		boundsError(offset, self.length - 8);
+
+	if (_bigint) {
+		return _bigint._readBigUInt64BE(self, offset)
+	}
+
+	console.warn('Not support bigint');
 
 	const hi = first * 2 ** 24 +
 		self[++offset] * 2 ** 16 +
@@ -253,7 +280,7 @@ function readBigUInt64BE(self, offset = 0) {
 		self[++offset] * 2 ** 8 +
 		last;
 
-	return (BigInt(hi) << 32n) + BigInt(lo);
+	return hi * 2 ** 32 + lo;
 }
 
 function readIntBE(self, offset = 0, byteLength = 4) {
@@ -429,28 +456,6 @@ function writeU_Int48BE(buf, value, offset, min, max) {
 	return offset + 4;
 }
 
-function writeBigU_Int64BE(buf, value, offset, min, max) {
-	checkInt(value, min, max, buf, offset, 7);
-
-	let lo = Number(value & 0xffffffffn);
-	buf[offset + 7] = lo;
-	lo = lo >> 8;
-	buf[offset + 6] = lo;
-	lo = lo >> 8;
-	buf[offset + 5] = lo;
-	lo = lo >> 8;
-	buf[offset + 4] = lo;
-	let hi = Number(value >> 32n & 0xffffffffn);
-	buf[offset + 3] = hi;
-	hi = hi >> 8;
-	buf[offset + 2] = hi;
-	hi = hi >> 8;
-	buf[offset + 1] = hi;
-	hi = hi >> 8;
-	buf[offset] = hi;
-	return offset + 8;
-}
-
 function writeInt8(self, value, offset = 0) {
 	return writeU_Int8(self, value, offset, -0x80, 0x7f);
 }
@@ -484,12 +489,11 @@ function writeUInt48BE(self, value, offset = 0) {
 }
 
 function writeBigInt64BE(self, value, offset = 0) {
-	return writeBigU_Int64BE(
-		self, value, offset, -0x8000000000000000n, 0x7fffffffffffffffn);
+	return _bigint._writeBigInt64BE(self, value, offset);
 }
 
 function writeBigUInt64BE(self, value, offset = 0) {
-	return writeBigU_Int64BE(self, value, offset, 0n, 0xffffffffffffffffn);
+	return _bigint._writeBigUInt64BE(self, value, offset);
 }
 
 function writeIntBE(self, value, offset = 0, byteLength = 4) {
@@ -583,6 +587,9 @@ function writeDoubleBackwards(self, val, offset = 0) {
 	return offset;
 }
 
+var readBigIntBE = _bigint._readBigIntBE;
+var writeBigIntLE = _bigint._writeBigIntLE;
+
 var readFloatBE = bigEndian ? readFloatForwards : readFloatBackwards;
 var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
@@ -598,6 +605,7 @@ module.exports = {
 	readBigInt64BE, readBigUInt64BE,
 	readIntBE, readUIntBE,
 	readFloatBE, readDoubleBE,
+	readBigIntBE,
 	// write
 	writeInt8, writeUInt8,
 	writeInt16BE, writeUInt16BE,
@@ -606,4 +614,5 @@ module.exports = {
 	writeBigInt64BE, writeBigUInt64BE,
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
+	writeBigIntLE,
 };

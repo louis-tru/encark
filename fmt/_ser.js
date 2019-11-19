@@ -29,9 +29,11 @@
  * ***** END LICENSE BLOCK ***** */
 
 var utils = require('../util');
+var uuid = require('../hash/uuid');
 var fmtc = require('./_fmtc');
 var service = require('../service');
 var wsservice = require('../ws/service');
+var errno = require('../errno');
 
 /**
  * @class FMTService
@@ -45,6 +47,10 @@ class FMTService extends wsservice.WSService {
 		return this.m_id;
 	}
 
+	get uuid() {
+		return this.m_uuid;
+	}
+
 	get time() {
 		return this.m_time;
 	}
@@ -54,7 +60,7 @@ class FMTService extends wsservice.WSService {
 		this.m_center = null;
 		this.m_id = String(this.params.id);
 		this.m_subscribe = new Set();
-		this.m_time = Date.now();
+		this.m_uuid = uuid();
 	}
 
 	requestAuth() {
@@ -68,24 +74,27 @@ class FMTService extends wsservice.WSService {
 	 */
 	async load() {
 		var center = fmtc._fmtc(this.conv.server);
-		if (center) {
+		utils.assert(center, 'FMTService.load() FMTC No found');
+		await utils.sleep(utils.random(0, 200));
+		this.m_time = new Date();
+		try {
 			await center.loginFrom(this);
-			this.m_center = center;
-		} else {
-			console.error('FMTService.load()', 'FMTC No found');
-			this.conv.close();
+		} catch(err) {
+			if (err.code == errno.ERR_REPEAT_LOGIN_FMTC[0]) {
+				await utils.sleep(2000);
+				await this._repeatLoginError();
+			}
+			throw err;
 		}
+		this.m_center = center;
 	}
 
 	/**
 	 * @overwrite
 	 */
 	async destroy() {
-		var center = this.m_center;
-		if (center) {
-			await center.logoutFrom(this);
-			this.m_center = null;
-		}
+		await this.m_center.logoutFrom(this);
+		this.m_center = null;
 	}
 
 	/**
@@ -95,6 +104,19 @@ class FMTService extends wsservice.WSService {
 		if (this.hasSubscribe({event})) {
 			super.trigger(event, data);
 		}
+	}
+
+	_repeatLoginError() {
+		return Promise.all([super.trigger('RepeatLoginError'), utils.sleep(200)]);
+	}
+
+	/**
+	 * @func repeatLoginError() close conv
+	 */
+	repeatLoginError() {
+		this._repeatLoginError()
+			.then(e=>this.conv.close())
+			.catch(e=>this.conv.close());
 	}
 
 	// ------------ api ------------

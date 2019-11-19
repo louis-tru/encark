@@ -79,6 +79,10 @@ class WSClient extends cli.WSClient {
 				utils.sleep(500).then(e=>this.conv.connect());
 			}
 		});
+
+		this.addEventListener('RepeatLoginError', e=>{
+			console.error(`FMTService Repeat login, id=${host.id}`);
+		});
 	}
 
 	/**

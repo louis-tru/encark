@@ -69,16 +69,10 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_inl.publish(event, data);
 	}
 
-	/**
-	 * @func clientAuth();
-	 */
 	clientAuth(fmtService) {
 		return true;
 	}
 
-	/**
-	 * @func fnodeAuth()
-	 */
 	fnodeAuth(fnodeRemoteService) {
 		return true;
 	}
@@ -111,8 +105,7 @@ class FastMessageTransferCenter_INL {
 		this.m_fnodes = null;
 		this.m_fnodes_cfg = {}; // node server cfg
 		this.m_fmtservice = new Map(); // client service handle
-		this.m_cli_route = new Map(); // client route 
-		// { 0_a: 'fnodeId-abcdefg-1', 1_b: 'fnodeId-abcdefg-2', 2_c: 'fnodeId-abcdefg-3' }	
+		this.m_route = new Map(); // { 0_a: 'fnodeId-abcdefg-1', 1_b: 'fnodeId-abcdefg-2' }
 		this.m_connecting = new Set();
 		this.m_broadcast_mark = new Set();
 
@@ -123,20 +116,26 @@ class FastMessageTransferCenter_INL {
 
 		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
 			var {fnodeId} = e.data;
-			for (var [id,fid] of this.m_cli_route) {
+			for (var [id,fid] of this.m_route) {
 				if (fnodeId == fid) {
-					this.m_cli_route.delete(id);
+					this.m_route.delete(id);
 				}
 			}
 		});
 
 		this.m_host.addEventListener('Login', e=>{ // client connect
-			var {fnodeId,id} = e.data;
-			this.m_cli_route.set(id, fnodeId);
+			var { id, fnodeId, time, uuid} = e.data;
+			var fmt = this.m_fmtservice.get(id);
+			if (fmt) {
+				if (fmt.time < time || (fmt.time == time && uuid != fmt.uuid)) {
+					fmt.repeatLoginError(); // Duplicate logon, close conv
+				}
+			}
+			this.m_route.set(id, fnodeId);
 		});
 
 		this.m_host.addEventListener('Logout', e=>{ // client disconnect
-			this.m_cli_route.delete(e.data.id);
+			this.m_route.delete(e.data.id);
 		});
 
 		for (var cfg of fnodes) {
@@ -230,54 +229,53 @@ class FastMessageTransferCenter_INL {
 	}
 
 	async exec(id, args = [], method = null) {
-		var fnodeId = this.m_cli_route.get(id);
+		var fnodeId = this.m_route.get(id);
 		if (fnodeId) {
-			var fnode = this.m_fnodes[fnodeId]; utils.assert(fnode);
-			try {
-				if (method)
-					return await fnode[method](id, ...args);
-				else
-					return utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
-			} catch(err) {
-				if (err.code != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
-					throw err;
+			var fnode = this.m_fnodes[fnodeId];
+			if (fnode) {
+				try {
+					if (method)
+						return await fnode[method](id, ...args);
+					else
+						return utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
+				} catch(err) {
+					if (err.code != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
+						throw err;
+					}
 				}
 			}
-			try { // Trigger again
-				this.m_cli_route.delete(id);
-				this.m_host.getNoticer('Logout').trigger({ fnodeId, id });
-			} catch(err) {
-				console.error(err);
-			}
+			// Trigger again
+			this.m_route.delete(id);
+			this.m_host.getNoticer('Logout').trigger({ fnodeId, id });
 		}
 
-		var fnode = await utils.promise((resolve, reject)=>{
-			var i = 0;
-			Object.values(this.m_fnodes).forEach((fnode,i,fnodes)=>{
-				// utils.assert(fnodes.length);
-				fnode.query(id).then(e=>{
+		var {fnode,time,uuid} = await utils.promise((resolve, reject)=>{
+			var fnodes = Object.values(this.m_fnodes);
+			var l = fnodes.length, i = 0, complete = 0;
+			fnodes.forEach(fnode=>{
+				fnode.query(id, true).then(e=>{
+					if (complete) return;
 					i++;
 					if (e) {
-						resolve(fnode);
-					} else if (fnodes.length == i) {
+						complete = 1;
+						resolve(Object.assign({fnode}, e));
+					} else if (l == i) {
 						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
 					}
 				}).catch(e=>{
+					if (complete) return;
 					i++;
-					if (fnodes.length == i) {
+					if (l == i) {
 						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
 					}
-					// console.error(e);
 				});
 			});
 		});
 
-		try { // Trigger again
-			this.m_cli_route.set(id, fnode.id);
-			this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id });
-		} catch(err) {
-			console.error(err);
-		}
+		// Trigger again
+		this.m_route.set(id, fnode.id);
+		this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id, time, uuid });
+
 		if (method)
 			return await fnode[method](id, ...args);
 	}
@@ -307,10 +305,15 @@ class FastMessageTransferCenter_INL {
 	 */
 	async loginFrom(fmtservice) {
 		utils.assert(fmtservice.id);
-		utils.assert(!this.m_fmtservice.has(fmtservice.id));
-		utils.assert( !await this.hasOnline(fmtservice.id) );
+		utils.assert(!await this.hasOnline(fmtservice.id), errno.ERR_REPEAT_LOGIN_FMTC);
+		utils.assert(!this.m_fmtservice.has(fmtservice.id), errno.ERR_REPEAT_LOGIN_FMTC);
 		this.m_fmtservice.set(fmtservice.id, fmtservice);
-		this.publish('Login', { fnodeId: this.id, id: fmtservice.id, time: fmtservice.time });
+		this.publish('Login', {
+			fnodeId: this.id, 
+			id: fmtservice.id, 
+			time: fmtservice.time,
+			uuid: fmtservice.uuid,
+		});
 		if (utils.dev)
 			console.log('Login', fmtservice.id);
 	}
@@ -322,7 +325,10 @@ class FastMessageTransferCenter_INL {
 		utils.assert(fmtservice.id);
 		utils.assert(this.m_fmtservice.has(fmtservice.id));
 		this.m_fmtservice.delete(fmtservice.id);
-		this.publish('Logout', { fnodeId: this.id, id: fmtservice.id });
+		this.publish('Logout', {
+			fnodeId: this.id, 
+			id: fmtservice.id,
+		});
 		if (utils.dev)
 			console.log('Logout', fmtservice.id);
 	}

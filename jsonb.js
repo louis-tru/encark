@@ -28,11 +28,11 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var errno = require('./errno');
-var utils = require('./util');
-var buffer = require('./_buffer');
-var codec = require('./_codec');
-var TypedArray = Uint8Array.prototype.__proto__.constructor;
+const errno = require('./errno');
+const utils = require('./util');
+const buffer = require('./_buffer');
+const codec = require('./_codec');
+const TypedArray = Uint8Array.prototype.__proto__.constructor;
 
 var // FLAGS
 	F_EOF = 0,
@@ -172,13 +172,8 @@ function write_bigint(o, out) {
 	} else {
 		write_flag(F_BIGINT, out);
 	}
-	var bytes = [], i = 0;
-	do {
-		bytes.push(Number(o & 0xffn));
-		o >>= 8n;
-		i++;
-	} while(o || i < 8);
-
+	var bytes = [];
+	buffer.writeBigIntLE(o, bytes);
 	return 1 + write_buffer(bytes.reverse(), out);
 }
 
@@ -357,13 +352,18 @@ function read_num(bin, api, len) {
 
 function read_bigint(bin) {
 	assert(bin.length > bin.index + 8);
-	var num = 0n;
 	var bytes = read_buffer(bin);
-	for (var byte of bytes) {
-		num <<= 8n;
-		num |= BigInt(byte);
+	if (_bigint) {
+		return buffer.readBigIntBE(bytes);
+	} else { // not support bigint
+		console.warn('Not support bigint');
+		var num = 0;
+		for (var byte of bytes) {
+			num *= 256;
+			num += byte;
+		}
+		return num;
 	}
-	return num;
 }
 
 function read_next(bin) {

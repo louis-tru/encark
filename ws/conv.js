@@ -98,7 +98,7 @@ var Conversation = utils.class('Conversation', {
 		self._initialize(bind_services).catch(err=>{
 			self.close();
 			self._safeDestroy();  // 关闭连接
-			console.warn(err);
+			// console.warn(err);
 		});
 	},
 

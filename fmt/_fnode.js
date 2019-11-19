@@ -51,7 +51,7 @@ class FNode {
 	broadcast(event, data, id) {}
 	triggerTo(id, event, data) {}
 	callTo(id, name, data, timeout) {}
-	query(id) {}
+	query(id, more = 0) {}
 }
 
 /**
@@ -76,8 +76,13 @@ class FNodeLocal extends FNode {
 	callTo(id, method, data, timeout) {
 		return this.m_center.getFMTService(id).call(method, data, timeout); // call method
 	}
-	async query(id) {
-		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
+	async query(id, more=0) {
+		var s = this.m_center.getFMTServiceNoError(id);
+		if (more) {
+			return s ? {time:s.time,uuid:s.uuid}: null;
+		} else {
+			return s ? 1: 0;
+		}
 	}
 }
 
@@ -155,8 +160,8 @@ class FNodeRemote extends FNode {
 		return this.m_impl.call('callTo', [id, method, data, timeout], timeout); // call method
 	}
 
-	query(id) { // query client
-		return this.m_impl.call('query', [id]);
+	query(id, more = 0) { // query client
+		return this.m_impl.call('query', [id, more?true:false]);
 	}
 }
 
@@ -185,8 +190,13 @@ class FNodeRemoteIMPL {
 		return this.m_center.getFMTService(id).call(method, data, timeout);
 	}
 
-	query([id]) { // query client
-		return this.m_center.getFMTServiceNoError(id) ? 1: 0;
+	query([id,more]) { // query client
+		var s = this.m_center.getFMTServiceNoError(id);
+		if (more) {
+			return s ? {time:s.time,uuid:s.uuid}: null;
+		} else {
+			return s ? 1: 0;
+		}
 	}
 }
 
@@ -200,7 +210,8 @@ class FNodeRemoteService extends wsservice.WSService {
 		utils.assert(center, 'FNodeRemoteService.requestAuth() fmt center No found');
 		utils.assert(this.params.id, 'FNodeRemoteService.loaded() node id param undefined');
 		utils.assert(this.params.id != center.id, 'Cannot connect to itself');
-		if (!await center.host.fnodeAuth(this)) return false;
+		if (!await center.host.fnodeAuth(this))
+			return false;
 		this.m_center = center;
 		return true;
 	}
