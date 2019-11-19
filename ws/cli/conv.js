@@ -319,11 +319,11 @@ class WebConversation extends WSConversationBasic {
 
 			req.onmessage = function(e) {
 				var data = e.data;
-				if (data instanceof Blob) {
-					data.arrayBuffer().then(e=>self.handlePacket(new Uint8Array(e), 0));
-				} else if (data instanceof ArrayBuffer) {
+				if (data instanceof ArrayBuffer) {
 					self.handlePacket(data, 0);
-				}	else { // string
+				} else if (data instanceof Blob && data.arrayBuffer) {
+					data.arrayBuffer().then(e=>self.handlePacket(new Uint8Array(e), 0));
+				} else { // string
 					self.handlePacket(data, 1);
 				}
 			};
@@ -334,6 +334,8 @@ class WebConversation extends WSConversationBasic {
 
 			self._open();
 		};
+
+		req.binaryType = 'arraybuffer';
 
 		req.onerror = function(e) {
 			console.log('CLI WebConversation error', self.m_url.href);

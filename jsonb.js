@@ -63,8 +63,10 @@ var // FLAGS
 	F_INFINITY_MIN = 25,
 	F_INFINITY_MAX = 26;
 
-var BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-var BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
+if (buffer.isBigInt) {
+	const BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+	const BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
+}
 
 function write_flag(flag, out) {
 	out.push([flag]);
