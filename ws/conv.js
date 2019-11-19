@@ -176,7 +176,7 @@ var Conversation = utils.class('Conversation', {
 			}
 
 			await ser.load();
-			ser.m_loaded = true;
+			ser.m_loaded = true; // ptinate visit
 			await utils.sleep(200); // 在同一个node进程中同时开启多个服务时socket无法写入
 			await ser._trigger('Load', {token:this.token});
 			console.log('SER Load', this.request.url);

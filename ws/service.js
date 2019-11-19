@@ -87,6 +87,9 @@ class WSService extends Service {
 	 * @fun receiveMessage() # 消息处理器
 	 */
 	async receiveMessage(msg) {
+		if (!this.m_loaded) 
+			console.warn('Unable to process message WSService.receiveMessage, loaded=false');
+
 		var self = this;
 		var { data = {}, name, cb } = msg;
 

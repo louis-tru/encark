@@ -320,7 +320,7 @@ class WebConversation extends WSConversationBasic {
 			req.onmessage = function(e) {
 				var data = e.data;
 				if (data instanceof ArrayBuffer) {
-					self.handlePacket(data, 0);
+					self.handlePacket(new Uint8Array(data), 0);
 				} else if (data instanceof Blob && data.arrayBuffer) {
 					data.arrayBuffer().then(e=>self.handlePacket(new Uint8Array(e), 0));
 				} else { // string
