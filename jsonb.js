@@ -166,7 +166,7 @@ function write_bigint(o, out) {
 	if (o < BIGINT_MAX_SAFE_INTEGER && o > BIGINT_MIN_SAFE_INTEGER) {
 		return write_number(Number(o), out);
 	}
-	if (o < 0n) { // 
+	if (o < 0) { // 
 		write_flag(F_BIGINT_NEGATIVE, out);
 		o = -o;
 	} else {

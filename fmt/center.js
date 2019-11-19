@@ -282,7 +282,7 @@ class FastMessageTransferCenter_INL {
 
 	publish(event, data) {
 		for (var fnode of Object.values(this.m_fnodes)) {
-			fnode.publish(event, data).catch(console.error);
+			fnode.publish(event, data).catch(e=>console.error('FastMessageTransferCenter_INL.publish', e));
 		}
 	}
 
@@ -295,7 +295,7 @@ class FastMessageTransferCenter_INL {
 			this.m_broadcast_mark.add(id);
 			for (var fnode of Object.values(this.m_fnodes)) {
 				if (!source || source !== fnode)
-					fnode.broadcast(event, data, id).catch(console.error);
+					fnode.broadcast(event, data, id).catch(e=>console.error('FastMessageTransferCenter_INL._forwardBroadcast', e));
 			}
 		}
 	}
