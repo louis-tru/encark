@@ -75,7 +75,13 @@ class Notification {
 				throw Error.new(`Cannot find a function named "${func}"`);
 			}
 		} else {
-			return this.getNoticer(name).on(func, 0); // default id 0
+			if (func) {
+				return this.getNoticer(name).on(func, 0); // default id 0
+			} else { // delete default listener
+				if (this.hasNoticer(name)) {
+					this.getNoticer(name).off(0);
+				}
+			}
 		}
 	}
 	
