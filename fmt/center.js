@@ -112,6 +112,8 @@ class FastMessageTransferCenter_INL {
 		this.m_host.addEventListener('AddNode', e=>{ // New Node connect
 			if (e.data.fnode)
 				this.addFnodeCfg(e.data.fnode);
+			if (utils.dev)
+				console.log('FastMessageTransferCenter_INL.onAddNode', e.data.fnode);
 		});
 
 		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
@@ -293,9 +295,14 @@ class FastMessageTransferCenter_INL {
 	_forwardBroadcast(event, data, id, source = null) {
 		if (!this.m_broadcast_mark.has(id)) {
 			this.m_broadcast_mark.add(id);
-			for (var fnode of Object.values(this.m_fnodes)) {
-				if (!source || source !== fnode)
-					fnode.broadcast(event, data, id).catch(e=>console.error('FastMessageTransferCenter_INL._forwardBroadcast', e));
+			for (let f of Object.values(this.m_fnodes)) {
+				if (!source || source !== f) {
+					f.broadcast(event, data, id)
+						.catch(e=>console.error('FastMessageTransferCenter_INL._forwardBroadcast', 
+							'cur', this.publishURL&&this.publishURL.href,
+							'fnode',f.publishURL&&f.publishURL.href, e)
+						);
+				}
 			}
 		}
 	}
