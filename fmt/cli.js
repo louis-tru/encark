@@ -144,10 +144,6 @@ class FMTClient extends event.Notification {
 		this.m_cli = new WSClient(this, url, certificate);
 	}
 
-	subscribeAll() {
-		this.m_cli.call('subscribeAll');
-	}
-
 	unsubscribe(events = []) {
 		events.forEach(e=>this.m_subscribe.delete(e));
 		this.m_cli.call('unsubscribe', {events}).catch(console.error);

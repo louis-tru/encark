@@ -37,6 +37,8 @@ var fnode = require('./_fnode');
 var path = require('../path');
 var errno = require('../errno');
 
+const OFFLINE_CACHE_TIME = 1e4; // 10s
+
 // Fast Message Transfer Center, 快速消息传输中心
 
 /**
@@ -144,7 +146,7 @@ class FastMessageTransferCenter_INL {
 			}
 			this.m_route.set(id, fnodeId);
 
-			for (var fmt of this.m_fmtservice) {
+			for (var [,fmt] of this.m_fmtservice) {
 				if (fmt.id != e.data.id)
 					fmt.reportState('Login', e.data.id);
 			}
@@ -152,7 +154,7 @@ class FastMessageTransferCenter_INL {
 
 		this.m_host.addEventListener('Logout', e=>{ // client disconnect
 			this.m_route.delete(e.data.id);
-			for (var fmt of this.m_fmtservice) {
+			for (var [,fmt] of this.m_fmtservice) {
 				if (fmt.id != e.data.id)
 					fmt.reportState('Logout', e.data.id);
 			}
@@ -249,8 +251,9 @@ class FastMessageTransferCenter_INL {
 	}
 
 	async exec(id, args = [], method = null) {
+
 		var fnodeId = this.m_route.get(id);
-		if (fnodeId) {
+		while (fnodeId) {
 			var fnode = this.m_fnodes[fnodeId];
 			if (fnode) {
 				try {
@@ -263,15 +266,25 @@ class FastMessageTransferCenter_INL {
 						throw err;
 					}
 				}
+			} else if (typeof fnodeId == 'number') { // OFFLINE cache
+				if (fnodeId > Date.now()) {
+					throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
+				}
+				break; // skip Trigger again Logout event
 			}
-			// Trigger again
+			// Trigger again:
 			this.m_route.delete(id);
 			this.m_host.getNoticer('Logout').trigger({ fnodeId, id });
+			break;
 		}
 
-		var {fnode,time,uuid} = await utils.promise((resolve, reject)=>{
+		var {fnode,time,uuid} = await new Promise((resolve, _reject)=>{
 			var fnodes = Object.values(this.m_fnodes);
 			var l = fnodes.length, i = 0, complete = 0;
+			var reject = e=>{
+				this.m_route.set(id, Date.now() + OFFLINE_CACHE_TIME); // use OFFLINE cache
+				_reject(e);
+			};
 			fnodes.forEach(fnode=>{
 				fnode.query(id, true).then(e=>{
 					if (complete) return;

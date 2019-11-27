@@ -102,7 +102,7 @@ class FMTService extends wsservice.WSService {
 	 */
 	trigger(event, data) {
 		if (this.hasSubscribe({event})) {
-			super.trigger(event, data);
+			return super.trigger(event, data);
 		}
 	}
 
@@ -125,10 +125,6 @@ class FMTService extends wsservice.WSService {
 
 	// ------------ api ------------
 
-	subscribeAll() {
-		this.m_subscribe.add('*');
-	}
-
 	subscribe({ events }) {
 		for (var event of events)
 			this.m_subscribe.add(event);
@@ -140,7 +136,7 @@ class FMTService extends wsservice.WSService {
 	}
 
 	hasSubscribe({ event }) {
-		return this.m_subscribe.has('*') || this.m_subscribe.has(event);
+		return this.m_subscribe.has(event);
 	}
 
 	hasOnline({ id }) {

@@ -57,7 +57,7 @@ class WSClient extends Notification {
 	constructor(service_name, conv) {
 		super();
 
-		this.m_calls = {};
+		this.m_calls = new Map();
 		this.m_service_name = service_name;
 		this.m_conv = conv || new WSConversation();
 		this.m_loaded = false;
@@ -73,7 +73,7 @@ class WSClient extends Notification {
 		this.m_conv.onClose.on(async e=>{
 			this.m_loaded = false;
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
-			for (var handle of Object.values(this.m_calls)) {
+			for (var [,handle] of this.m_calls) {
 				handle.cancel = true;
 				handle.err(err);
 			}
@@ -107,7 +107,7 @@ class WSClient extends Notification {
 		var { data = {}, name, cb } = msg;
 
 		if (msg.isCallback()) {
-			var handle = this.m_calls[cb];
+			var handle = this.m_calls.get(cb);
 			if (handle) {
 				if (msg.error) { // throw error
 					handle.err(Error.new(msg.error));
@@ -171,9 +171,7 @@ class WSClient extends Notification {
 
 	_checkTimeout() {
 		var now = Date.now();
-		var calls = this.m_calls;
-		for (var id in calls) {
-			var handle = calls[id];
+		for (var [,handle] of this.m_calls) {
 			if (handle.timeout) {
 				if (handle.timeout < now) { // timeouted
 					handle.err(Error.new([...errno.ERR_METHOD_CALL_TIMEOUT,
@@ -188,16 +186,16 @@ class WSClient extends Notification {
 		return util.promise(async (resolve, reject)=>{
 			var id = util.id;
 			var calls = this.m_calls;
-			calls[id] = await this._send({
+			calls.set(id, await this._send({
 				timeout: timeout ? timeout + Date.now(): 0,
-				ok: e=>(delete calls[id],resolve(e)),
-				err: e=>(delete calls[id],reject(e)),
+				ok: e=>(calls.delete(id),resolve(e)),
+				err: e=>(calls.delete(id),reject(e)),
 				service: this.m_conv._service(this.name),
 				type: type,
 				name: name,
 				data: data,
 				cb: id,
-			});
+			}));
 		});
 	}
 
