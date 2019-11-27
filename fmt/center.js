@@ -148,7 +148,7 @@ class FastMessageTransferCenter_INL {
 	}
 
 	addFnodeCfg(url, init = false) {
-		if (!this.m_fnodes_cfg.hasOwnProperty(url)) {
+		if (url && !this.m_fnodes_cfg.hasOwnProperty(url)) {
 			if (!this.m_publish_url || url != this.m_publish_url.href) {
 				this.m_fnodes_cfg[url] = { url, init, retry: 0 };
 			}
