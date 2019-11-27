@@ -106,6 +106,10 @@ class FMTService extends wsservice.WSService {
 		}
 	}
 
+	reportState(event, id, data) {
+		this.trigger(`${event}-${id}`, data);
+	}
+
 	_repeatLoginError() {
 		return Promise.all([super.trigger('RepeatLoginError'), utils.sleep(200)]);
 	}

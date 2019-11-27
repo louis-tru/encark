@@ -143,10 +143,19 @@ class FastMessageTransferCenter_INL {
 				}
 			}
 			this.m_route.set(id, fnodeId);
+
+			for (var fmt of this.m_fmtservice) {
+				if (fmt.id != e.data.id)
+					fmt.reportState('Login', e.data.id);
+			}
 		});
 
 		this.m_host.addEventListener('Logout', e=>{ // client disconnect
 			this.m_route.delete(e.data.id);
+			for (var fmt of this.m_fmtservice) {
+				if (fmt.id != e.data.id)
+					fmt.reportState('Logout', e.data.id);
+			}
 		});
 
 		for (var cfg of fnodes) {
