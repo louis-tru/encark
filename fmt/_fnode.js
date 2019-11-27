@@ -210,7 +210,7 @@ class FNodeRemoteService extends wsservice.WSService {
 		utils.assert(center, 'FNodeRemoteService.requestAuth() fmt center No found');
 		utils.assert(this.params.id, 'FNodeRemoteService.loaded() node id param undefined');
 		utils.assert(this.params.id != center.id, 'Cannot connect to itself');
-		if (!await center.host.fnodeAuth(this))
+		if (!await center.host.authFnode(this))
 			return false;
 		this.m_center = center;
 		return true;
@@ -245,6 +245,19 @@ class FNodeRemoteService extends wsservice.WSService {
 }
 
 /**
+ * @class WSConv
+ */
+class WSConv extends cli.WSConversation {
+	constructor(center, s) {
+		super(s);
+		this.m_center = center;
+	}
+	getRequestHeaders() {
+		return this.m_center.host.getCertificate();
+	}
+}
+
+/**
  * @class FNodeRemoteClient
  */
 class FNodeRemoteClient extends cli.WSClient {
@@ -256,7 +269,7 @@ class FNodeRemoteClient extends cli.WSClient {
 			url.setParam('publish', encodeURIComponent(center.publishURL.href));
 		var s = url.protocol == 'fnodes:'? 'wss:': 'ws:';
 				s += '//' + url.host + url.path;
-		super('_fnode', new cli.WSConversation(s));
+		super('_fnode', new WSConv(center, s));
 		this.m_center = center;
 		this.m_that_fnode = new path.URL(fnode);
 		this.m_fnode = null;

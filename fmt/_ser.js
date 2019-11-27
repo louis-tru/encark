@@ -66,7 +66,7 @@ class FMTService extends wsservice.WSService {
 	requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
 		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
-		return center.host.clientAuth(this);
+		return center.host.auth(this);
 	}
 
 	/**

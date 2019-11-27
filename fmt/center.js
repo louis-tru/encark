@@ -69,12 +69,21 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_inl.publish(event, data);
 	}
 
-	clientAuth(fmtService) {
+	auth(fmtService) {
 		return true;
 	}
 
-	fnodeAuth(fnodeRemoteService) {
-		return true;
+	authFnode(fnodeRemoteService) {
+		// console.log(`-------------------fnodeRemoteService.headers`, fnodeRemoteService.headers);
+		return fnodeRemoteService.headers.certificate;
+	}
+
+	/**
+	 * @func getCertificate() fnode certificate
+	 */
+	getCertificate() {
+		// console.log('-------------------getCertificate');
+		return { certificate: 'Certificate' };
 	}
 
 }

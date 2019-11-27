@@ -36,6 +36,19 @@ var errno = require('../errno');
 var utils = require('../util');
 
 /**
+ * @class WSConv
+ */
+class WSConv extends cli.WSConversation {
+	constructor(s, certificate) {
+		super(s);
+		this.m_certificate = certificate || {};
+	}
+	getRequestHeaders() {
+		return this.m_certificate;
+	}
+}
+
+/**
  * @class Client
  */
 class WSClient extends cli.WSClient {
@@ -48,11 +61,10 @@ class WSClient extends cli.WSClient {
 		this.m_autoConnect = value;
 	}
 
-	constructor(host) {
-		var url = host.m_url;
+	constructor(host, url, certificate) {
 		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
 				s += '//' + url.host + url.path;
-		super('_fmt', new cli.WSConversation(s));
+		super('_fmt', new WSConv(s, certificate));
 		this.m_host = host;
 		this.m_autoConnect = true;
 
@@ -122,14 +134,14 @@ class FMTClient extends event.Notification {
 		this.conv.close();
 	}
 
-	constructor(id = uuid(), url = 'fmt://localhost/') {
+	constructor(id = uuid(), url = 'fmt://localhost/', certificate = null) {
 		super();
 		url = new path.URL(url);
 		url.setParam('id', id);
 		this.m_id = String(id);
 		this.m_url = url;
 		this.m_subscribe = new Set();
-		this.m_cli = new WSClient(this, url);
+		this.m_cli = new WSClient(this, url, certificate);
 	}
 
 	subscribeAll() {
