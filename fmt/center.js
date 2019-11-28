@@ -42,35 +42,21 @@ const OFFLINE_CACHE_TIME = 1e4; // 10s
 // Fast Message Transfer Center, 快速消息传输中心
 
 /**
- * @class FastMessageTransferCenter
+ * @class FastMessageTransferCenterDelegate
  */
-class FastMessageTransferCenter extends event.Notification {
+class FastMessageTransferCenterDelegate {
 
-	get id() {
-		return this.m_inl.id;
+	get host() {
+		return this.m_host;
 	}
 
-	get publishURL() {
-		return this.m_inl.publishURL;
+	exec(...args) {
+		return this.m_host.m_impl.exec(...args);
 	}
 
-	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
-		super();
-		this.m_inl = new FastMessageTransferCenter_INL(this, server, fnodes, publish);
-	}
-
-	client(id) {
-		return this.m_inl.client(id);
-	}
-
-	trigger(event, data) {
-		return this.publish(event, data);
-	}
-
-	publish(event, data) {
-		return this.m_inl.publish(event, data);
-	}
-
+	/** 
+	 * @func auth
+	*/
 	auth(fmtService) {
 		return true;
 	}
@@ -81,20 +67,70 @@ class FastMessageTransferCenter extends event.Notification {
 	}
 
 	/**
-	 * @func getCertificate() fnode certificate
+	 * @func getCertificate() get fnode certificate
 	 */
 	getCertificate() {
 		// console.log('-------------------getCertificate');
 		return { certificate: 'Certificate' };
 	}
 
+	triggerTo(id, event, data) {
+		return this.exec(id, [event, data], 'triggerTo');
+	}
+
+	callTo(id, method, data, timeout) {
+		return this.exec(id, [method, data, timeout], 'callTo');
+	}
+
 }
 
 /**
- * @class FastMessageTransferCenter_INL
+ * @class FastMessageTransferCenter
+ */
+class FastMessageTransferCenter extends event.Notification {
+
+	get id() {
+		return this.m_impl.id;
+	}
+
+	get publishURL() {
+		return this.m_impl.publishURL;
+	}
+
+	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
+		super();
+		this.m_impl = new FastMessageTransferCenter_IMPL(this, server, fnodes, publish);
+		this.setDelegate(new FastMessageTransferCenterDelegate());
+	}
+
+	setDelegate(delegate) {
+		this.m_delegate = delegate;
+		delegate.m_host = this;
+	}
+
+	client(id) {
+		return this.m_impl.client(id);
+	}
+
+	hasOnline(id) {
+		return this.m_impl.hasOnline(id);
+	}
+
+	trigger(event, data) {
+		return this.publish(event, data);
+	}
+
+	publish(event, data) {
+		return this.m_impl.publish(event, data);
+	}
+
+}
+
+/**
+ * @class FastMessageTransferCenter_IMPL
  * @private
  */
-class FastMessageTransferCenter_INL {
+class FastMessageTransferCenter_IMPL {
 
 	get id() {
 		return this.m_fnode_id;
@@ -106,6 +142,10 @@ class FastMessageTransferCenter_INL {
 
 	get publishURL() {
 		return this.m_publish_url;
+	}
+
+	get delegate() {
+		return this.m_host.m_delegate;
 	}
 
 	constructor(host, server, fnodes, publish) {
@@ -124,7 +164,7 @@ class FastMessageTransferCenter_INL {
 			if (e.data.fnode)
 				this.addFnodeCfg(e.data.fnode);
 			if (utils.dev)
-				console.log('FastMessageTransferCenter_INL.onAddNode', e.data.fnode);
+				console.log('FastMessageTransferCenter_IMPL.onAddNode', e.data.fnode);
 		});
 
 		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
@@ -187,7 +227,7 @@ class FastMessageTransferCenter_INL {
 			for (var cfg of Object.values(this.m_fnodes_cfg)) {
 				if ( !this.getFnodeFrom(cfg.url) ) {
 					cfg.retry++;
-					// console.log('FastMessageTransferCenter_INL.run(), connect', cfg.url);
+					// console.log('FastMessageTransferCenter_IMPL.run(), connect', cfg.url);
 					this.connect(cfg.url).catch(err=>{
 						if (err.code != errno.ERR_REPEAT_FNODE_CONNECT[0]) {
 							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
@@ -219,9 +259,9 @@ class FastMessageTransferCenter_INL {
 			return;
 		try {
 			this.m_connecting.add(fNodePublishURL);
-			console.log('FastMessageTransferCenter_INL.connect', fNodePublishURL);
+			console.log('FastMessageTransferCenter_IMPL.connect', fNodePublishURL);
 			await (new fnode.FNodeRemoteClient(this, fNodePublishURL))._init();
-			console.log('FastMessageTransferCenter_INL, connect ok');
+			console.log('FastMessageTransferCenter_IMPL, connect ok');
 		} finally {
 			this.m_connecting.delete(fNodePublishURL);
 		}
@@ -315,7 +355,7 @@ class FastMessageTransferCenter_INL {
 
 	publish(event, data) {
 		for (var fnode of Object.values(this.m_fnodes)) {
-			fnode.publish(event, data).catch(e=>console.error('FastMessageTransferCenter_INL.publish', e));
+			fnode.publish(event, data).catch(e=>console.error('FastMessageTransferCenter_IMPL.publish', e));
 		}
 	}
 
@@ -329,7 +369,7 @@ class FastMessageTransferCenter_INL {
 			for (let f of Object.values(this.m_fnodes)) {
 				if (!source || source !== f) {
 					f.broadcast(event, data, id)
-						.catch(e=>console.error('FastMessageTransferCenter_INL._forwardBroadcast', 
+						.catch(e=>console.error('FastMessageTransferCenter_IMPL._forwardBroadcast', 
 							'cur', this.publishURL&&this.publishURL.href,
 							'fnode',f.publishURL&&f.publishURL.href, e)
 						);
@@ -424,5 +464,6 @@ class FastMessageTransferCenter_INL {
 
 module.exports = {
 	FastMessageTransferCenter,
+	FastMessageTransferCenterDelegate,
 	fmtc: fmtc.get,
 };

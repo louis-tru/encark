@@ -66,7 +66,7 @@ class FMTService extends wsservice.WSService {
 	requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
 		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
-		return center.host.auth(this);
+		return center.delegate.auth(this);
 	}
 
 	/**
@@ -146,8 +146,8 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @func triggerTo() event message
 	 */
-	async triggerTo([id, event, data]) {
-		return this.m_center.exec(id, [event, data], 'triggerTo');
+	triggerTo([id, event, data]) {
+		return this.m_center.delegate.triggerTo(id, event, data);
 	}
 
 	// /**
@@ -159,8 +159,8 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @func callTo()
 	 */
-	callTo([id, method, data, timeout]) { //
-		return this.m_center.exec(id, [method, data, timeout], 'callTo');
+	callTo([id, method, data, timeout]) {
+		return this.m_center.delegate.callTo(id, method, data, timeout);
 	}
 
 }
@@ -180,11 +180,11 @@ class FMTServerClient {
 	}
 
 	trigger(event, data) {
-		return this.m_center.exec(this.m_id, [event, data], 'triggerTo');
+		return this.m_center.delegate.triggerTo(this.m_id, event, data);
 	}
 
 	call(method, data, timeout = wsservice.METHOD_CALL_TIMEOUT) {
-		return this.m_center.exec(this.m_id, [method, data, timeout], 'callTo');
+		return this.m_center.delegate.callTo(this.m_id, method, data, timeout);
 	}
 
 }

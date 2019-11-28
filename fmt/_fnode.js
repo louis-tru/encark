@@ -210,7 +210,7 @@ class FNodeRemoteService extends wsservice.WSService {
 		utils.assert(center, 'FNodeRemoteService.requestAuth() fmt center No found');
 		utils.assert(this.params.id, 'FNodeRemoteService.loaded() node id param undefined');
 		utils.assert(this.params.id != center.id, 'Cannot connect to itself');
-		if (!await center.host.authFnode(this))
+		if (!await center.delegate.authFnode(this))
 			return false;
 		this.m_center = center;
 		return true;
@@ -253,7 +253,7 @@ class WSConv extends cli.WSConversation {
 		this.m_center = center;
 	}
 	getRequestHeaders() {
-		return this.m_center.host.getCertificate();
+		return this.m_center.delegate.getCertificate();
 	}
 }
 
