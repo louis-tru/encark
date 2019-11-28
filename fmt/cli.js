@@ -49,7 +49,7 @@ class WSConv extends cli.WSConversation {
 }
 
 /**
- * @class Client
+ * @class WSClient
  */
 class WSClient extends cli.WSClient {
 
@@ -144,15 +144,15 @@ class FMTClient extends event.Notification {
 		this.m_cli = new WSClient(this, url, certificate);
 	}
 
-	unsubscribe(events = []) {
-		events.forEach(e=>this.m_subscribe.delete(e));
-		this.m_cli.call('unsubscribe', {events}).catch(console.error);
-	}
+	// unsubscribe(events = []) {
+	// 	events.forEach(e=>this.m_subscribe.delete(e));
+	// 	this.m_cli.call('unsubscribe', {events}).catch(console.error);
+	// }
 
-	subscribe(events = []) {
-		events.forEach(e=>this.m_subscribe.add(e));
-		this.m_cli.call('subscribe', {events}).catch(console.error);
-	}
+	// subscribe(events = []) {
+	// 	events.forEach(e=>this.m_subscribe.add(e));
+	// 	this.m_cli.call('subscribe', {events}).catch(console.error);
+	// }
 
 	that(id) {
 		utils.assert(id != this.id);
