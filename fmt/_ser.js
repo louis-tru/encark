@@ -32,13 +32,13 @@ var utils = require('../util');
 var uuid = require('../hash/uuid');
 var fmtc = require('./_fmtc');
 var service = require('../service');
-var wsservice = require('../ws/service');
+var wss = require('../ws/service');
 var errno = require('../errno');
 
 /**
  * @class FMTService
  */
-class FMTService extends wsservice.WSService {
+class FMTService extends wss.WSService {
 
 	/**
 	 * @get id client
@@ -100,9 +100,9 @@ class FMTService extends wsservice.WSService {
 	/**
 	 * @overwrite
 	 */
-	trigger(event, data) {
+	trigger(event, data, timeout = 0, sender = '') {
 		if (this.hasSubscribe({event})) {
-			return super.trigger(event, data);
+			return super.trigger(event, data, timeout, sender);
 		}
 	}
 
@@ -147,7 +147,7 @@ class FMTService extends wsservice.WSService {
 	 * @func triggerTo() event message
 	 */
 	triggerTo([id, event, data]) {
-		return this.m_center.delegate.triggerTo(id, event, data);
+		return this.m_center.delegate.triggerTo(id, event, data, this.m_id);
 	}
 
 	// /**
@@ -160,7 +160,8 @@ class FMTService extends wsservice.WSService {
 	 * @func callTo()
 	 */
 	callTo([id, method, data, timeout]) {
-		return this.m_center.delegate.callTo(id, method, data, timeout);
+		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
+		return this.m_center.delegate.callTo(id, method, data, timeout, this.m_id);
 	}
 
 }
@@ -179,12 +180,13 @@ class FMTServerClient {
 		this.m_center = center;
 	}
 
-	trigger(event, data) {
-		return this.m_center.delegate.triggerTo(this.m_id, event, data);
+	trigger(event, data, sender = '') {
+		return this.m_center.delegate.triggerTo(this.m_id, event, data, sender);
 	}
 
-	call(method, data, timeout = wsservice.METHOD_CALL_TIMEOUT) {
-		return this.m_center.delegate.callTo(this.m_id, method, data, timeout);
+	call(method, data, timeout = wss.METHOD_CALL_TIMEOUT, sender = '') {
+		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
+		return this.m_center.delegate.callTo(this.m_id, method, data, timeout, sender);
 	}
 
 }

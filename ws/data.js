@@ -84,9 +84,9 @@ class DataFormater {
 			}
 		}
 		try {
-			var [type,service,name,data,error,cb] = isText ? 
+			var [type,service,name,data,error,cb,sender] = isText ? 
 				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
-			return Object.assign(new DataFormater(), {type,service,name,data,error,cb});
+			return Object.assign(new DataFormater(), {type,service,name,data,error,cb,sender});
 		} catch(err) {
 			console.warn('no parse EXT buffer data', err, packet);
 			return new DataFormater();
@@ -95,7 +95,7 @@ class DataFormater {
 	toBuffer(isGzip = false) {
 		var buffer = jsonb.binaryify([
 			this.type, this.service, this.name,
-			this.data, this.error, this.cb,
+			this.data, this.error, this.cb, this.sender
 		]);
 		if (isGzip) {
 			return gzip(buffer);
@@ -105,7 +105,7 @@ class DataFormater {
 	toJSON() {
 		return [
 			this.type, this.service, this.name,
-			this.data, this.error, this.cb,
+			this.data, this.error, this.cb, this.sender
 		];
 	}
 	isPing() {

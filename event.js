@@ -31,11 +31,12 @@
 Object.assign(exports, require('./_event'));
 
 const _util = require('./_util');
-const EventNoticer = exports.EventNoticer;
 const PREFIX = 'on';
-const REG = new RegExp('^' + PREFIX);
 
 /**********************************************************************************/
+
+const {EventNoticer,Event} = exports;
+const REG = new RegExp('^' + PREFIX);
 
 /**
  * @class Notification
@@ -119,13 +120,9 @@ class Notification {
 	* @arg data {Object}       要发送的消数据
 	*/
 	trigger(name, data) {
-		var noticer = this[PREFIX + name];
-		if (noticer) {
-			return noticer.trigger(data);
-		}
-		return 0;
+		return this.triggerWithEvent(name, new Event(data));
 	}
-	
+
 	/**
 	* @func triggerWithEvent 通知事监听器
 	* @arg name {String}       事件名称
@@ -136,7 +133,7 @@ class Notification {
 		if (noticer) {
 			return noticer.triggerWithEvent(event);
 		}
-		return 0;
+		return event.returnValue;
 	}
 
 	/**
@@ -145,7 +142,7 @@ class Notification {
 	$trigger(name, event, is_event) {
 		var noticer = this[PREFIX + name];
 		if (noticer) {
-			if ( is_event || (event && event.__has_event) ) {
+			if ( is_event ) {
 				return this.triggerWithEvent(name, event)
 			} else {
 				return this.trigger(name, event)

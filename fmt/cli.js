@@ -100,7 +100,7 @@ class WSClient extends cli.WSClient {
 	/**
 	 * @overwrite
 	 */
-	handleCall(method, data) {
+	handleCall(method, data, sender) {
 		if (method in FMTClient.prototype) {
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		}
@@ -108,7 +108,7 @@ class WSClient extends cli.WSClient {
 		if (typeof fn != 'function') {
 			throw Error.new('"{0}" no defined function'.format(name));
 		}
-		return fn.call(this.m_host, data);
+		return fn.call(this.m_host, data, sender);
 	}
 
 }

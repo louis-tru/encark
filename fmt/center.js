@@ -74,12 +74,12 @@ class FastMessageTransferCenterDelegate {
 		return { certificate: 'Certificate' };
 	}
 
-	triggerTo(id, event, data) {
-		return this.exec(id, [event, data], 'triggerTo');
+	triggerTo(id, event, data, sender) {
+		return this.exec(id, [event, data, sender], 'triggerTo');
 	}
 
-	callTo(id, method, data, timeout) {
-		return this.exec(id, [method, data, timeout], 'callTo');
+	callTo(id, method, data, timeout, sender) {
+		return this.exec(id, [method, data, timeout, sender], 'callTo');
 	}
 
 }

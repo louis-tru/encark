@@ -30,7 +30,7 @@
 
 const util = require('../../util');
 const errno = require('../../errno');
-const { Notification } = require('../../event');
+const { Notification, Event } = require('../../event');
 const { T_CALLBACK,T_CALL} = require('../data');
 const conv = require('./conv');
 
@@ -104,7 +104,7 @@ class WSClient extends Notification {
 	 */
 	async receiveMessage(msg) {
 		var self = this;
-		var { data = {}, name, cb } = msg;
+		var { data = {}, name, cb, sender } = msg;
 
 		if (msg.isCallback()) {
 			var handle = this.m_calls.get(cb);
@@ -121,14 +121,16 @@ class WSClient extends Notification {
 				if (print_log) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
-					r.data = await self.handleCall(name, data);
+					r.data = await self.handleCall(name, data, sender);
 				} catch(e) {
 					r.error = e;
 				}
 			} else if (msg.isEvent()) {
 				// console.log('CLI Event receive', name);
 				try {
-					this.trigger(name, data);
+					var evt = new Event(data);
+					evt.origin = sender;
+					this.triggerWithEvent(name, evt); // TODO
 				} catch(err) {
 					console.error(err);
 				}
@@ -150,13 +152,13 @@ class WSClient extends Notification {
 	/**
 	 * @class handleCall
 	 */
-	handleCall(method, data) {
+	handleCall(method, data, sender) {
 		if (method in WSClient.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		var fn = this[method];
 		if (typeof fn != 'function')
 			throw Error.new('"{0}" no defined function'.format(name));
-		return fn.call(this, data);
+		return fn.call(this, data, sender);
 	}
 
 	async _send(data) {
@@ -182,7 +184,7 @@ class WSClient extends Notification {
 		}
 	}
 
-	_call(type, name, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+	_call(type, name, data, timeout, sender) {
 		return util.promise(async (resolve, reject)=>{
 			var id = util.id;
 			var calls = this.m_calls;
@@ -195,6 +197,7 @@ class WSClient extends Notification {
 				name: name,
 				data: data,
 				cb: id,
+				sender: sender,
 			}));
 		});
 	}
@@ -203,8 +206,8 @@ class WSClient extends Notification {
 	 * @func call(method, data, timeout)
 	 * @async
 	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return this._call(T_CALL, method, data, timeout);
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+		return this._call(T_CALL, method, data, timeout, sender);
 	}
 
 }

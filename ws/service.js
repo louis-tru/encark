@@ -91,7 +91,7 @@ class WSService extends Service {
 			console.warn('Unable to process message WSService.receiveMessage, loaded=false');
 
 		var self = this;
-		var { data = {}, name, cb } = msg;
+		var { data = {}, name, cb, sender } = msg;
 
 		if (msg.isCallback()) {
 			var handle = this.m_calls.get(cb);
@@ -108,7 +108,7 @@ class WSService extends Service {
 				if (print_log) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
-					r.data = await self.handleCall(name, data);
+					r.data = await self.handleCall(name, data, sender);
 				} catch(e) {
 					r.error = e;
 				}
@@ -135,13 +135,13 @@ class WSService extends Service {
 	/**
 	 * @func handleCall
 	 */
-	handleCall(method, data) {
+	handleCall(method, data, sender) {
 		if (method in WSService.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		var fn = this[method];
 		if (typeof fn != 'function')
 			throw Error.new('"{0}" no defined function'.format(name));
-		return fn.call(this, data);
+		return fn.call(this, data, sender);
 	}
 
 	async _send(data) {
@@ -163,7 +163,7 @@ class WSService extends Service {
 		}
 	}
 
-	_call(type, name, data, timeout = exports.METHOD_CALL_TIMEOUT) {
+	_call(type, name, data, timeout, sender) {
 		return util.promise(async (resolve, reject)=>{
 			var id = util.id;
 			var calls = this.m_calls;
@@ -176,29 +176,30 @@ class WSService extends Service {
 				name: name,
 				data: data,
 				cb: id,
+				sender: sender,
 			}));
 			// console.log('SER send', name);
 		});
 	}
 
-	_trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT);
+	_trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
 	}
 
 	/**
 	 * @func call(method, data)
 	 * @async
 	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return this._call(T_CALL, method, data, timeout);
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+		return this._call(T_CALL, method, data, timeout, sender);
 	}
 
 	/**
 	 * @func  trigger(event, data)
 	 * @async
 	 */
-	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT) {
-		return this._trigger(event, data, timeout);
+	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+		return this._trigger(event, data, timeout, sender);
 	}
 
 	// @end

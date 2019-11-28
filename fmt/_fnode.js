@@ -31,7 +31,7 @@
 var utils = require('../util');
 var fmtc = require('./_fmtc');
 var service = require('../service');
-var wsservice = require('../ws/service');
+var wss = require('../ws/service');
 var cli = require('../ws/cli');
 var path = require('../path');
 var errno = require('../errno');
@@ -70,11 +70,11 @@ class FNodeLocal extends FNode {
 	async broadcast(event, data, id) {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
-	triggerTo(id, event, data) {
-		return this.m_center.getFMTService(id).trigger(event, data); // trigger event
+	triggerTo(id, event, data, sender) {
+		return this.m_center.getFMTService(id).trigger(event, data, 0, sender); // trigger event
 	}
-	callTo(id, method, data, timeout) {
-		return this.m_center.getFMTService(id).call(method, data, timeout); // call method
+	callTo(id, method, data, timeout, sender) {
+		return this.m_center.getFMTService(id).call(method, data, timeout, sender); // call method
 	}
 	async query(id, more=0) {
 		var s = this.m_center.getFMTServiceNoError(id);
@@ -152,12 +152,12 @@ class FNodeRemote extends FNode {
 		return this.m_impl.call('broadcast', [event,data,id]);
 	}
 
-	triggerTo(id, event, data) { // trigger event to client
-		return this.m_impl.call('triggerTo', [id, event, data]); // trigger event
+	triggerTo(id, event, data, sender) { // trigger event to client
+		return this.m_impl.call('triggerTo', [id, event, data, sender]); // trigger event
 	}
 
-	callTo(id, method, data, timeout) { // call client
-		return this.m_impl.call('callTo', [id, method, data, timeout], timeout); // call method
+	callTo(id, method, data, timeout, sender) { // call client
+		return this.m_impl.call('callTo', [id, method, data, timeout, sender], timeout); // call method
 	}
 
 	query(id, more = 0) { // query client
@@ -182,12 +182,12 @@ class FNodeRemoteIMPL {
 		this.m_center._forwardBroadcast(event, data, id, this.m_fnode);
 	}
 
-	triggerTo([id, event, data]) { // trigger event to client
-		return this.m_center.getFMTService(id).trigger(event, data);
+	triggerTo([id, event, data, sender]) { // trigger event to client
+		return this.m_center.getFMTService(id).trigger(event, data, 0, sender);
 	}
 
-	callTo([id, method, data, timeout]) { // call client
-		return this.m_center.getFMTService(id).call(method, data, timeout);
+	callTo([id, method, data, timeout, sender]) { // call client
+		return this.m_center.getFMTService(id).call(method, data, timeout, sender);
 	}
 
 	query([id,more]) { // query client
@@ -195,7 +195,7 @@ class FNodeRemoteIMPL {
 		if (more) {
 			return s ? {time:s.time,uuid:s.uuid}: null;
 		} else {
-			return s ? 1: 0;
+			return s ? true: false;
 		}
 	}
 }
@@ -203,7 +203,7 @@ class FNodeRemoteIMPL {
 /**
  * @class FNodeRemoteService
  */
-class FNodeRemoteService extends wsservice.WSService {
+class FNodeRemoteService extends wss.WSService {
 
 	async requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
