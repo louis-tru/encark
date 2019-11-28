@@ -58,7 +58,7 @@ class WSClient extends cli.WSClient {
 	}
 
 	set autoConnect(value) {
-		this.m_autoConnect = value;
+		this.m_autoConnect = !!value;
 	}
 
 	constructor(host, url, certificate) {
@@ -67,9 +67,11 @@ class WSClient extends cli.WSClient {
 		super('_fmt', new WSConv(s, certificate));
 		this.m_host = host;
 		this.m_autoConnect = true;
+		this.m_active_close = true;
 
 		this.conv.onOpen.on(e=>{
 			console.log('open ok', host.id);
+			this.m_active_close = false;
 			if (host.m_subscribe.size) {
 				var events = [];
 				for (var i of host.m_subscribe)
@@ -79,14 +81,14 @@ class WSClient extends cli.WSClient {
 		});
 
 		this.conv.onClose.on(e=>{
-			if (this.m_autoConnect) { // auto connect
+			if (this.m_autoConnect && !this.m_active_close) { // auto connect
 				console.log('reconnect Clo..', host.id);
 				utils.sleep(500).then(e=>this.conv.connect());
 			}
 		});
 
 		this.conv.onError.on(e=>{
-			if (this.m_autoConnect) { // auto connect
+			if (this.m_autoConnect && !this.m_active_close) { // auto connect
 				console.log('reconnect Err..', host.id);
 				utils.sleep(500).then(e=>this.conv.connect());
 			}
@@ -111,6 +113,14 @@ class WSClient extends cli.WSClient {
 		return fn.call(this.m_host, data, sender);
 	}
 
+	/**
+	 * @func close() close client
+	 */
+	close() {
+		this.m_active_close = true;
+		this.conv.close();
+	}
+
 }
 
 /**
@@ -130,8 +140,16 @@ class FMTClient extends event.Notification {
 		return this.m_cli.loaded;
 	}
 
+	get autoConnect() {
+		return this.m_cli.autoConnect;
+	}
+
+	set autoConnect(value) {
+		this.m_cli.autoConnect = value;
+	}
+
 	close() {
-		this.conv.close();
+		this.m_cli.close();
 	}
 
 	constructor(id = uuid(), url = 'fmt://localhost/', certificate = null) {
@@ -144,16 +162,6 @@ class FMTClient extends event.Notification {
 		this.m_cli = new WSClient(this, url, certificate);
 	}
 
-	// unsubscribe(events = []) {
-	// 	events.forEach(e=>this.m_subscribe.delete(e));
-	// 	this.m_cli.call('unsubscribe', {events}).catch(console.error);
-	// }
-
-	// subscribe(events = []) {
-	// 	events.forEach(e=>this.m_subscribe.add(e));
-	// 	this.m_cli.call('subscribe', {events}).catch(console.error);
-	// }
-
 	that(id) {
 		utils.assert(id != this.id);
 		return new ThatClient(this, id);
@@ -162,11 +170,25 @@ class FMTClient extends event.Notification {
 	// @overwrite:
 	getNoticer(name) {
 		if (!this.hasNoticer(name)) {
-			this.m_subscribe.add(name);
-			this.m_cli.call('subscribe', {events:[name]}).catch(console.error);
 			this.m_cli.addEventListener(name, super.getNoticer(name)); // Forward event
 		}
 		return super.getNoticer(name);
+	}
+
+	// @overwrite:
+	triggerListenerChange(name, count, change) {
+		this.m_subscribe.add(name);
+		if (change > 0) { // add
+			if (!this.m_subscribe.has(name)) {
+				this.m_subscribe.add(name);
+				this.m_cli.call('subscribe', {events:[name]}).catch(console.error); // subscribe event
+			}
+		} else if (count === 0) { // del
+			if (this.m_subscribe.has(name)) {
+				this.m_subscribe.delete(name);
+				this.m_cli.call('unsubscribe', {events:[name]}).catch(console.error); // unsubscribe event
+			}
+		}
 	}
 
 }

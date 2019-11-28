@@ -55,22 +55,23 @@ class FastMessageTransferCenterDelegate {
 	}
 
 	/** 
-	 * @func auth
+	 * @func auth() auth client
 	*/
 	auth(fmtService) {
 		return true;
 	}
 
+	/** 
+	 * @func authFnode() auth fnode
+	*/
 	authFnode(fnodeRemoteService) {
-		// console.log(`-------------------fnodeRemoteService.headers`, fnodeRemoteService.headers);
 		return fnodeRemoteService.headers.certificate;
 	}
 
 	/**
-	 * @func getCertificate() get fnode certificate
+	 * @func getCertificate() get current center certificate
 	 */
 	getCertificate() {
-		// console.log('-------------------getCertificate');
 		return { certificate: 'Certificate' };
 	}
 

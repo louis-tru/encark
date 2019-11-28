@@ -66,10 +66,8 @@ class Notification {
 	 * @func addDefaultListener
 	 */
 	addDefaultListener(name, func) {
-		
 		if ( typeof func == 'string' ) {
 			var func2 = this[func]; // find func 
-			
 			if ( typeof func2 == 'function' ) {
 				return this.addEventListener(name, func2, 0); // default id 0
 			} else {

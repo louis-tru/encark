@@ -276,7 +276,7 @@ class Signer {
 		return this.m_host;
 	}
 
-	sign(path, data_str = null) { /* subclass rewrite */ }
+	sign(path, data = null) { /* subclass rewrite */ }
 }
 
 /**
