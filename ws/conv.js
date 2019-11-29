@@ -125,6 +125,8 @@ var Conversation = utils.class('Conversation', {
 
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
+
+			console.log('WS conv close');
 			delete self.server.m_ws_conversations[self.token]; // private visit
 
 			self.m_isOpen = false;
