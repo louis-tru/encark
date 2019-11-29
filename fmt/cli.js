@@ -67,7 +67,7 @@ class WSClient extends cli.WSClient {
 		super('_fmt', new WSConv(s, headers));
 		this.m_host = host;
 		this.m_autoConnect = true;
-		this.m_active_close = true;
+		this.m_active_close = false;
 
 		this.conv.onOpen.on(e=>{
 			console.log('open ok', host.id);
