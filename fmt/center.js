@@ -72,7 +72,7 @@ class FastMessageTransferCenterDelegate {
 	 * @func getCertificate() get current center certificate
 	 */
 	getCertificate() {
-		return { certificate: 'Certificate' };
+		return 'Certificate';
 	}
 
 	triggerTo(id, event, data, sender) {

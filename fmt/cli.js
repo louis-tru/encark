@@ -39,12 +39,12 @@ var utils = require('../util');
  * @class WSConv
  */
 class WSConv extends cli.WSConversation {
-	constructor(s, certificate) {
+	constructor(s, headers) {
 		super(s);
-		this.m_certificate = certificate || {};
+		this.m_headers = headers || {};
 	}
 	getRequestHeaders() {
-		return this.m_certificate;
+		return this.m_headers;
 	}
 }
 
@@ -61,10 +61,10 @@ class WSClient extends cli.WSClient {
 		this.m_autoConnect = !!value;
 	}
 
-	constructor(host, url, certificate) {
+	constructor(host, url, headers) {
 		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
 				s += '//' + url.host + url.path;
-		super('_fmt', new WSConv(s, certificate));
+		super('_fmt', new WSConv(s, headers));
 		this.m_host = host;
 		this.m_autoConnect = true;
 		this.m_active_close = true;
@@ -85,6 +85,7 @@ class WSClient extends cli.WSClient {
 				console.log('reconnect Clo..', host.id);
 				utils.sleep(500).then(e=>this.conv.connect());
 			}
+			this.trigger('Offline');
 		});
 
 		this.conv.onError.on(e=>{
@@ -92,6 +93,10 @@ class WSClient extends cli.WSClient {
 				console.log('reconnect Err..', host.id);
 				utils.sleep(500).then(e=>this.conv.connect());
 			}
+		});
+
+		this.addEventListener('Load', e=>{
+			this.trigger('Online');
 		});
 
 		this.addEventListener('RepeatLoginError', e=>{
@@ -103,14 +108,7 @@ class WSClient extends cli.WSClient {
 	 * @overwrite
 	 */
 	handleCall(method, data, sender) {
-		if (method in FMTClient.prototype) {
-			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
-		}
-		var fn = this.m_host[method];
-		if (typeof fn != 'function') {
-			throw Error.new('"{0}" no defined function'.format(name));
-		}
-		return fn.call(this.m_host, data, sender);
+		return this.m_host.handleCall(method, data, sender);
 	}
 
 	/**
@@ -152,19 +150,49 @@ class FMTClient extends event.Notification {
 		this.m_cli.close();
 	}
 
-	constructor(id = uuid(), url = 'fmt://localhost/', certificate = null) {
+	constructor(id = uuid(), url = 'fmt://localhost/', headers = null) {
 		super();
 		url = new path.URL(url);
 		url.setParam('id', id);
 		this.m_id = String(id);
 		this.m_url = url;
 		this.m_subscribe = new Set();
-		this.m_cli = new WSClient(this, url, certificate);
+		this.m_cli = new WSClient(this, url, headers);
 	}
 
 	that(id) {
 		utils.assert(id != this.id);
 		return new ThatClient(this, id);
+	}
+
+	/**
+	 * @func handleCall()
+	 */
+	handleCall(method, data, sender) {
+		if (method in FMTClient.prototype) {
+			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
+		}
+		var fn = this[method];
+		if (typeof fn != 'function') {
+			throw Error.new('"{0}" no defined function'.format(method));
+		}
+		return fn.call(this, data, sender);
+	}
+
+	/**
+	 * @func subscribe()
+	 */
+	subscribe(events) {
+		events.forEach(e=>this.m_subscribe.add(e));
+		return this.m_cli.call('subscribe', {events});
+	}
+
+	/**
+	 * @func unsubscribe()
+	 */
+	unsubscribe(events) {
+		events.forEach(e=>this.m_subscribe.delete(e));
+		return this.m_cli.call('unsubscribe', {events});
 	}
 
 	// @overwrite:
@@ -177,7 +205,6 @@ class FMTClient extends event.Notification {
 
 	// @overwrite:
 	triggerListenerChange(name, count, change) {
-		this.m_subscribe.add(name);
 		if (change > 0) { // add
 			if (!this.m_subscribe.has(name)) {
 				this.m_subscribe.add(name);

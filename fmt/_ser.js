@@ -139,7 +139,7 @@ class FMTService extends wss.WSService {
 		return this.m_subscribe.has(event);
 	}
 
-	hasOnline({ id }) {
+	hasOnline([id]) {
 		return this.m_center.hasOnline(id);
 	}
 

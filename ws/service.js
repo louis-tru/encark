@@ -83,6 +83,10 @@ class WSService extends Service {
 	load() {}
 	destroy() {}
 
+	_checkMethodName(method) {
+		util.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
+	}
+
 	/**
 	 * @fun receiveMessage() # 消息处理器
 	 */
@@ -105,6 +109,7 @@ class WSService extends Service {
 		} else {
 			var r = {};
 			if (msg.isCall()) {
+				this._checkMethodName(name);
 				if (print_log) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
@@ -140,7 +145,7 @@ class WSService extends Service {
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		var fn = this[method];
 		if (typeof fn != 'function')
-			throw Error.new('"{0}" no defined function'.format(name));
+			throw Error.new('"{0}" no defined function'.format(method));
 		return fn.call(this, data, sender);
 	}
 

@@ -253,7 +253,7 @@ class WSConv extends cli.WSConversation {
 		this.m_center = center;
 	}
 	getRequestHeaders() {
-		return this.m_center.delegate.getCertificate();
+		return { certificate: this.m_center.delegate.getCertificate() };
 	}
 }
 
