@@ -464,9 +464,9 @@ var StaticService = util.class('StaticService', Service, {
 	},
 
 	/**
-	 * @func markResponseOk
+	 * @func markResponse
 	 */
-	markResponseOk() {
+	markResponse() {
 		if (this._response_ok)
 			throw new Error('request has been completed');
 		this._response_ok = true;
@@ -477,7 +477,7 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String} path
 	 */
 	returnRedirect: function(path) {
-		this.markResponseOk();
+		this.markResponse();
 		returnRedirect(this, path);
 	},
 	
@@ -487,7 +487,7 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String} text (Optional)  not default status ,return text
 	 */
 	returnErrorStatus: function(statusCode, html) {
-		this.markResponseOk();
+		this.markResponse();
 		returnErrorStatus(this, statusCode, html);
 	},
 	
@@ -495,7 +495,7 @@ var StaticService = util.class('StaticService', Service, {
 	 * 返回站点文件
 	 */
 	returnSiteFile: function (name) {
-		this.markResponseOk();
+		this.markResponse();
 		return returnFile(this, this.server.root + '/' + name);
 	},
 
@@ -526,7 +526,7 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String}       filename
 	 */	
 	returnFile: function (filename) {
-		this.markResponseOk();
+		this.markResponse();
 		return returnFile(this, filename);
 	},
 	
@@ -535,7 +535,7 @@ var StaticService = util.class('StaticService', Service, {
 	 * @param {String}       filename
 	 */
 	returnDirectory: function (filename) {
-		this.markResponseOk();
+		this.markResponse();
 		return returnDirectory(this, filename);
 	},
 

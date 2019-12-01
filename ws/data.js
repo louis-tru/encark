@@ -80,13 +80,13 @@ class DataFormater {
 	static async parse(packet, isText, isGzip = false) {
 		if (isText) { // JSON data
 			if (packet.length == 1 && packet == EXT_PING_MARK) {
-				return Object.assign(new DataFormater(), {ping: true});
+				return new DataFormater({ping: true});
 			}
 		}
 		try {
 			var [type,service,name,data,error,cb,sender] = isText ? 
 				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
-			return Object.assign(new DataFormater(), {type,service,name,data,error,cb,sender});
+			return new DataFormater({type,service,name,data,error,cb,sender});
 		} catch(err) {
 			console.warn('no parse EXT buffer data', err, packet);
 			return new DataFormater();

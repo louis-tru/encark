@@ -131,8 +131,6 @@ function initializ(self, server) {
 		console.log(err);
 		console.log('Server Error ---------------');
 	});
-
-	server.setTimeout(self.timeout * 1e3);
 }
 
 /**
@@ -314,10 +312,12 @@ var Server = util.class('Server', event.Notification, {
 	textEncoding: 'utf-8',
 
 	/**
-	 * 请求超时时间(秒)
+	 * 请求超时时间(毫秒)
 	 * @type {Number}
 	 */
-	timeout: 120,
+	get timeout() {
+		return this.m_server.timeout;
+	},
 
 	/**
 	 * 静态gzip文件格式
@@ -363,6 +363,13 @@ var Server = util.class('Server', event.Notification, {
 	 */
 	router: null,
 
+	/**
+	 * @get impl 
+	 */
+	get impl() {
+		return this.m_server;
+	},
+
 	// event onWSConversationOpen
 	// event onWSConversationClose
 
@@ -391,6 +398,11 @@ var Server = util.class('Server', event.Notification, {
 	 */
 	get wsConversations() {
 		return this.m_ws_conversations;
+	},
+
+	set timeout(timeout) {
+		timeout = Number(timeout) || this.m_server.timeout;
+		this.m_server.setTimeout(timeout);
 	},
 
 	/**

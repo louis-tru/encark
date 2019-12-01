@@ -356,7 +356,7 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg data {Object} #    data
 	 */
 	returnData: function(type, data) {
-		this.markResponseOk();
+		this.markResponse();
 
 		var self = this;
 		var res = this.response;
