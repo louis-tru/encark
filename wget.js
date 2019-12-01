@@ -184,6 +184,7 @@ function wget(www, save, options) { // 206
 					err.save = save;
 					err.statusCode = res.statusCode;
 					err.httpVersion = res.httpVersion;
+					err.headers = res.headers;
 					error(err);
 					req.abort();
 				}
