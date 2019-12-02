@@ -1,15 +1,14 @@
 
 var wget = require('./wget');
 
-debugger;
-
 wget(
-	'http://pgmyt3sfp.bkt.clouddn.com/2018-10-19_leveldb_full.zip', 
-	'/tmp/2018-10-19_leveldb_full.zip',
+	'http://upgrade-os.hard-chain.cn/201911291926/dphotos-develop-2.313.119.tar.gz', 
+	'./out/2018-10-19_leveldb_full.zip',
 	{
-		broken_point: 1,
-		progress: e=>{
-			console.log(e);
+		renewal: 1,
+		limit: 200 * 1024,
+		onProgress: e=>{
+			console.log(e, Math.floor(e.speed / 1024));
 		},
 	}
 ).then(console.error);

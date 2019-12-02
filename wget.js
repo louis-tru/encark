@@ -29,6 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var util = require('./util');
+var {List} = require('./event');
 var http = require('http');
 var https = require('https');
 var url = require('url');
@@ -37,10 +38,16 @@ var errno = require('./errno');
 var { userAgent } = require('./request');
 
 function wget(www, save, options) { // 206
-	var { broken_point = false,
-				progress = e=>{},
-				timeout = 18e4, } = options || {};
-	
+	var { renewal = false,
+				limit = wget.LIMIT, // limit rate byte/second
+				// limitTime = 0, // limt network use time
+				onProgress,
+				timeout = 12e4, } = options || {};
+
+	limit = Number(limit) || 0;
+	renewal = renewal || options.broken_point || false;
+	onProgress = onProgress || options.progress || util.noop;
+
 	var promise = new Promise((resolve, reject)=> {
 		var uri = url.parse(String(www));
 		var isSSL = uri.protocol == 'https:';
@@ -55,7 +62,7 @@ function wget(www, save, options) { // 206
 				'User-Agent': userAgent,
 			},
 			rejectUnauthorized: false,
-			timeout: timeout || 18e4,
+			timeout: timeout || 12e4,
 		};
 
 		if (isSSL) {
@@ -67,7 +74,7 @@ function wget(www, save, options) { // 206
 			var download_total = 0;
 			var download_size = 0;
 
-			if (broken_point) {
+			if (renewal) {
 				if (!err) {
 					if (stat.isFile()) {
 						start_range = stat.size;
@@ -84,7 +91,7 @@ function wget(www, save, options) { // 206
 			var ok = false;
 			var fd = 0;
 			var res_end = false;
-			var buffers = [];
+			var buffers = new List();
 
 			function error(err) {
 				if (!ok) {
@@ -101,7 +108,7 @@ function wget(www, save, options) { // 206
 			function write() {
 				if (fd) {
 					if (buffers.length) {
-						fs.write(fd, buffers[0], function(err) {
+						fs.write(fd, buffers.first.value, function(err) {
 							if (err) {
 								error(err);
 								req.abort();
@@ -125,26 +132,56 @@ function wget(www, save, options) { // 206
 				if (res.statusCode == 200 || res.statusCode == 206) {
 					res.pause();
 					res.client.setNoDelay(true);
-					res.client.setKeepAlive(true, 30000); // 30s
+					res.client.setKeepAlive(true, 3e4); // 30s
 					res.client.on('error', e=>error(e));
 					res.on('error', e=>error(e));
 
+					var speed = 0; // speed / 3 second
+					var time = 0;
+					var ptime = 0; // pause time
+
 					res.on('data', (chunk)=>{
 						download_size += chunk.length;
+
+						var st = Date.now();
+						var ts = st - time; // time span
+						if (ts) {
+							var ispeed = chunk.length / ts * 1e3; // instantaneous speed/second
+							// speed = (speed + ispeed * 0.11) * 0.901; // (100 + 100 * 0.11) * 0.901, Finally converges to ispeed
+							speed = (speed + ispeed * 0.25) * 0.8; // (100 + 100 * 0.25) * 0.8, Finally converges to ispeed
+
+							// limit flow, byte/second
+							if (limit && time) {
+								if (speed > limit) {
+									ptime = Math.min(1e4, ptime + 5); // increase
+								} else {
+									ptime = Math.max(0, ptime - 5); // lessen
+								}
+								if (ptime > 0) {
+									res.pause();
+									util.sleep(ptime).then(e=>res.resume()).catch(e=>{});
+								}
+							}
+							time = st;
+							// console.log(Math.floor(speed / 1024), Math.floor(ispeed / 1024));
+						}
+
 						try {
-							progress({ total: download_total, size: download_size });
-						} catch(e) {}
+							onProgress({ total: download_total, size: download_size, speed });
+						} catch(e) {
+							console.error(e);
+						}
+
 						buffers.push(chunk);
-						if (buffers.length == 1) {
+
+						if (buffers.length == 1)
 							write();
-						};
 					});
 
 					res.on('end', ()=>{
 						res_end = true;
-						if (buffers.length == 0) {
+						if (buffers.length == 0)
 							write();
-						}
 					});
 
 					var flag = 'w';
@@ -206,5 +243,7 @@ function wget(www, save, options) { // 206
 
 	return promise;
 }
+
+wget.LIMIT = 0;
 
 module.exports = wget;
