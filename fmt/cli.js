@@ -238,7 +238,10 @@ class ThatClient {
 		return this.m_host.m_cli.call('triggerTo', [this.m_id, event, data]);
 	}
 	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
-		return this.m_host.m_cli.call('callTo', [this.m_id, method, data, timeout], timeout);
+		var args = [this.m_id, method, data];
+		if (timeout && timeout != cli.METHOD_CALL_TIMEOUT)
+			args.push(timeout);
+		return this.m_host.m_cli.call('callTo', args, timeout);
 	}
 	send(method, data) {
 		return this.m_host.m_cli.send('sendTo', [this.m_id, method, data]);

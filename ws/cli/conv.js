@@ -28,13 +28,13 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../../util');
+var utils = require('../../util');
 var event = require('../../event');
 var { userAgent } = require('../../request');
 var url = require('../../url');
 var errno = require('../../errno');
 var { DataFormater, T_BIND, T_PING, T_PONG, PING_BUFFER, PONG_BUFFER } = require('../data');
-var { haveNode, haveWeb } = util;
+var { haveNode, haveWeb } = utils;
 
 if (haveWeb) {
 	var WebSocket = global.WebSocket;
@@ -63,14 +63,13 @@ class Conversation {
 	// m_clients: null, // client list
 	// m_default_service: '',
 	// m_token: '',
-	// m_msgs: null, 
 	// m_signer: null,
 	// m_isGzip: false,
 	// m_last_packet_time: 0,
+	// m_overflow: false,
 
 	// @public:
 	// onOpen: null,
-	// onMessage: null,
 	// onPing: null,
 	// onError: null,
 	// onClose: null,
@@ -100,11 +99,15 @@ class Conversation {
 		return this.m_last_packet_time;
 	}
 
+	get overflow() {
+		return this.m_overflow;
+	}
+
 	_keepAlive() {
 		this._clearKeepAlive();
 		if (this.m_is_open) {
 			this.m_IntervalId = setInterval(e=>this.ping(), 
-				util.random(0, Math.floor(this.m_KEEP_ALIVE_TIME / 10)) + this.m_KEEP_ALIVE_TIME);
+				utils.random(0, Math.floor(this.m_KEEP_ALIVE_TIME / 10)) + this.m_KEEP_ALIVE_TIME);
 		}
 	}
 
@@ -116,7 +119,7 @@ class Conversation {
 	}
 
 	setGzip(value) {
-		util.assert(!this.m_is_open, 'Can only be set before opening');
+		utils.assert(!this.m_is_open, 'Can only be set before opening');
 		this.m_isGzip = !!value;
 	}
 
@@ -124,16 +127,16 @@ class Conversation {
 	 * @constructor
 	 */
 	constructor() {
-		event.initEvents(this, 'Open', 'Message', 'Ping', 'Pong', 'Error', 'Close');
+		event.initEvents(this, 'Open', 'Ping', 'Pong', 'Error', 'Close', 'Drain', 'Overflow');
 		this.m_connect = false;
 		this.m_is_open = false;
 		this.m_clients = {};
 		this.m_clients_count = 0;
 		this.m_token = '';
-		this.m_msgs = [];
 		this.m_signer = null;
 		this.m_isGzip = false;
 		this.m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
+		this.m_overflow = false;
 	}
 
 	/**
@@ -160,7 +163,7 @@ class Conversation {
 			if (this.m_is_open) {
 				this.sendFormatData({ service: name, type: T_BIND });
 			} else {
-				util.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
+				utils.nextTick(e=>this.connect()); // 还没有打开连接,下一帧开始尝试连接
 			}
 		}
 	}
@@ -177,23 +180,21 @@ class Conversation {
 	}
 
 	/*async */_open() {
-		util.assert(!this.m_is_open);
-		util.assert(this.m_connect);
-		// await util.sleep(1e2); // 100ms
-		var msgs = this.m_msgs;
+		utils.assert(!this.m_is_open);
+		utils.assert(this.m_connect);
+		// await utils.sleep(1e2); // 100ms
 		this.m_is_open = true;
 		this.m_connect = false;
-		this.m_msgs = [];
 		this.m_last_packet_time = Date.now();
+		this.m_overflow = false;
 		this.onOpen.trigger();
 		this._keepAlive();
-		msgs.forEach(e=>this.send(e));
 	}
 
 	_error(err) {
 		if (this.m_connect)
 			this.close();
-		util.nextTick(e=>this.onError.trigger(err));
+		utils.nextTick(e=>this.onError.trigger(err));
 	}
 
 	/**
@@ -201,7 +202,7 @@ class Conversation {
 	 */
 	connect() {
 		if (!this.m_is_open && !this.m_connect) {
-			util.assert(this.m_default_service, 'connection must bind service'); // 连接必需要绑定服务才能使用
+			utils.assert(this.m_default_service, 'connection must bind service'); // 连接必需要绑定服务才能使用
 			console.log('Connection..', this.m_url.href, this.m_connect);
 			this.m_connect = true;
 			this.initialize();
@@ -210,42 +211,38 @@ class Conversation {
 
 	/**
 	 * @fun parse # parser message
-	 * @arg {Number} type    0:String|1:Buffer
 	 * @arg packet {String|Buffer}
+	 * @arg {Boolean} isText
 	 */
 	async handlePacket(packet, isText) {
+		this.m_last_packet_time = Date.now();
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
+		if (!data)
+			return;
 		if (!this.isOpen)
 			return console.warn('CLI Conversation.handlePacket, connection close status');
 
-		this.m_last_packet_time = Date.now();
-
-		if (data.isValidEXT()) { // Extension protocol
-			switch (data.type) {
-				case T_PING: // ping Extension protocol 
-					this.handlePing();
-					break;
-				case T_PONG: // pong Extension protocol 
-					this.onPong.trigger();
-					break;
-				default:
-					var handle = this.m_clients[data.service || this.m_default_service];
-					if (handle) {
-						handle.receiveMessage(data).catch(e=>console.error(e));
-					} else {
-						console.error('Could not find the message handler, '+
-													'discarding the message, ' + data.service);
-					}
-					break;
-			}
-		} else {
-			this.onMessage.trigger({ isText, data: packet });
+		switch (data.type) {
+			case T_PING: // ping Extension protocol 
+				this.handlePing();
+				break;
+			case T_PONG: // pong Extension protocol 
+				this.onPong.trigger();
+				break;
+			default:
+				var handle = this.m_clients[data.service || this.m_default_service];
+				if (handle) {
+					handle.receiveMessage(data).catch(e=>console.error(e));
+				} else {
+					console.error('Could not find the message handler, '+
+												'discarding the message, ' + data.service);
+				}
 		}
 	}
 
 	handlePing() {
 		this.m_last_packet_time = Date.now();
-		this.send(PONG_BUFFER);
+		this.send(PONG_BUFFER).catch(console.error);
 		this.onPing.trigger();
 	}
 
@@ -271,7 +268,7 @@ class Conversation {
 	async sendFormatData(data) {
 		data = new DataFormater(data);
 		data = await data.toBuffer(this.isGzip)
-		this.send(data);
+		await this.send(data);
 	}
 
 	/**
@@ -296,6 +293,24 @@ class Conversation {
 		}
 	}
 
+	static write(self, api, args) {
+		return utils.promise(function(resolve, reject) {
+			var ok = api(...args, function(err) {
+				if (err) {
+					reject(Error.new(err));
+				} else {
+					resolve();
+				}
+			});
+			if (!ok) {
+				if (!self.m_overflow) {
+					self.m_overflow = true;
+					self.onOverflow.trigger();
+				}
+			}
+		});
+	}
+
 	/**
 	 * @fun send # send message to server
 	 * @arg [data] {Object}
@@ -305,7 +320,7 @@ class Conversation {
 	/**
 	 * @func sendPing()
 	 */
-	sendPing() {}
+	ping() {}
 
 	// @end
 }
@@ -325,8 +340,8 @@ class WSConversationBasic extends Conversation {
 	 */
 	constructor(path) {
 		super();
-		path = path || util.config.web_service || 'ws://localhost';
-		util.assert(path, 'Server path is not correct');
+		path = path || utils.config.web_service || 'ws://localhost';
+		utils.assert(path, 'Server path is not correct');
 		path = url.resolve(path);
 		this.m_url = new url.URL(path.replace(/^http/, 'ws'));
 	}
@@ -344,7 +359,7 @@ class WebConversation extends WSConversationBasic {
 	 * @ovrewrite 
 	 */
 	initialize() {
-		util.assert(!this.m_req, 'No need to repeat open');
+		utils.assert(!this.m_req, 'No need to repeat open');
 
 		var self = this;
 		var url = this.m_url;
@@ -415,30 +430,23 @@ class WebConversation extends WSConversationBasic {
 	/**
 	 * @ovrewrite 
 	 */
-	send(data) {
-		if (this.isOpen) {
-			if (data instanceof ArrayBuffer) {
-				this.m_req.send(data);
-			} else if (data && data.buffer instanceof ArrayBuffer) {
-				this.m_req.send(data.buffer);
-			} else { // send json string message
-				this.m_req.send(JSON.stringify(data));
-			}
-		} else {
-			this.m_msgs.push(data);
-			this.connect(); // 尝试连接
+	async send(data) {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		if (data instanceof ArrayBuffer) {
+			this.m_req.send(data);
+		} else if (data && data.buffer instanceof ArrayBuffer) {
+			this.m_req.send(data.buffer);
+		} else { // send json string message
+			this.m_req.send(JSON.stringify(data));
 		}
 	}
 
 	/**
 	 * @ovrewrite 
 	 */
-	ping() {
-		if (this.isOpen) {
-			this.m_req.send(PING_BUFFER);
-		} else {
-			this.connect(); // 尝试连接
-		}
+	async ping() {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		this.m_req.send(PING_BUFFER);
 	}
 
 }
@@ -453,7 +461,9 @@ class NodeConversation extends WSConversationBasic {
 	 * @ovrewrite
 	 */
 	initialize() {
-		util.assert(!this.m_req, 'No need to repeat open');
+		utils.assert(!this.m_req, 'No need to repeat open');
+
+		this.setGzip(true); // use gzip
 
 		var self = this;
 		var url = this.m_url;
@@ -521,7 +531,7 @@ class NodeConversation extends WSConversationBasic {
 
 			var parser = new PacketParser();
 
-			// socket.setNoDelay(true);
+			socket.setNoDelay(true);
 			socket.setTimeout(0);
 			socket.setKeepAlive(true, KEEP_ALIVE_TIME);
 
@@ -530,6 +540,7 @@ class NodeConversation extends WSConversationBasic {
 			socket.on('close', e=>self.close());
 			socket.on('data', d=>parser.add(d));
 			socket.on('error', e=>(self._error(e),self.close()));
+			socket.on('drain', e=>(self.m_overflow = false,self.onDrain.trigger()));
 
 			parser.onText.on(e=>self.handlePacket(e.data, 1));
 			parser.onData.on(e=>self.handlePacket(e.data, 0));
@@ -557,19 +568,17 @@ class NodeConversation extends WSConversationBasic {
 		var socket = this.m_socket;
 		if (socket) {
 			this.m_socket = null;
+			socket.removeAllListeners('timeout');
 			socket.removeAllListeners('end');
 			socket.removeAllListeners('close');
 			socket.removeAllListeners('error');
 			socket.removeAllListeners('data');
+			socket.removeAllListeners('drain');
 			try {
 				if (socket.writable)
 					socket.end();
 			} catch(err) {
 				console.error(err);
-			}
-			if (!this.isOpen) {
-				this.onError.trigger(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
-				// this._error(Error.new(errno.ERR_REQUEST_AUTH_FAIL));
 			}
 		} else {
 			if (this.m_req) {
@@ -581,27 +590,29 @@ class NodeConversation extends WSConversationBasic {
 		super.close();
 	}
 
+	_write(api, args) {
+		return utils.promise((resolve, reject)=>{
+			var ok = api(...args);
+			if (ok) {
+				
+			}
+		});
+	}
+
 	/**
 	 * @ovrewrite
 	 */
 	send(data) {
-		if (this.isOpen) {
-			sendDataPacket(this.m_socket, data);
-		} else {
-			this.m_msgs.push(data);
-			this.connect(); // 尝试连接
-		}
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		return Conversation.write(this, sendDataPacket, [this.m_socket, data]);
 	}
 
 	/**
 	 * @ovrewrite 
 	 */
 	ping() {
-		if (this.isOpen) {
-			sendPingPacket(this.m_socket);
-		} else {
-			this.connect(); // 尝试连接
-		}
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		return Conversation.write(this, sendPingPacket, [this.m_socket]);
 	}
 
 }
@@ -611,7 +622,7 @@ class NodeConversation extends WSConversationBasic {
  */
 var WSConversation =
 	haveWeb ? WebConversation: 
-	haveNode ? NodeConversation: util.unrealized;
+	haveNode ? NodeConversation: utils.unrealized;
 
 module.exports = {
 	Conversation,

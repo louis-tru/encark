@@ -42,10 +42,6 @@ if (require('../util').haveNode) {
 	var zlib = require('zlib');
 }
 
-function isValidEXT(type) {
-	return type >= TYPES.T_BIND && type < 0xff;
-}
-
 function ungzip(buffer) {
 	return zlib ? new Promise((resolve, reject)=>{
 		zlib.inflateRaw(buffer, function (err, data) {
@@ -70,8 +66,8 @@ function gzip(buffer) {
 	}): buffer;
 }
 
-var PING_BUFFER = jsonb.binaryify([TYPES.T_PING]);
-var PONG_BUFFER = jsonb.binaryify([TYPES.T_PONG]);
+var PING_BUFFER = jsonb.binaryify(TYPES.T_PING);
+var PONG_BUFFER = jsonb.binaryify(TYPES.T_PONG);
 
 function toBuffer(data, isGzip) {
 	data = jsonb.binaryify(data);
@@ -92,8 +88,8 @@ class DataFormater {
 
 	static async parse(packet, isText, isGzip = false) {
 		try {
-			if (!isText && packet.length === 3) { // PING_BUFFER, PONG_BUFFER
-				var type = packet[1];
+			if (!isText && packet.length === 1) { // PING_BUFFER, PONG_BUFFER
+				var type = packet[0];
 				if (type == TYPES.T_PING || type == TYPES.T_PONG) {
 					return new DataFormater({type});
 				}
@@ -102,8 +98,7 @@ class DataFormater {
 				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
 			return new DataFormater({type,service,name,data,error,cb,sender});
 		} catch(err) {
-			console.warn('no parse EXT buffer data', err, packet);
-			return new DataFormater();
+			console.warn('no parse EXT buffer data', err);
 		}
 	}
 
@@ -119,10 +114,6 @@ class DataFormater {
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb, this.sender
 		];
-	}
-
-	isValidEXT() {
-		return isValidEXT(this.type);
 	}
 
 	isPing() {
@@ -148,6 +139,7 @@ class DataFormater {
 	isCallback() {
 		return this.type == TYPES.T_CALLBACK;
 	}
+	
 }
 
 module.exports = Object.assign({ DataFormater, PING_BUFFER, PONG_BUFFER }, TYPES);

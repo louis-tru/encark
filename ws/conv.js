@@ -37,6 +37,7 @@ var {Buffer} = require('buffer');
 var crypto = require('crypto');
 var uuid = require('../hash/uuid');
 var errno = require('../errno');
+var { Conversation: _Conversation } = require('./cli/conv');
 var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
 var {DataFormater, T_BIND, T_PING, T_PONG, PONG_BUFFER } = require('./data');
 var KEEP_ALIVE_TIME = 5e4; // 50s
@@ -93,13 +94,17 @@ var Conversation = utils.class('Conversation', {
 		this.m_KEEP_ALIVE_TIME = Math.max(5e3, Number(value) || KEEP_ALIVE_TIME);
 	},
 
+	get overflow() {
+		return this.m_overflow;
+	},
+
 	/**
 	 * @param {http.ServerRequest}   req
 	 * @param {String}   bind_services
 	 * @constructor
 	 */
 	constructor: function(req, bind_services) {
-		event.initEvents(this, 'Open', 'Message', 'Ping', 'Pong', 'Close');
+		event.initEvents(this, 'Open', 'Ping', 'Pong', 'Close', 'Drain', 'Overflow');
 
 		this.server = req.socket.server.wrap;
 		this.request = req;
@@ -107,6 +112,8 @@ var Conversation = utils.class('Conversation', {
 		this.token = uuid();
 		this.m_services = {};
 		this.m_services_count = 0;
+		this.m_overflow = false;
+
 		var self = this;
 
 		// initialize
@@ -140,6 +147,7 @@ var Conversation = utils.class('Conversation', {
 		self.server.m_ws_conversations[self.token] = self; // TODO private visit
 		self.m_isOpen = true;
 		self.m_last_packet_time = Date.now();
+		self.m_overflow = false;
 
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
@@ -264,42 +272,40 @@ var Conversation = utils.class('Conversation', {
 	/**
 	 * @func handlePacket() 进一步解析数据
 	 * @arg {String|Buffer} packet
+	 * @arg {Boolean} isText
 	 */
 	handlePacket: async function(packet, isText) {
+		this.m_last_packet_time = Date.now();
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
+		if (!data)
+			return;
 		if (!this.isOpen)
 			return console.warn('SER Conversation.handlePacket, connection close status');
 
-		this.m_last_packet_time = Date.now();
-
-		if (data.isValidEXT()) { // Extension protocol
-			switch (data.type) {
-				case T_BIND:
-					this._bind([data.service]).catch(console.warn);
-					break;
-				case T_PING: // ping Extension protocol 
-					this.handlePing();
-					break;
-				case T_PONG: // pong Extension protocol 
-					this.onPong.trigger();
-					break;
-				default:
-					var handle = this.m_services[data.service || this.m_default_service];
-					if (handle) {
-						handle.receiveMessage(data).catch(e=>console.error(e));
-					} else {
-						console.error('Could not find the message handler, '+
-													'discarding the message, ' + data.service);
-					}
-			}
-		} else {
-			this.onMessage.trigger({ isText, data: packet });
+		switch (data.type) {
+			case T_BIND:
+				this._bind([data.service]).catch(console.warn);
+				break;
+			case T_PING: // ping Extension protocol 
+				this.handlePing();
+				break;
+			case T_PONG: // pong Extension protocol 
+				this.onPong.trigger();
+				break;
+			default:
+				var handle = this.m_services[data.service || this.m_default_service];
+				if (handle) {
+					handle.receiveMessage(data).catch(e=>console.error(e));
+				} else {
+					console.error('Could not find the message handler, '+
+												'discarding the message, ' + data.service);
+				}
 		}
 	},
 
 	handlePing: function() {
 		this.m_last_packet_time = Date.now();
-		this.send(PONG_BUFFER);
+		this.send(PONG_BUFFER).catch(console.error);;
 		this.onPing.trigger();
 	},
 
@@ -309,7 +315,7 @@ var Conversation = utils.class('Conversation', {
 	sendFormatData: async function(data) {
 		data = new DataFormater(data);
 		data = await data.toBuffer(this.isGzip)
-		this.send(data);
+		await this.send(data);
 	},
 
 	/**
@@ -414,8 +420,9 @@ class Hybi extends Conversation {
 		socket.on('timeout', e=>self.close());
 		socket.on('end', e=>self.close());
 		socket.on('close', e=>self.close());
-		socket.on('error', e=>self.close());
 		socket.on('data', e=>parser.add(e));
+		socket.on('error', e=>(console.error('web socket error:',e),self.close()));
+		socket.on('drain', e=>(self.m_overflow = false,self.onDrain.trigger()));
 
 		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
 		parser.onData.on(e=>self.handlePacket(e.data, 0));
@@ -431,7 +438,7 @@ class Hybi extends Conversation {
 	 */
 	send(data) {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		sendDataPacket(this.socket, data);
+		return _Conversation.write(this, sendDataPacket, [this.socket, data]);
 	}
 
 	/**
@@ -439,7 +446,7 @@ class Hybi extends Conversation {
 	 */
 	ping() {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		sendPingPacket(this.socket);
+		return _Conversation.write(this, sendPingPacket, [this.socket]);
 	}
 
 	/**
@@ -448,10 +455,12 @@ class Hybi extends Conversation {
 	close () {
 		if (this.isOpen) {
 			var socket = this.socket;
+			socket.removeAllListeners('timeout');
 			socket.removeAllListeners('end');
 			socket.removeAllListeners('close');
 			socket.removeAllListeners('error');
 			socket.removeAllListeners('data');
+			socket.removeAllListeners('drain');
 			try {
 				if (socket.writable) 
 					socket.end();

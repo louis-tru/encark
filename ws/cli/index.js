@@ -43,6 +43,7 @@ const print_log = false; // util.dev
 class WSClient extends Notification {
 	// @private:
 	// m_calls: null,
+	// m_sends: null,
 	// m_service_name: '',
 	// m_conv: null,   // conversation
 
@@ -172,6 +173,7 @@ class WSClient extends Notification {
 			delete data.data;
 		} else {
 			this.m_sends.push(data);
+			this.m_conv.connect(); // 尝试连接
 		}
 		return data;
 	}

@@ -410,7 +410,7 @@ class PacketParser {
  * @func sendDataPacket() Frame server-to-client output as a text packet.
  * @static
  */
-function sendDataPacket(socket, data) {
+function sendDataPacket(socket, data, cb) {
 	var opcode = 0x81; // text 0x81 | buffer 0x82 | close 0x88 | ping 0x89
 
 	if (data instanceof Uint8Array) {
@@ -465,19 +465,18 @@ function sendDataPacket(socket, data) {
 			}
 	}
 
-	socket.write(header);
-	socket.write(data);
+	return socket.write(Buffer.concat([header, data]), cb);
 }
 
 /**
  * @func sendPingPacket()
  * @static
  */
-function sendPingPacket(socket) {
+function sendPingPacket(socket, cb) {
 	var header = Buffer.alloc(2);
 	header[0] = 0x89;
 	header[1] = 0;
-	socket.write(header);
+	return socket.write(header, cb);
 }
 
 module.exports = {
