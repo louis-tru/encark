@@ -35,9 +35,10 @@ var service = require('../service');
 var {WSService} = require('./service');
 var {Buffer} = require('buffer');
 var crypto = require('crypto');
+var uuid = require('../hash/uuid');
 var errno = require('../errno');
 var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
-var {DataFormater} = require('./data');
+var {DataFormater, T_BIND, T_PING, T_PONG, PONG_BUFFER } = require('./data');
 var KEEP_ALIVE_TIME = 5e4; // 50s
 
 /**
@@ -49,6 +50,8 @@ var Conversation = utils.class('Conversation', {
 	m_services: null,
 	m_default_service: '',
 	m_services_count: 0,
+	m_last_packet_time: 0,
+	m_KEEP_ALIVE_TIME: KEEP_ALIVE_TIME,
 
 	/**
 	 * @field server {Server}
@@ -78,18 +81,30 @@ var Conversation = utils.class('Conversation', {
 	onClose: null,
 	onOpen: null,
 
+	get lastPacketTime() {
+		return this.m_last_packet_time;
+	},
+
+	get keepAliveTime() {
+		return this.m_KEEP_ALIVE_TIME;
+	},
+
+	set keepAliveTime(value) {
+		this.m_KEEP_ALIVE_TIME = Math.max(5e3, Number(value) || KEEP_ALIVE_TIME);
+	},
+
 	/**
 	 * @param {http.ServerRequest}   req
 	 * @param {String}   bind_services
 	 * @constructor
 	 */
 	constructor: function(req, bind_services) {
-		event.initEvents(this, 'Open', 'Message', 'Ping', 'Close');
+		event.initEvents(this, 'Open', 'Message', 'Ping', 'Pong', 'Close');
 
 		this.server = req.socket.server.wrap;
 		this.request = req;
 		this.socket = req.socket;
-		this.token = utils.hash(utils.id + this.server.host + '');
+		this.token = uuid();
 		this.m_services = {};
 		this.m_services_count = 0;
 		var self = this;
@@ -116,12 +131,15 @@ var Conversation = utils.class('Conversation', {
 		var services = bind_services.split(',');
 		utils.assert(services[0], 'Bind Service undefined');
 
+		self.socket.pause();
+
 		if (!self.initialize())
 			return self._safeDestroy();  // 关闭连接
 
 		utils.assert(!self.m_isOpen);
 		self.server.m_ws_conversations[self.token] = self; // TODO private visit
 		self.m_isOpen = true;
+		self.m_last_packet_time = Date.now();
 
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
@@ -135,7 +153,7 @@ var Conversation = utils.class('Conversation', {
 			self.token = '';
 			self.onOpen.off();
 			self.onMessage.off();
-			// self.onError.off();
+
 			try {
 				for (var s of Object.values(self.m_services))
 					if (s.loaded) 
@@ -151,7 +169,13 @@ var Conversation = utils.class('Conversation', {
 		self.onOpen.trigger();
 		self.server.trigger('WSConversationOpen', self);
 
-		await self._bind(services);
+		try {
+			await self._bind(services);
+		} catch(err) {
+			await utils.sleep(1e3); // delay 1s
+			throw err;
+		}
+		self.socket.resume();
 	},
 
 	/** 
@@ -178,9 +202,9 @@ var Conversation = utils.class('Conversation', {
 			}
 
 			await ser.load();
-			ser.m_loaded = true; // ptinate visit
-			await utils.sleep(200); // 在同一个node进程中同时开启多个服务时socket无法写入
-			await ser._trigger('Load', {token:this.token});
+			ser.m_loaded = true; // TODO ptinate visit
+			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
+			ser._trigger('Load', {token:this.token}).catch(e=>console.error(e));
 			console.log('SER Load', this.request.url);
 		}
 	},
@@ -245,24 +269,47 @@ var Conversation = utils.class('Conversation', {
 		var data = await DataFormater.parse(packet, isText, this.isGzip);
 		if (!this.isOpen)
 			return console.warn('SER Conversation.handlePacket, connection close status');
-		if (data.isPing()) { // ping, browser web socket, Extension protocol 
-			this.onPing.trigger();
-		}
-		else if (data.isValidEXT()) { // Extension protocol
-			if (data.isBind()) { // 绑定服务消息
-				this._bind([data.service]).catch(console.warn);
-			} else {
-				var handle = this.m_services[data.service || this.m_default_service];
-				if (handle) {
-					handle.receiveMessage(data).catch(e=>console.error(e));
-				} else {
-					console.error('Could not find the message handler, '+
-												'discarding the message, ' + data.service);
-				}
+
+		this.m_last_packet_time = Date.now();
+
+		if (data.isValidEXT()) { // Extension protocol
+			switch (data.type) {
+				case T_BIND:
+					this._bind([data.service]).catch(console.warn);
+					break;
+				case T_PING: // ping Extension protocol 
+					this.handlePing();
+					break;
+				case T_PONG: // pong Extension protocol 
+					this.onPong.trigger();
+					break;
+				default:
+					var handle = this.m_services[data.service || this.m_default_service];
+					if (handle) {
+						handle.receiveMessage(data).catch(e=>console.error(e));
+					} else {
+						console.error('Could not find the message handler, '+
+													'discarding the message, ' + data.service);
+					}
 			}
 		} else {
 			this.onMessage.trigger({ isText, data: packet });
 		}
+	},
+
+	handlePing: function() {
+		this.m_last_packet_time = Date.now();
+		this.send(PONG_BUFFER);
+		this.onPing.trigger();
+	},
+
+	/**
+	 * @func sendFormatData
+	 */
+	sendFormatData: async function(data) {
+		data = new DataFormater(data);
+		data = await data.toBuffer(this.isGzip)
+		this.send(data);
 	},
 
 	/**
@@ -277,18 +324,9 @@ var Conversation = utils.class('Conversation', {
 	send: function(data) {},
 
 	/**
-	 * @func sendData
+	 * @func ping()
 	 */
-	sendFormattedData: async function(data) {
-		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip)
-		this.send(data);
-	},
-
-	/**
-	 * @func pong()
-	 */
-	pong: function() {},
+	ping: function() {},
 
 	/**
 	 * close the connection
@@ -369,7 +407,7 @@ class Hybi extends Conversation {
 		var socket = this.socket;
 		var parser = new PacketParser();
 
-		// socket.setNoDelay(true);
+		socket.setNoDelay(true);
 		socket.setTimeout(0);
 		socket.setKeepAlive(true, KEEP_ALIVE_TIME);
 
@@ -381,7 +419,7 @@ class Hybi extends Conversation {
 
 		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
 		parser.onData.on(e=>self.handlePacket(e.data, 0));
-		parser.onPing.on(e=>self.onPing.trigger());
+		parser.onPing.on(e=>self.handlePing());
 		parser.onClose.on(e=>self.close());
 		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
 
@@ -393,22 +431,15 @@ class Hybi extends Conversation {
 	 */
 	send(data) {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		try {
-			sendDataPacket(this.socket, data);
-		} catch (err) {
-			this.close();
-			throw err;
-		}
+		sendDataPacket(this.socket, data);
 	}
 
-	pong() {
-		if (this.isOpen) {
-			try {
-				sendPingPacket(this.socket);
-			} catch (e) {
-				console.error(e);
-			}
-		}
+	/**
+	 * @overwrite
+	 */
+	ping() {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		sendPingPacket(this.socket);
 	}
 
 	/**
@@ -421,8 +452,12 @@ class Hybi extends Conversation {
 			socket.removeAllListeners('close');
 			socket.removeAllListeners('error');
 			socket.removeAllListeners('data');
-			if (socket.writable) 
-				socket.end();
+			try {
+				if (socket.writable) 
+					socket.end();
+			} catch(err) {
+				console.error(err);
+			}
 			this.onClose.trigger();
 			console.log('Hybi Conversation Close');
 		}

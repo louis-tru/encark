@@ -143,6 +143,11 @@ class FMTService extends wss.WSService {
 		return this.m_center.hasOnline(id);
 	}
 
+	// /**
+	//  * @func publishTo() publish multicast,broadcast event message
+	//  */
+	// publishTo({ event, data, gid = '0' }){}
+
 	/**
 	 * @func triggerTo() event message
 	 */
@@ -150,18 +155,19 @@ class FMTService extends wss.WSService {
 		return this.m_center.delegate.triggerTo(id, event, data, this.m_id);
 	}
 
-	// /**
-	//  * @func publishTo() publish multicast,broadcast event message
-	//  */
-	// publishTo({ event, data, gid = '0' }) {
-	// }
-
 	/**
 	 * @func callTo()
 	 */
 	callTo([id, method, data, timeout]) {
 		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
 		return this.m_center.delegate.callTo(id, method, data, timeout, this.m_id);
+	}
+
+	/**
+	 * @func sendTo()
+	 */
+	sendTo([id, method, data]) {
+		return this.m_center.delegate.sendTo(id, method, data, this.m_id);
 	}
 
 }
@@ -180,13 +186,17 @@ class FMTServerClient {
 		this.m_center = center;
 	}
 
-	trigger(event, data, sender = '') {
+	trigger(event, data, sender = null) {
 		return this.m_center.delegate.triggerTo(this.m_id, event, data, sender);
 	}
 
-	call(method, data, timeout = wss.METHOD_CALL_TIMEOUT, sender = '') {
+	call(method, data, timeout = wss.METHOD_CALL_TIMEOUT, sender = null) {
 		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
 		return this.m_center.delegate.callTo(this.m_id, method, data, timeout, sender);
+	}
+
+	send(method, data, sender = null) {
+		return this.m_center.delegate.sendTo(this.m_id, method, data, sender);
 	}
 
 }

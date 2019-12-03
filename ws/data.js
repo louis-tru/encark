@@ -28,14 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var jsonb = require('../jsonb');
-var EXT_PING_MARK = '\ufffe';
-var TYPES = {
+const jsonb = require('../jsonb');
+const TYPES = {
 	T_BIND: 0xf1,
 	T_EVENT: 0xf2,
 	T_CALL: 0xf3,
 	T_CALLBACK: 0xf4,
+	T_PING: 0xf5,
+	T_PONG: 0xf6,
 };
 
 if (require('../util').haveNode) {
@@ -70,20 +70,34 @@ function gzip(buffer) {
 	}): buffer;
 }
 
+var PING_BUFFER = jsonb.binaryify([TYPES.T_PING]);
+var PONG_BUFFER = jsonb.binaryify([TYPES.T_PONG]);
+
+function toBuffer(data, isGzip) {
+	data = jsonb.binaryify(data);
+	if (isGzip) {
+		return gzip(data);
+	}
+	return data;
+}
+
 /**
  * @class DataFormater
  */
 class DataFormater {
+
 	constructor(data) {
 		Object.assign(this, data);
 	}
+
 	static async parse(packet, isText, isGzip = false) {
-		if (isText) { // JSON data
-			if (packet.length == 1 && packet == EXT_PING_MARK) {
-				return new DataFormater({ping: true});
-			}
-		}
 		try {
+			if (!isText && packet.length === 3) { // PING_BUFFER, PONG_BUFFER
+				var type = packet[1];
+				if (type == TYPES.T_PING || type == TYPES.T_PONG) {
+					return new DataFormater({type});
+				}
+			}
 			var [type,service,name,data,error,cb,sender] = isText ? 
 				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
 			return new DataFormater({type,service,name,data,error,cb,sender});
@@ -92,42 +106,48 @@ class DataFormater {
 			return new DataFormater();
 		}
 	}
+
 	toBuffer(isGzip = false) {
-		var buffer = jsonb.binaryify([
+		return toBuffer([
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb, this.sender
-		]);
-		if (isGzip) {
-			return gzip(buffer);
-		}
-		return buffer;
+		], isGzip);
 	}
+
 	toJSON() {
 		return [
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb, this.sender
 		];
 	}
-	isPing() {
-		return this.ping;
-	}
+
 	isValidEXT() {
 		return isValidEXT(this.type);
 	}
+
+	isPing() {
+		return this.type == TYPES.T_OING;
+	}
+
+	isPong() {
+		return this.type == TYPES.T_PONG;
+	}
+
 	isBind() {
 		return this.type == TYPES.T_BIND;
 	}
+
 	isEvent() {
 		return this.type == TYPES.T_EVENT;
 	}
+
 	isCall() {
 		return this.type == TYPES.T_CALL;
 	}
+
 	isCallback() {
 		return this.type == TYPES.T_CALLBACK;
 	}
 }
 
-module.exports = Object.assign({ 
-	EXT_PING_MARK, DataFormater,
-}, TYPES);
+module.exports = Object.assign({ DataFormater, PING_BUFFER, PONG_BUFFER }, TYPES);

@@ -144,7 +144,7 @@ class WSClient extends Notification {
 			}
 
 			if (cb) {
-				self.m_conv.sendFormattedData(Object.assign(r, {
+				self.m_conv.sendFormatData(Object.assign(r, {
 					service: self.m_conv._service(self.name),
 					type: T_CALLBACK, 
 					cb: cb,
@@ -168,7 +168,7 @@ class WSClient extends Notification {
 
 	async _send(data) {
 		if (this.m_loaded) {
-			await this.m_conv.sendFormattedData(data);
+			await this.m_conv.sendFormatData(data);
 			delete data.data;
 		} else {
 			this.m_sends.push(data);
@@ -204,6 +204,21 @@ class WSClient extends Notification {
 				cb: id,
 				sender: sender,
 			}));
+		});
+	}
+
+	/**
+	 * @func send(method, data, sender) method call
+	 * @async
+	 */
+	async send(method, data, sender = null) {
+		await this._send({
+			service: this.conv._service(this.name),
+			type: T_CALL,
+			name: method,
+			data: data,
+			cb: null,
+			sender: sender,
 		});
 	}
 

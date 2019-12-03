@@ -49,8 +49,9 @@ class FNode {
 	destroy() { return this.m_center.deleteNode(this)}
 	publish(event, data) {}
 	broadcast(event, data, id) {}
-	triggerTo(id, event, data) {}
-	callTo(id, name, data, timeout) {}
+	triggerTo(id, event, data, sender) {}
+	callTo(id, name, data, timeout, sender) {}
+	sendTo(id, name, data, sender) {}
 	query(id, more = 0) {}
 }
 
@@ -75,6 +76,9 @@ class FNodeLocal extends FNode {
 	}
 	callTo(id, method, data, timeout, sender) {
 		return this.m_center.getFMTService(id).call(method, data, timeout, sender); // call method
+	}
+	sendTo(id, method, data, sender) {
+		return this.m_center.getFMTService(id).send(method, data, sender); // call method
 	}
 	async query(id, more=0) {
 		var s = this.m_center.getFMTServiceNoError(id);
@@ -160,6 +164,10 @@ class FNodeRemote extends FNode {
 		return this.m_impl.call('callTo', [id, method, data, timeout, sender], timeout); // call method
 	}
 
+	sendTo(id, method, data, sender) {
+		return this.m_impl.send('sendTo', [id, method, data, sender]); // call method
+	}
+
 	query(id, more = 0) { // query client
 		return this.m_impl.call('query', [id, more?true:false]);
 	}
@@ -188,6 +196,10 @@ class FNodeRemoteIMPL {
 
 	callTo([id, method, data, timeout, sender]) { // call client
 		return this.m_center.getFMTService(id).call(method, data, timeout, sender);
+	}
+
+	sendTo([id, method, data, sender]) { // call client
+		return this.m_center.getFMTService(id).send(method, data, sender);
 	}
 
 	query([id,more]) { // query client

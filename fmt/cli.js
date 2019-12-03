@@ -83,7 +83,7 @@ class WSClient extends cli.WSClient {
 		this.conv.onClose.on(e=>{
 			if (this.m_autoConnect && !this.m_active_close) { // auto connect
 				console.log('reconnect Clo..', host.id);
-				utils.sleep(500).then(e=>this.conv.connect());
+				utils.sleep(50).then(e=>this.conv.connect());
 			}
 			this.trigger('Offline');
 		});
@@ -91,7 +91,7 @@ class WSClient extends cli.WSClient {
 		this.conv.onError.on(e=>{
 			if (this.m_autoConnect && !this.m_active_close) { // auto connect
 				console.log('reconnect Err..', host.id);
-				utils.sleep(500).then(e=>this.conv.connect());
+				utils.sleep(50).then(e=>this.conv.connect());
 			}
 		});
 
@@ -239,6 +239,9 @@ class ThatClient {
 	}
 	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
 		return this.m_host.m_cli.call('callTo', [this.m_id, method, data, timeout], timeout);
+	}
+	send(method, data) {
+		return this.m_host.m_cli.send('sendTo', [this.m_id, method, data]);
 	}
 }
 

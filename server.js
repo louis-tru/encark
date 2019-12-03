@@ -131,6 +131,24 @@ function initializ(self, server) {
 		console.log(err);
 		console.log('Server Error ---------------');
 	});
+
+	self.addEventListener('Startup', function() {
+		self.m_checkIntervalId = setInterval(function() {
+			var time = Date.now();
+			for (var conv of Object.values(self.m_ws_conversations)) {
+				if (conv.keepAliveTime * 2 + conv.lastPacketTime < time) {
+					conv.close(); // disconnect
+				}
+			}
+		}, 3e4/*30s*/);
+	});
+
+	server.on('close', function() {
+		clearInterval(self.m_checkIntervalId);
+		self.m_isRun = false;
+		self.trigger('Stop');
+	});
+
 }
 
 /**
@@ -397,7 +415,7 @@ var Server = util.class('Server', event.Notification, {
 	 * Get wsConversations conversation 
 	 */
 	get wsConversations() {
-		return this.m_ws_conversations;
+		return Object.create(this.m_ws_conversations);
 	},
 
 	set timeout(timeout) {
@@ -455,21 +473,29 @@ var Server = util.class('Server', event.Notification, {
 	},
 
 	/**
-	 * 停止服务
+	 * @func stop() sopt service
 	 */
 	stop: function () {
 		this.m_server.close();
-		this.m_isRun = false;
-		self.trigger('Stop');
 	},
 
 	/**
-	 * 重新启动
+	 * @func restart() restart service
 	 */
-	restart: function (){
+	restart: function () {
 		this.m_server.stop();
-		this.m_server.start();
+		(async e=>{
+			var i = 4;
+			while(--i) {
+				if (!this.m_isRun) {
+					this.m_server.start();
+					break;
+				}
+				await util.sleep(5e2/*500ms*/);
+			}
+		})().catch(console.error);
 	},
+
 	// @end
 });
 

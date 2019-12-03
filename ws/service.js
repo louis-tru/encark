@@ -128,7 +128,7 @@ class WSService extends Service {
 			}
 
 			if (cb) {
-				self.m_conv.sendFormattedData(Object.assign(r, {
+				self.m_conv.sendFormatData(Object.assign(r, {
 					service: self.m_conv._service(self.name),
 					type: T_CALLBACK, 
 					cb: cb,
@@ -150,7 +150,7 @@ class WSService extends Service {
 	}
 
 	async _send(data) {
-		await this.m_conv.sendFormattedData(data);
+		await this.m_conv.sendFormatData(data);
 		delete data.data;
 		return data;
 	}
@@ -189,6 +189,21 @@ class WSService extends Service {
 
 	_trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
 		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
+	}
+
+	/**
+	 * @func send(method, data, sender) method call, No response
+	 * @async
+	 */
+	async send(method, data, sender = null) {
+		await this._send({
+			service: this.conv._service(this.name),
+			type: T_CALL,
+			name: method,
+			data: data,
+			cb: null,
+			sender: sender,
+		});
 	}
 
 	/**

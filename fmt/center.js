@@ -83,6 +83,10 @@ class FastMessageTransferCenterDelegate {
 		return this.exec(id, [method, data, timeout, sender], 'callTo');
 	}
 
+	sendTo(id, method, data, sender) {
+		return this.exec(id, [method, data, sender], 'sendTo');
+	}
+
 }
 
 /**
