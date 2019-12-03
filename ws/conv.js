@@ -314,7 +314,7 @@ var Conversation = utils.class('Conversation', {
 	 */
 	sendFormatData: async function(data) {
 		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip)
+		data = await data.toBuffer(this.isGzip);
 		await this.send(data);
 	},
 

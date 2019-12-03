@@ -267,7 +267,7 @@ class Conversation {
 	 */
 	async sendFormatData(data) {
 		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip)
+		data = await data.toBuffer(this.isGzip);
 		await this.send(data);
 	}
 

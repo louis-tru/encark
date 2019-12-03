@@ -28,6 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+const {List} = require('../event');
 const jsonb = require('../jsonb');
 const TYPES = {
 	T_BIND: 0xf1,
@@ -38,32 +39,44 @@ const TYPES = {
 	T_PONG: 0xf6,
 };
 
+function gen_func(queue, api) {
+	return function(buffer) {
+		return new Promise((resolve, reject)=>{
+			var item = queue.push({ resolve, reject });
+			api(buffer, function (err, data) {
+				item.value.result = { err, data };
+				var first = queue.first;
+				while (first) {
+					var { result, resolve, reject } = first.value;
+					if (result) {
+						if (result.err) {
+							reject(result.err);
+						} else {
+							resolve(result.data);
+						}
+						queue.shift();
+						first = queue.first;
+					} else {
+						break;
+					}
+				}
+			});
+		})
+	};
+}
+
 if (require('../util').haveNode) {
 	var zlib = require('zlib');
+	var _ungzip = gen_func(new List(), zlib.inflateRaw);
+	var _gzip = gen_func(new List(), zlib.deflateRaw);
 }
 
 function ungzip(buffer) {
-	return zlib ? new Promise((resolve, reject)=>{
-		zlib.inflateRaw(buffer, function (err, data) {
-			if (err) {
-				reject(err);
-			} else {
-				resolve(data);
-			}
-		});
-	}): buffer;
+	return zlib ? _ungzip(buffer): buffer;
 }
 
 function gzip(buffer) {
-	return zlib ? new Promise((resolve, reject)=>{
-		zlib.deflateRaw(buffer, function (err, data) {
-			if (err) {
-				reject(err);
-			} else {
-				resolve(data);
-			}
-		});
-	}): buffer;
+	return zlib ? _gzip(buffer): buffer;
 }
 
 var PING_BUFFER = jsonb.binaryify(TYPES.T_PING);
