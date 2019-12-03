@@ -88,8 +88,8 @@ class DataFormater {
 
 	static async parse(packet, isText, isGzip = false) {
 		try {
-			if (!isText && packet.length === 1) { // PING_BUFFER, PONG_BUFFER
-				var type = packet[0];
+			if (!isText && packet.length === 2) { // PING_BUFFER, PONG_BUFFER
+				var type = packet[1];
 				if (type == TYPES.T_PING || type == TYPES.T_PONG) {
 					return new DataFormater({type});
 				}
