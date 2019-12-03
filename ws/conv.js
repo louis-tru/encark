@@ -77,10 +77,11 @@ var Conversation = utils.class('Conversation', {
 	isGzip: false,
 
 	// @event:
-	onMessage: null,
 	onPing: null,
 	onClose: null,
 	onOpen: null,
+	onDrain: null,
+	onOverflow: null,
 
 	get lastPacketTime() {
 		return this.m_last_packet_time;
@@ -159,8 +160,7 @@ var Conversation = utils.class('Conversation', {
 			self.request = null;
 			self.socket = null;
 			self.token = '';
-			self.onOpen.off();
-			self.onMessage.off();
+			// self.onOpen.off();
 
 			try {
 				for (var s of Object.values(self.m_services))
