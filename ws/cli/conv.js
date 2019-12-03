@@ -463,7 +463,8 @@ class NodeConversation extends WSConversationBasic {
 	initialize() {
 		utils.assert(!this.m_req, 'No need to repeat open');
 
-		this.setGzip(true); // use gzip
+		if (exports.USE_GZIP_DATA)
+			this.setGzip(true); // use gzip
 
 		var self = this;
 		var url = this.m_url;
@@ -624,7 +625,8 @@ var WSConversation =
 	haveWeb ? WebConversation: 
 	haveNode ? NodeConversation: utils.unrealized;
 
-module.exports = {
+module.exports = exports = {
 	Conversation,
 	WSConversation,
+	USE_GZIP_DATA: true,
 };
