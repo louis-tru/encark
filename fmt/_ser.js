@@ -55,18 +55,27 @@ class FMTService extends wss.WSService {
 		return this.m_time;
 	}
 
+	get user() {
+		return this.m_user;
+	}
+
 	constructor(conv) {
 		super(conv);
 		this.m_center = null;
 		this.m_id = String(this.params.id);
 		this.m_subscribe = new Set();
 		this.m_uuid = uuid();
+		this.m_user = null;
 	}
 
-	requestAuth() {
+	async requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
 		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
-		return center.delegate.auth(this);
+		var user = await center.delegate.auth(this);
+		if (user) {
+			this.m_user = { ...user, id: this.m_id };
+			return true;
+		}
 	}
 
 	/**
@@ -77,6 +86,7 @@ class FMTService extends wss.WSService {
 		utils.assert(center, 'FMTService.load() FMTC No found');
 		await utils.sleep(utils.random(0, 200));
 		this.m_time = new Date();
+		this.m_user.time = this.m_time;
 		try {
 			await center.loginFrom(this);
 		} catch(err) {
@@ -170,6 +180,10 @@ class FMTService extends wss.WSService {
 		return this.m_center.delegate.sendTo(id, method, data, this.m_id);
 	}
 
+	getUser([id]) {
+		return this.m_center.user(id);
+	}
+
 }
 
 /**
@@ -197,6 +211,10 @@ class FMTServerClient {
 
 	send(method, data, sender = null) {
 		return this.m_center.delegate.sendTo(this.m_id, method, data, sender);
+	}
+
+	user() {
+		return this.m_center.user(this.m_id);
 	}
 
 }

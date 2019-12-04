@@ -52,6 +52,7 @@ class FNode {
 	triggerTo(id, event, data, sender) {}
 	callTo(id, name, data, timeout, sender) {}
 	sendTo(id, name, data, sender) {}
+	user(id) {}
 	query(id, more = 0) {}
 }
 
@@ -79,6 +80,9 @@ class FNodeLocal extends FNode {
 	}
 	sendTo(id, method, data, sender) {
 		return this.m_center.getFMTService(id).send(method, data, sender); // call method
+	}
+	user(id) {
+		return this.m_center.getFMTService(id).user;
 	}
 	async query(id, more=0) {
 		var s = this.m_center.getFMTServiceNoError(id);
@@ -168,6 +172,10 @@ class FNodeRemote extends FNode {
 		return this.m_impl.send('sendTo', [id, method, data, sender]); // call method
 	}
 
+	user(id) {
+		return this.m_impl.call('user', [id]); // call method
+	}
+
 	query(id, more = 0) { // query client
 		return this.m_impl.call('query', [id, more?true:false]);
 	}
@@ -200,6 +208,10 @@ class FNodeRemoteIMPL {
 
 	sendTo([id, method, data, sender]) { // call client
 		return this.m_center.getFMTService(id).send(method, data, sender);
+	}
+
+	user([id]) {
+		return this.m_center.getFMTService(id).user;
 	}
 
 	query([id,more]) { // query client
@@ -300,7 +312,6 @@ class FNodeRemoteClient extends cli.WSClient {
 			throw err;
 		}
 	}
-
 }
 
 utils.extendClass(FNodeRemoteService, FNodeRemoteIMPL);

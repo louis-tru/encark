@@ -165,6 +165,10 @@ class FMTClient extends event.Notification {
 		return new ThatClient(this, id);
 	}
 
+	user(id) {
+		return this.m_cli.call('getUser', [id]);
+	}
+
 	/**
 	 * @func handleCall()
 	 */
@@ -245,6 +249,9 @@ class ThatClient {
 	}
 	send(method, data) {
 		return this.m_host.m_cli.send('sendTo', [this.m_id, method, data]);
+	}
+	user() {
+		return this.m_host.m_cli.call('getUser', [this.m_id]);
 	}
 }
 

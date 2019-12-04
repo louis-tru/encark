@@ -55,10 +55,10 @@ class FastMessageTransferCenterDelegate {
 	}
 
 	/** 
-	 * @func auth() auth client
+	 * @func auth() auth client, return client user info
 	*/
 	auth(fmtService) {
-		return true;
+		return {/* user info */};
 	}
 
 	/** 
@@ -119,6 +119,10 @@ class FastMessageTransferCenter extends event.Notification {
 
 	hasOnline(id) {
 		return this.m_impl.hasOnline(id);
+	}
+
+	user(id) {
+		return this.m_impl.user(id);
 	}
 
 	trigger(event, data) {
@@ -293,6 +297,10 @@ class FastMessageTransferCenter_IMPL {
 			return false;
 		}
 		return true;
+	}
+
+	user(id) {
+		return this.exec(id, [], 'user');
 	}
 
 	async exec(id, args = [], method = null) {
