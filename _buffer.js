@@ -54,7 +54,7 @@ if (global.BigInt) {
 		_bigint._set(checkInt);
 		exports.readBigIntBE = m._readBigIntBE;
 		exports.writeBigIntLE = m._writeBigIntLE;
-		console.log('exports.writeBigIntLE', exports.writeBigIntLE)
+		// console.log('exports.writeBigIntLE', exports.writeBigIntLE)
 	});
 }
 
