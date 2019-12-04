@@ -91,7 +91,6 @@ class FMTService extends wss.WSService {
 			await center.loginFrom(this);
 		} catch(err) {
 			if (err.code == errno.ERR_REPEAT_LOGIN_FMTC[0]) {
-				await utils.sleep(2000);
 				await this._repeatLoginError();
 			}
 			throw err;
@@ -121,7 +120,7 @@ class FMTService extends wss.WSService {
 	}
 
 	_repeatLoginError() {
-		return Promise.all([super.trigger('RepeatLoginError'), utils.sleep(200)]);
+		return Promise.race([this._trigger('RepeatLoginError'), utils.sleep(200)]);
 	}
 
 	/**
