@@ -327,7 +327,7 @@ function get_config() {
 						_path.dirname(mainModule.filename) + '/config') || 
 					read_config_file(cwd() + '/.config', cwd() + '/config') || {};
 			} else {
-				config = read_config(cwd() + '/.config', cwd() + '/config') || {};
+				config = read_config_file(cwd() + '/.config', cwd() + '/config') || {};
 			}
 		} else {
 			config = {};
