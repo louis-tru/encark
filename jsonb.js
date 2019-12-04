@@ -64,8 +64,8 @@ var // FLAGS
 	F_INFINITY_MAX = 26;
 
 if (buffer.isBigInt) {
-	const BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-	const BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
+	var BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+	var BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
 }
 
 function write_flag(flag, out) {
@@ -76,8 +76,8 @@ function write_flag(flag, out) {
 function write_buffer(data, out) {
 	/*
 		0   - 253   : 1,	len|data...
-		254 - 65536 : 3,	254|len|len|data...
-		65537 -     : 9,	255|len|len|len|len|len|len|len|len|data...
+		254 - 65535 : 3,	254|len|len|data...
+		65536 -     : 9,	255|len|len|len|len|len|len|len|len|data...
 	*/
 	var dataLength = data.length;
 	var secondByte = dataLength;
@@ -335,8 +335,8 @@ function read_buffer(bin) {
 		assert(bin.length > bin.index + 8);
 		dataLen = 0;
 		for (var i = 0; i < 8; i++) {
-			dataLen |= bin.next();
 			dataLen <<= 8;
+			dataLen |= bin.next();
 		}
 		end = bin.index + dataLen;
 	}

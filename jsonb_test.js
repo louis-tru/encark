@@ -54,4 +54,13 @@ var objerr = jsonb.parse(binerr);
 
 console.log(objerr);
 
+// 
+
+debugger
+var big = jsonb.binaryify(new ArrayBuffer(65536));
+console.log(big);
+console.log('jsonb.parse(big)');
+var bigraw = jsonb.parse(big);
+console.log(bigraw);
+
 console.log('OK');
