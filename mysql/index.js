@@ -34,101 +34,86 @@ var constants = require('./constants');
 var {Query} = require('./query');
 var {OutgoingPacket} = require('./outgoing_packet');
 var {Buffer} = require('buffer');
-var connect_util = require('./connect');
+var connect_lib = require('./connect');
 
 //private:
 //close back connect
 function close(self) {
 	var connect = self._connect;
 	self._connect = null;
-	self.connected = false;
-	if (connect && typeof connect == 'object') {
+	if (connect) {
 		connect.idle();
+	} else if (self._connecting) {
+		self._connecting = false;
 	}
 }
 
 //net error and connection error
-function connectionErrorHandler(self, err) {
-	close(self);
+function handlError(self, err) {
+	close(self); // close this connect
+	var item = self._queue[0];
+	var after = item ? item.after : null;
 
-	console.error(err);
-	
-	var task = self._queue[0];
-	var cb = task ? task.cb : null;
-	
-	if (cb instanceof Query) {
-		return cb.onError.trigger(err);
-	}
-	
-	if (cb) {
-		cb(err);
+	if (after) {
+		after({ toUserObject: function() { return err } });
 	} else {
 		self.onError.trigger(err);
+		dequeue(self);
+		console.error(err);
 	}
-	dequeue(self);
 }
 
 //onpacket handle
-function handlePacket(e) {
-	var self = this;
+function handlePacket(self, e) {
 	var packet = e.data;
-
 	// @TODO Simplify the code below and above as well
-	var type = packet.type;
-	var task = self._queue[0];
-	var cb = task ? task.cb : null;
-
-	if (cb instanceof Query) {
-		return cb.handlePacket(packet);
-	}
-
-	//delete packet.ondata;
-	if (type === Parser.ERROR_PACKET) {
-		packet = packet.toUserObject();
-
-		console.error(packet);
-		if (cb) {
-			cb(packet);
-		}
-		else {
+	var item = self._queue[0];
+	var after = item ? item.after : null;
+	if (after) {
+		after(packet);
+	} else {
+		if (packet.type === Parser.ERROR_PACKET) {
 			self.onError.trigger(packet);
+			console.error(packet);
 		}
+		dequeue(self);
 	}
-	else if (cb) {
-		cb(null, packet.toUserObject());
-	}
+}
 
-	dequeue(self);
+function after(self, cb) {
+	return function(packet) {
+		var data = packet.toUserObject();
+		if (packet.type === Parser.ERROR_PACKET) {
+			cb(data);
+		} else {
+			cb(null, data);
+		}
+		dequeue(self);
+	}
 }
 
 //get connect
 function connect(self) {
-	var num = util.random(1);
-	var opt = {
+	if (self._connecting) return;
+	self._connecting = true;
+
+	connect_lib.resolve({
 		host: self.host,
 		port: self.port,
 		user: self.user,
 		password: self.password,
 		database: self.database
-	};
-	self._connect = num;
-
-	connect_util.get(opt, function (err, connect) {
-		if (self._connect !== num) { // not current connect
-			return connect && connect.idle();
-		}
+	}, function (err, connect) {
+		util.assert(self._connecting);
 		if (err) {
-			return connectionErrorHandler(self, err);
+			handlError(self, err);
+		} else {
+			connect.onPacket.on2(handlePacket, self);
+			connect.onError.on(e=>handlError(self, e.data));
+			self._connect = connect;
+			self._connecting = false;
+			self._queue[0].exec();
 		}
-		util.nextTick(function() {
-			connect.onpacket.on(handlePacket, self);
-			connect.onerror.on(function (e) {
-				connectionErrorHandler(self, e.data);
-			});
-		});
-		self.connected = true;
-		self._connect = connect;
-		self._queue[0].exec();
 	});
 }
 
@@ -138,33 +123,28 @@ function write(self, packet) {
 }
 
 //enqueue
-function enqueue(self, exec, cb) {
-	if (!self._connect) {
+function enqueue(self, exec, after) {
+	self._queue.push({ exec, after });
+	if (self._connect) {
+		if (self._queue.length === 1) {
+			if (self._connect)
+				exec();
+		}
+	} else {
 		connect(self);
-	}
-	var query = self._queue;
-	query.push({ exec: exec, cb: cb });
-
-	if (query.length === 1 && self.connected) {
-		exec();
 	}
 }
 
 //dequeue
 function dequeue(self) {
 	var queue = self._queue;
-
 	queue.shift();
-
-	if (!queue.length) {
-		return;
-	}
-	if (!self._connect) {
-		return connect(self);
-	}
-
-	if (self.connected) {
-		queue[0].exec();
+	if (queue.length) {
+		if (self._connect) {
+			queue[0].exec();
+		} else {
+			connect(self);
+		}
 	}
 }
 
@@ -175,6 +155,7 @@ exports.Mysql = util.class('Mysql', Database, {
 	_queue: null,
 	_connect: null,
 	_transaction: false,
+	_connecting: false,
 
 	//public:
 	port: 3306,
@@ -185,9 +166,11 @@ exports.Mysql = util.class('Mysql', Database, {
 
 	/**
 		* is connection
-		* @type {Boolean}
+		* @get connected
 		*/
-	connected: false,
+	get connected() {
+		return !!this._connect;
+	},
 
 	/**
 		* constructor function
@@ -203,11 +186,11 @@ exports.Mysql = util.class('Mysql', Database, {
 	//overlay
 	statistics: function(cb) {
 		var self = this;
-		enqueue(self, function () {
+		enqueue(self, function() {
 			var packet = new OutgoingPacket(1);
 			packet.writeNumber(1, constants.COM_STATISTICS);
 			write(self, packet);
-		}, cb);
+		}, after(this, cb));
 	},
 
 	//overlay
@@ -248,12 +231,14 @@ exports.Mysql = util.class('Mysql', Database, {
 			});
 		}
 
-		enqueue(self, function () {
+		enqueue(self, function() {
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(sql, 'utf-8'));
 			packet.writeNumber(1, constants.COM_QUERY);
 			packet.write(sql, 'utf-8');
 			write(self, packet);
-		}, query);
+		}, function(packet) {
+			query.handlePacket(packet);
+		});
 
 		return query;
 	},
@@ -261,26 +246,22 @@ exports.Mysql = util.class('Mysql', Database, {
 	//overlay
 	close: function() {
 		var self = this;
-		if (self._connect) {
-			if (self.connected || self._queue.length) {
-				if (self._transaction) {
-					self.commit();
-				}
-				enqueue(self, function () {
-					close(self);
-					dequeue(self);
-				});
-			} else {
+		if (self._queue.length) {
+			if (self._transaction)
+				self.commit();
+			enqueue(self, function() {
 				close(self);
-			}
+				dequeue(self);
+			});
+		} else {
+			close(self);
 		}
 	},
 
 	//overlay
 	transaction: function() {
-		if (this._transaction) {
+		if (this._transaction)
 			return;
-		}
 		this._transaction = true;
 		this.query('START TRANSACTION');
 	},

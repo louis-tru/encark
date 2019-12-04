@@ -37,7 +37,7 @@ var OutgoingPacket = require('./outgoing_packet').OutgoingPacket;
 var Buffer = require('buffer').Buffer;
 var Socket = require('net').Socket;
 
-var connect_timout = 1e4;
+var CONNECT_TIMEOUT = 1e4;
 var connect_pool = {};
 var require_connect = [];
 var { Parser, GREETING_PACKET, USE_OLD_PASSWORD_PROTOCOL_PACKET, ERROR_PACKET, } = parser;
@@ -88,107 +88,83 @@ function sendOldAuth(self, greeting) {
 	write(self, packet);
 }
 
-function remove_connect(self) {
-	self.onerror.off();
-	self.onpacket.off();
+function destroyConnect(self) {
+	self.onError.off();
+	self.onPacket.off();
+	self.onReady.off();
 	self._socket.destroy();
+	self._socket = null;
 
-	var opt = self.opt;
-	var key = opt.host + ':' + opt.port;
-	var pool = connect_pool[key];
+	var key = self.opt.host + ':' + self.opt.port;
+	connect_pool[key].deleteValue(self);
 
-	pool.deleteValue(self);
-
-	var queue = require_connect.shift();
-	if (queue) {
-		clearTimeout(queue.timeout);
-		exports.get(...queue.args);
+	var req = require_connect.shift();
+	if (req) {
+		clearTimeout(req.timeout);
+		resolve(...req.args);
 	}
 }
 
 var Connect = util.class('Connect', {
-
 	//private:
 	_greeting: null,
 	_socket: null,
 	_parser: null,
 	_tomeout: 0,
-	_use: true,
+	_isUse: true,
+	_isReady: false,
 
-	//public:
-
+	// public:
 	/**
 	 * option
 	 * @type {Object}
 	 */
 	opt: null,
 
-	/**
-	 * @event onerror
-	 */
-	onerror: null,
-
-	/**
-	 * @event onpacket
-	 */
-	onpacket: null,
-
+	onError: null,
+	onPacket: null,
+	onReady: null,
+	
 	/**
 	 * constructor function
 	 * @param {Object}   opt
-	 * @param {Function} cb
 	 * @constructor
 	 */
-	constructor: function (opt, cb) {
-		event.initEvents(this, 'error', 'packet');
+	constructor: function(opt) {
+		event.initEvents(this, 'Error', 'Packet', 'Ready');
 
 		this.opt = opt;
 		var self = this;
 		var parser = self._parser = new Parser();
 		var socket = self._socket = new Socket();
 
-		socket.setTimeout(8e7);
+		function error(err) {
+			destroyConnect(self);
+			self.onError.trigger(Error.new(err));
+		}
 		socket.setNoDelay(true);
-		socket.on('data', function(data) {
-			parser.write(data);
-		});
-		socket.on('error', function (err) {
-			self.onerror.trigger(err);
-			remove_connect(self);
-		});
-		socket.on('end', function() {
-			self.onerror.trigger(new Error('mysql server has been disconnected'));
-			remove_connect(self);
+		socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
+		socket.on('data', e=>parser.write(e));
+		socket.on('error', err=>error(err));
+		socket.on('end', ()=>error('mysql server has been disconnected'));
+
+		parser.onpacket.on(function(e) {
+			var packet = e.data;
+			if (packet.type === ERROR_PACKET) {
+				error({ message: 'ERROR_PACKET', packet: packet.toUserObject() });
+			} else if (this._isReady) {
+				self.onPacket.trigger(packet);
+			} else if (packet.type == GREETING_PACKET) {
+				sendAuth(self, packet);
+			} else if (packet.type == USE_OLD_PASSWORD_PROTOCOL_PACKET) {
+				sendOldAuth(self, self._greeting);
+			} else { // ok
+				this._isReady = true;
+				self.onReady.trigger();
+			}
 		});
 
 		socket.connect(opt.port, opt.host);
-
-		parser.onpacket.on(function (e) {
-			self.onpacket.trigger(e.data) 
-		});
-		self.onerror.on(function (e) {
-			cb(e.data) 
-		});
-		self.onpacket.on(function (e) {
-			var packet = e.data;
-
-			if (packet.type == GREETING_PACKET) {
-				return sendAuth(self, packet);
-			}
-			if (packet.type == USE_OLD_PASSWORD_PROTOCOL_PACKET) {
-				return sendOldAuth(self, self._greeting);
-			}
-			//connection ok
-			//error
-			if (packet.type === ERROR_PACKET) {
-				cb(packet.toUserObject());
-				remove_connect(self);
-			} else {
-				self.onerror.off();
-				self.onpacket.off();
-				cb(null, self);
-			}
-		});
 	},
 
 	/**
@@ -203,34 +179,57 @@ var Connect = util.class('Connect', {
 	 * return connection pool
 	 */
 	idle: function() {
-		this.onerror.off();
-		this.onpacket.off();
-		this._use = false;
+		if (!this._socket) return; // destroy
 
-		for (var i = 0, l = require_connect.length, opt1 = this.opt; i < l; i++) {
+		this.onError.off();
+		this.onPacket.off();
+		this.onReady.off();
+		this._isUse = false;
+
+		for (var i = 0, l = require_connect.length; i < l; i++) {
 			var req = require_connect[i];
 			var args = req.args;
-			var opt = args[0];
-
+			var [opt] = args;
 			if (
-				opt.host == opt1.host &&
-				opt.port === opt1.port &&
-				opt.user == opt1.user &&
-				opt.password == opt1.password
+				opt.host == this.opt.host && opt.port === this.opt.port &&
+				opt.user == this.opt.user && opt.password == this.opt.password
 			) {
 				require_connect.splice(i, 1);
 				clearTimeout(req.timeout);
-				return exports.get(...args);
+				resolve(...args);
+				return;
 			}
 		}
-		this._tomeout = remove_connect.setTimeout(connect_timout, this);
+		this._tomeout = destroyConnect.setTimeout(CONNECT_TIMEOUT, this);
+	},
+
+	_changeDB(db, cb) {
+		if (db != this.opt.database) { // change  db
+			// init db, change db
+			utils.assert(this._isReady);
+			this.opt.database = db;
+			var packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
+			packet.writeNumber(1, constants.COM_INIT_DB);
+			packet.write(db, 'utf-8');
+			write(this, packet);
+			this._isReady = false;
+		}
+		this._ready(cb);
+	},
+
+	_ready: function(cb) {
+		if (this._isReady)
+			return cb(null, this);
+		// wait ready
+		this.onReady.once(()=>cb(null, this));
+		this.onError.once(e=>cb(e.data));
 	},
 
 	/**
 		* start use connect
 		*/
-	use: function () {
-		this._use = true;
+		_use: function () {
+		this._isUse = true;
 		clearTimeout(this._tomeout);
 	},
 
@@ -241,65 +240,43 @@ var Connect = util.class('Connect', {
  * @param {Object}   opt
  * @param {Function} cb
  */
-exports.get = function (opt, cb) {
-
+function resolve(opt, cb) {
 	var key = opt.host + ':' + opt.port;
 	var pool = connect_pool[key] || (connect_pool[key] = []);
 
-	for (var i = 0, l = pool.length; i < l; i++) {
-		var connect = pool[i];
-		var opt1 = { ...connect.opt };
-
-		if (
-			!connect._use &&
-			opt1.user == opt.user &&
-			opt1.password == opt.password
-		) {
-			connect.use();
-
-			var db = opt.database;
-			if (opt1.database == db) {
-				return util.nextTick(cb, null, connect);
+	for (var c of pool) {
+		var options = c.opt;
+		if (!c._isUse && options.user == opt.user && options.password == opt.password) {
+			c._use();
+			if (options.database == opt.database) {
+				util.nextTick(cb, null, c);
+			} else {
+				c._changeDB(opt.database, cb);
 			}
-
-			opt1.database = db;
-
-			//init db
-			var packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
-			packet.writeNumber(1, constants.COM_INIT_DB);
-			packet.write(db, 'utf-8');
-			write(connect, packet);
-
-			connect.onpacket.on(function(e) {
-				connect.onpacket.off();
-				var packet = e.data;
-				if (packet.type === ERROR_PACKET) {
-					connect.idle();
-					cb(packet.toUserObject());
-				} else {
-					cb(null, connect);
-				}
-			});
 			return;
 		}
 	}
-
 	//is max connect
 	if (pool.length < exports.MAX_CONNECT_COUNT) {
-		return pool.push(new Connect(opt, cb));
+		var con = new Connect(opt);
+		pool.push(con);
+		con._ready(cb);
+		return;
 	}
 
+	// queue up
 	var req = {
 		timeout: function() {
 			require_connect.deleteValue(req);
 			cb(new Error('obtaining a connection from the connection pool timeout'));
-		} .setTimeout(connect_timout),
+		} .setTimeout(CONNECT_TIMEOUT),
 		args: Array.toArray(arguments)
 	};
-	
 	//append to require connect
 	require_connect.push(req);
 };
+
+exports.resolve = resolve;
 
 /**
 	* <span style="color:#f00">[static]</span>max connect count
