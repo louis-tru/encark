@@ -180,7 +180,7 @@ var Conversation = utils.class('Conversation', {
 		try {
 			await self._bind(services);
 		} catch(err) {
-			await utils.sleep(1e3); // delay 1s
+			await utils.sleep(5e3); // delay 5s
 			throw err;
 		}
 		self.socket.resume();
@@ -201,6 +201,10 @@ var Conversation = utils.class('Conversation', {
 			ser = new cls(self);
 			ser.name = name;
 			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
+
+			await ser.load(); // load
+
+			ser.m_loaded = true; // TODO ptinate visit
 			self.m_services[name] = ser;
 			self.m_services_count++;
 
@@ -208,9 +212,6 @@ var Conversation = utils.class('Conversation', {
 				self.m_default_service = name;
 				self.isGzip = ser.headers['use-gzip'] == 'on';
 			}
-
-			await ser.load();
-			ser.m_loaded = true; // TODO ptinate visit
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch(e=>console.error(e));
 			console.log('SER Load', this.request.url);
