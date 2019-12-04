@@ -187,7 +187,7 @@ class WSService extends Service {
 		});
 	}
 
-	_trigger(event, data, sender = null) {
+	async _trigger(event, data, sender = null) {
 		await this._send({
 			service: this.conv._service(this.name),
 			type: T_EVENT,
