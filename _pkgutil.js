@@ -302,9 +302,15 @@ function Packages_require_parse_argv(self) {
 }
 
 function inl_require_without_err(pathname) {
-	try {
-		return _require(pathname);
-	} catch(e) {}
+	try { return _require(pathname) } catch(e) {}
+}
+
+function read_config_file(pathname, pathname2) {
+	var c = inl_require_without_err(pathname);
+	var c2 = inl_require_without_err(pathname2);
+	if (c || c2) {
+		return Object.assign({}, c, c2);
+	}
 }
 
 function get_config() {
@@ -316,14 +322,12 @@ function get_config() {
 			var mainModule = process.mainModule;
 			if (mainModule) {
 				config = 
-					inl_require_without_err(_path.dirname(mainModule.filename) + '/config') ||
-					inl_require_without_err(_path.dirname(mainModule.filename) + '/.config') ||
-					inl_require_without_err(cwd() + '/config') ||
-					inl_require_without_err(cwd() + '/.config') || {};
+					read_config_file(
+						_path.dirname(mainModule.filename) + '/.config', 
+						_path.dirname(mainModule.filename) + '/config') || 
+					read_config_file(cwd() + '/.config', cwd() + '/config') || {};
 			} else {
-				config = 
-					inl_require_without_err(cwd() + '/config') || 
-					inl_require_without_err(cwd() + '/.config') || {};
+				config = read_config(cwd() + '/.config', cwd() + '/config') || {};
 			}
 		} else {
 			config = {};

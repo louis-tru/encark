@@ -63,7 +63,7 @@ function connectionErrorHandler(self, err) {
 	if (cb) {
 		cb(err);
 	} else {
-		self.onerror.trigger(err);
+		self.onError.trigger(err);
 	}
 	dequeue(self);
 }
@@ -91,7 +91,7 @@ function handlePacket(e) {
 			cb(packet);
 		}
 		else {
-			self.onerror.trigger(packet);
+			self.onError.trigger(packet);
 		}
 	}
 	else if (cb) {
@@ -261,7 +261,6 @@ exports.Mysql = util.class('Mysql', Database, {
 	//overlay
 	close: function() {
 		var self = this;
-
 		if (self._connect) {
 			if (self.connected || self._queue.length) {
 				if (self._transaction) {

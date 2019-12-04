@@ -68,16 +68,16 @@ var Database = util.class('Database', {
 	database: '',
 	
 	/**
-	 * @event onerror
+	 * @event onError
 	 */
-	onerror: null,
+	onError: null,
 	
 	/**
 	 * constructor function
 	 * @constructor
 	 */
 	constructor: function () {
-		event.initEvents(this, 'error');
+		event.initEvents(this, 'Error');
 	},
 	
 	/**
@@ -85,16 +85,26 @@ var Database = util.class('Database', {
 	 * @method statistics
 	 * @param {Function} cb
 	 */
-	statistics: function () { },
-	
+	statistics: function () {},
+
 	/**
-	 * query database
-	 * @method query
-	 * @param  {String}   sql
-	 * @param  {Function} cb  (Optional)
+	 * @func query()
 	 */
-	query: function () { },
-	
+	query: function(sql, cb) {},
+
+	/**
+	 * exec query database
+	 * @method exec
+	 * @param  {String}   sql
+	 */
+	exec: function(sql) {
+		return new Promise((resolve, reject)=>{
+			this.query(sql, function(err, data) {
+				err ? reject(err): resolve(data);
+			});
+		});
+	},
+
 	/**
 	 * close database connection
 	 * @method close
@@ -105,19 +115,19 @@ var Database = util.class('Database', {
 	 * srart transaction
 	 * @method transaction
 	 */
-	transaction: function () { },
+	transaction: function () {},
 	
 	/**
 	 * commit transaction
 	 * @method commit
 	 */
-	commit: function () { },
+	commit: function () {},
 	
 	/**
 	 * rollback transaction and clear sql command queue
 	 * @method rollback
 	 */
-	rollback: function () { },
+	rollback: function () {},
 	// @end
 });
 
