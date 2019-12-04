@@ -111,7 +111,7 @@ class DataFormater {
 				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
 			return new DataFormater({type,service,name,data,error,cb,sender});
 		} catch(err) {
-			console.warn('no parse EXT buffer data', err);
+			console.warn('no parse EXT buffer data', err, packet.length);
 		}
 	}
 

@@ -83,10 +83,10 @@ function write_buffer(data, out) {
 	var secondByte = dataLength;
 	var headerLength = 1;
 
-	if (dataLength > 65536) {
+	if (dataLength > 65535) { // 65536 - *
 		headerLength += 8;
 		secondByte = 255;
-	} else if (dataLength > 253) {
+	} else if (dataLength > 253) { // 254 - 65535
 		headerLength += 2;
 		secondByte = 254;
 	}
@@ -327,11 +327,11 @@ function read_buffer(bin) {
 	var dataLen = bin.next(), end;
 	if (dataLen < 254) { // 0 - 253 byte length
 		end = bin.index + dataLen;
-	} else if (dataLen < 255) { // 254 - 65536 byte length
+	} else if (dataLen < 255) { // 254 - 65535 byte length
 		assert(bin.length > bin.index + 2);
 		dataLen = (bin.next() << 8) | bin.next();
 		end = bin.index + dataLen;
-	} else { // 65537 - byte length
+	} else { // 65536 - byte length
 		assert(bin.length > bin.index + 8);
 		dataLen = 0;
 		for (var i = 0; i < 8; i++) {
