@@ -30,7 +30,7 @@
 
 var utils = require('../util');
 var uuid = require('../hash/uuid');
-var fmtc = require('./_fmtc');
+var fmtc = require('./fmtc');
 var service = require('../service');
 var wss = require('../ws/service');
 var errno = require('../errno');

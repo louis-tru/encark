@@ -627,5 +627,5 @@ var WSConversation =
 module.exports = exports = {
 	Conversation,
 	WSConversation,
-	USE_GZIP_DATA: true,
+	USE_GZIP_DATA: false,
 };

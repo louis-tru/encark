@@ -168,7 +168,7 @@ class WSService extends Service {
 		}
 	}
 
-	_call(type, name, data, timeout, sender) {
+	_call(type, name, data, timeout, sender, target = null) {
 		return util.promise(async (resolve, reject)=>{
 			var id = util.id;
 			var calls = this.m_calls;
@@ -182,6 +182,7 @@ class WSService extends Service {
 				data: data,
 				cb: id,
 				sender: sender,
+				target: target,
 			}));
 			// console.log('SER send', name);
 		});
@@ -226,6 +227,14 @@ class WSService extends Service {
 	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
 		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
 	}
+
+	// callTo(target, method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+	// 	return this._call(T_CALL, method, data, timeout, sender, target);
+	// }
+
+	// triggerTo(target, method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+	// 	return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
+	// }
 
 	// @end
 }

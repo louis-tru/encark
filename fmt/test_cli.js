@@ -3,6 +3,7 @@ var utils = require('../util');
 var cli = require('./cli');
 var log = require('../log');
 
+// require('../ws/cli/conv').USE_GZIP_DATA = false;
 // log.defaultConsole.makeDefault();
 
 var host = utils.options.host;

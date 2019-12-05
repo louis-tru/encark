@@ -37,6 +37,8 @@ const TYPES = {
 	T_CALLBACK: 0xf4,
 	T_PING: 0xf5,
 	T_PONG: 0xf6,
+	T_EVENT_TO: 0xf7,
+	T_CALL_TO: 0xf8,
 };
 
 function gen_func(queue, api) {
@@ -152,7 +154,7 @@ class DataFormater {
 	isCallback() {
 		return this.type == TYPES.T_CALLBACK;
 	}
-	
+
 }
 
 module.exports = Object.assign({ DataFormater, PING_BUFFER, PONG_BUFFER }, TYPES);

@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var utils = require('../util');
-var fmtc = require('./_fmtc');
+var fmtc = require('./fmtc');
 var service = require('../service');
 var wss = require('../ws/service');
 var cli = require('../ws/cli');
@@ -153,11 +153,11 @@ class FNodeRemote extends FNode {
 	}
 
 	publish(event, data) { // publish event to fnode
-		return this.m_impl.call('publish', [event,data]);
+		return this.m_impl.send('publish', [event,data]);
 	}
 
 	broadcast(event, data, id) { // broadcast event to fnode
-		return this.m_impl.call('broadcast', [event,data,id]);
+		return this.m_impl.send('broadcast', [event,data,id]);
 	}
 
 	triggerTo(id, event, data, sender) { // trigger event to client

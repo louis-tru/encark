@@ -31,9 +31,9 @@
 var utils = require('../util');
 var event = require('../event');
 var uuid = require('../hash/uuid');
-var fmtc = require('./_fmtc');
-var ser = require('./_ser');
-var fnode = require('./_fnode');
+var fmtc = require('./fmtc');
+var ser = require('./service');
+var fnode = require('./node');
 var path = require('../path');
 var errno = require('../errno');
 
@@ -204,7 +204,7 @@ class FastMessageTransferCenter_IMPL {
 				console.log('FastMessageTransferCenter_IMPL.DeleteNode', e.data.fnodeId);
 		});
 
-		this.m_host.addEventListener('Login', e=>{ // client connect
+		this.m_host.addEventListener('_Login', e=>{ // client connect
 			var { id, uuid, time, fnodeId } = e.data;
 			var fmt = this.m_fmtservice.get(id);
 			if (fmt) {
@@ -223,17 +223,22 @@ class FastMessageTransferCenter_IMPL {
 			}
 			new Route(this, id, uuid, time, fnodeId);
 
+			// trigger login event
+			this.m_host.getNoticer('Login').trigger(e.data);
+
 			for (var [,fmt] of this.m_fmtservice) {
 				if (fmt.id != e.data.id)
 					fmt.reportState('Login', id);
 			}
 		});
 
-		this.m_host.addEventListener('Logout', e=>{ // client disconnect
+		this.m_host.addEventListener('_Logout', e=>{ // client disconnect
 			var {id, uuid} = e.data;
 			var route = this.m_routeTable.get(id);
 			if (route && route.uuid == uuid) {
 				this.m_routeTable.delete(id);
+				// trigger logout event
+				this.m_host.getNoticer('Logout').trigger(e.data);
 				for (var [,fmt] of this.m_fmtservice) {
 					if (fmt.id != id)
 						fmt.reportState('Logout', id);
@@ -355,7 +360,7 @@ class FastMessageTransferCenter_IMPL {
 				}
 			}
 			// Trigger again:
-			this.m_host.getNoticer('Logout').trigger({ id, uuid: route.uuid, fnodeId: route.fnodeId });
+			this.m_host.getNoticer('_Logout').trigger({ id, uuid: route.uuid, fnodeId: route.fnodeId });
 		}
 
 		var mark = this.m_markOffline.get(id);
@@ -385,7 +390,7 @@ class FastMessageTransferCenter_IMPL {
 			throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
 		}
 		// Trigger again
-		this.m_host.getNoticer('Login').trigger({ id, uuid, time, fnodeId: fnode.id });
+		this.m_host.getNoticer('_Login').trigger({ id, uuid, time, fnodeId: fnode.id });
 
 		if (method) {
 			return await fnode[method](id, ...args);
@@ -429,7 +434,7 @@ class FastMessageTransferCenter_IMPL {
 			await this.logoutFrom(fmt);
 		}
 		this.m_fmtservice.set(fmtservice.id, fmtservice);
-		this.publish('Login', {
+		this.publish('_Login', {
 			id: fmtservice.id, uuid: fmtservice.uuid,
 			time: fmtservice.time, fnodeId: this.id, 
 		});
@@ -445,7 +450,7 @@ class FastMessageTransferCenter_IMPL {
 		if (!this.m_fmtservice.has(fmtservice.id))
 			return;
 		this.m_fmtservice.delete(fmtservice.id);
-		this.publish('Logout', {
+		this.publish('_Logout', {
 			id: fmtservice.id, uuid: fmtservice.uuid, fnodeId: this.id,
 		});
 		if (utils.dev)
@@ -506,5 +511,6 @@ class FastMessageTransferCenter_IMPL {
 module.exports = {
 	FastMessageTransferCenter,
 	FastMessageTransferCenterDelegate,
-	fmtc: fmtc.get,
+	fmtc: fmtc.fmtc,
+	center: fmtc.fmtc,
 };

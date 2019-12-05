@@ -44,7 +44,7 @@ module.exports = {
 	_fmtc(server) {
 		return _centers.get(server);
 	},
-	get(server) {
+	fmtc(server) {
 		var c = _centers.get(server);
 		return c && c.host;
 	},
