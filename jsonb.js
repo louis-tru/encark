@@ -64,8 +64,8 @@ var // FLAGS
 	F_INFINITY_MAX = 26;
 
 if (buffer.isBigInt) {
-	const BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-	const BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
+	var BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+	var BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
 }
 
 function write_flag(flag, out) {
@@ -76,17 +76,17 @@ function write_flag(flag, out) {
 function write_buffer(data, out) {
 	/*
 		0   - 253   : 1,	len|data...
-		254 - 65536 : 3,	254|len|len|data...
-		65537 -     : 9,	255|len|len|len|len|len|len|len|len|data...
+		254 - 65535 : 3,	254|len|len|data...
+		65536 -     : 9,	255|len|len|len|len|len|len|len|len|data...
 	*/
 	var dataLength = data.length;
 	var secondByte = dataLength;
 	var headerLength = 1;
 
-	if (dataLength > 65536) {
+	if (dataLength > 65535) { // 65536 - *
 		headerLength += 8;
 		secondByte = 255;
-	} else if (dataLength > 253) {
+	} else if (dataLength > 253) { // 254 - 65535
 		headerLength += 2;
 		secondByte = 254;
 	}
@@ -327,16 +327,16 @@ function read_buffer(bin) {
 	var dataLen = bin.next(), end;
 	if (dataLen < 254) { // 0 - 253 byte length
 		end = bin.index + dataLen;
-	} else if (dataLen < 255) { // 254 - 65536 byte length
+	} else if (dataLen < 255) { // 254 - 65535 byte length
 		assert(bin.length > bin.index + 2);
 		dataLen = (bin.next() << 8) | bin.next();
 		end = bin.index + dataLen;
-	} else { // 65537 - byte length
+	} else { // 65536 - byte length
 		assert(bin.length > bin.index + 8);
 		dataLen = 0;
 		for (var i = 0; i < 8; i++) {
-			dataLen |= bin.next();
 			dataLen <<= 8;
+			dataLen |= bin.next();
 		}
 		end = bin.index + dataLen;
 	}

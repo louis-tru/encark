@@ -427,8 +427,8 @@ function sendDataPacket(socket, data, cb) {
 
 	/*
 		0   - 125   : 2,	opcode|len|data
-		126 - 65536 : 4,	opcode|126|len|len|data
-		65537 -     : 10,	opcode|127|len|len|len|len|len|len|len|len|data
+		126 - 65535 : 4,	opcode|126|len|len|data
+		65536 -     : 10,	opcode|127|len|len|len|len|len|len|len|len|data
 	*/
 	/*
 		opcode:
@@ -438,7 +438,7 @@ function sendDataPacket(socket, data, cb) {
 		0x89: ping
 	*/
 
-	if (dataLength > 65536) {
+	if (dataLength > 65535) {
 		headerLength = 10;
 		secondByte = 127;
 	}

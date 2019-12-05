@@ -197,21 +197,19 @@ var Conversation = utils.class('Conversation', {
 			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
 
-			var ser;
-			ser = new cls(self);
+			var ser = new cls(self);
 			ser.name = name;
 			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
+			self.isGzip = ser.headers['use-gzip'] == 'on';
 
 			await ser.load(); // load
 
-			ser.m_loaded = true; // TODO ptinate visit
+			if (!self.m_default_service)
+				self.m_default_service = name;
 			self.m_services[name] = ser;
 			self.m_services_count++;
+			ser.m_loaded = true; // TODO ptinate visit
 
-			if (!self.m_default_service) {
-				self.m_default_service = name;
-				self.isGzip = ser.headers['use-gzip'] == 'on';
-			}
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch(e=>console.error(e));
 			console.log('SER Load', this.request.url);

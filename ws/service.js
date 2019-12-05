@@ -187,8 +187,14 @@ class WSService extends Service {
 		});
 	}
 
-	_trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
+	async _trigger(event, data, sender = null) {
+		await this._send({
+			service: this.conv._service(this.name),
+			type: T_EVENT,
+			name: event,
+			data: data,
+			sender: sender,
+		});
 	}
 
 	/**
@@ -201,7 +207,6 @@ class WSService extends Service {
 			type: T_CALL,
 			name: method,
 			data: data,
-			cb: null,
 			sender: sender,
 		});
 	}
@@ -219,7 +224,7 @@ class WSService extends Service {
 	 * @async
 	 */
 	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._trigger(event, data, timeout, sender);
+		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
 	}
 
 	// @end

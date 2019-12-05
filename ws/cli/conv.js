@@ -152,13 +152,12 @@ class Conversation {
 	 */
 	bind(client) {
 		var name = client.name;
-		var clients = this.m_clients;
-		if (name in clients) {
+		if (name in this.m_clients) {
 			throw new Error('No need to repeat binding');
 		} else {
-			clients[name] = client;
 			if (!this.m_default_service)
 				this.m_default_service = name;
+			this.m_clients[name] = client;
 			this.m_clients_count++;
 			if (this.m_is_open) {
 				this.sendFormatData({ service: name, type: T_BIND });

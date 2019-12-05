@@ -38,6 +38,10 @@ const float64Array = new Float64Array(1);
 const uInt8Float64Array = new Uint8Array(float64Array.buffer);
 var _bigint = null;
 
+module.exports = exports = {
+	get isBigInt() { return !!_bigint }
+};
+
 if (global.BigInt) {
 	(function(complete) {
 		if (utils.haveWeb) {
@@ -50,6 +54,7 @@ if (global.BigInt) {
 		_bigint._set(checkInt);
 		exports.readBigIntBE = m._readBigIntBE;
 		exports.writeBigIntLE = m._writeBigIntLE;
+		// console.log('exports.writeBigIntLE', exports.writeBigIntLE)
 	});
 }
 
@@ -600,8 +605,7 @@ var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
-module.exports = exports = {
-	get isBigInt() { return !!_bigint },
+Object.assign(exports, {
 	// read
 	readInt8, readUInt8,
 	readInt16BE, readUInt16BE,
@@ -619,4 +623,4 @@ module.exports = exports = {
 	writeBigInt64BE, writeBigUInt64BE,
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
-};
+});
