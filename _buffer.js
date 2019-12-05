@@ -43,11 +43,11 @@ module.exports = exports = {
 };
 
 if (global.BigInt) {
-	(function(complete) {
+	(function(ok) {
 		if (utils.haveWeb) {
-			import('./_bigint').then(complete);
+			import('./_bigint').then(ok); // bigint syntax, webpack delay load
 		} else {
-			complete(eval('require("./_bigint")'));
+			ok(arguments[1]("./_bigint"));
 		}
 	})(function(m) {
 		_bigint = m;
@@ -55,7 +55,7 @@ if (global.BigInt) {
 		exports.readBigIntBE = m._readBigIntBE;
 		exports.writeBigIntLE = m._writeBigIntLE;
 		// console.log('exports.writeBigIntLE', exports.writeBigIntLE)
-	});
+	}, require);
 }
 
 // Check endianness.
