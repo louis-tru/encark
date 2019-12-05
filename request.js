@@ -286,7 +286,7 @@ function request(pathname, options) {
 	options = Object.assign({}, defaultOptions, options);
 	var { params, method, timeout, headers = {}, signer } = options;
 
-	if (util.dev) {
+	if (util.config.moreLog) {
 		var data = [];
 		if (params) {
 			if (method == 'GET') {

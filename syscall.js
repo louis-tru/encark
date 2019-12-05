@@ -31,7 +31,6 @@
 var util = require('./util');
 var child_process = require('child_process');
 var stream = require('stream');
-var { moreLog } = util.config;
 
 function syscall(cmd) {
 	var ch = child_process.spawnSync('sh', ['-c', cmd]);
@@ -76,7 +75,7 @@ function spawnSync(cmd, args = []) {
 }
 
 function on_data_default(data) {
-	if (moreLog) {
+	if (util.config.moreLog) {
 		process.stdout.write(data);
 		process.stdout.write('\n');
 	}
@@ -84,7 +83,7 @@ function on_data_default(data) {
 }
 
 function on_error_default(data) {
-	if (moreLog) {
+	if (util.config.moreLog) {
 		process.stderr.write(data);
 		process.stderr.write('\n');
 	}
