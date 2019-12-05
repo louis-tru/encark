@@ -322,7 +322,7 @@ module.exports = exports = extend(extend(utils, _util), {
 		if (self)
 			delete self[name];
 	},
-	
+
 	/**
 	 * @fun random # 创建随机数字
 	 * @arg [start] {Number} # 开始位置
@@ -330,12 +330,14 @@ module.exports = exports = extend(extend(utils, _util), {
 	 * @ret {Number}
 	 */
 	random: function(start, end) {
+		if (start == end)
+			return start;
 		var r = Math.random();
 		start = start || 0;
-		end = end || 1E8;
+		end = end || (end===0?0:1E8);
 		return Math.floor(start + r * (end - start + 1));
 	},
-	
+
 	/**
 	* @fun fixRandom # 固定随机值,指定几率返回常数
 	* @arg args.. {Number} # 输入百分比

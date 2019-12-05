@@ -99,8 +99,8 @@ class WSClient extends cli.WSClient {
 			this.trigger('Online');
 		});
 
-		this.addEventListener('RepeatLoginError', e=>{
-			console.error(`FMTService Repeat login, id=${host.id}`);
+		this.addEventListener('ForceLogout', e=>{
+			console.error(`FMTService Force Logout, id=${host.id}, token=${this.conv.token}`);
 		});
 	}
 

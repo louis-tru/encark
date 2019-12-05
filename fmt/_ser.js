@@ -90,9 +90,8 @@ class FMTService extends wss.WSService {
 		try {
 			await center.loginFrom(this);
 		} catch(err) {
-			if (err.code == errno.ERR_REPEAT_LOGIN_FMTC[0]) {
-				await this._repeatLoginError();
-			}
+			if (err.code == errno.ERR_REPEAT_LOGIN_FMTC[0])
+				await this._repeatForceLogout(err.id);
 			throw err;
 		}
 		this.m_center = center;
@@ -119,17 +118,17 @@ class FMTService extends wss.WSService {
 		this.trigger(`${event}-${id}`, data);
 	}
 
-	_repeatLoginError() {
-		return Promise.race([this._trigger('RepeatLoginError'), utils.sleep(200)]);
+	_repeatForceLogout() {
+		return Promise.race([this._trigger('ForceLogout'), utils.sleep(200)]);
 	}
 
 	/**
-	 * @func repeatLoginError() close conv
+	 * @func forceLogout() close conv
 	 */
-	repeatLoginError() {
-		this._repeatLoginError()
-			.then(e=>this.conv.close())
-			.catch(e=>this.conv.close());
+	forceLogout() {
+		this._repeatForceLogout()
+			.then(()=>this.conv.close())
+			.catch(()=>this.conv.close());
 	}
 
 	// ------------ api ------------

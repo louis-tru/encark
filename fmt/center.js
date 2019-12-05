@@ -102,6 +102,14 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_impl.publishURL;
 	}
 
+	get kickout() {
+		return this.m_impl.m_kickout;
+	}
+
+	set kickout(value) {
+		this.m_impl.m_kickout = !!value;
+	}
+
 	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
 		super();
 		this.m_impl = new FastMessageTransferCenter_IMPL(this, server, fnodes, publish);
@@ -136,6 +144,20 @@ class FastMessageTransferCenter extends event.Notification {
 }
 
 /**
+ * @class Route
+ */
+class Route {
+	constructor(host, id, uuid, time, fnodeId) {
+		this.id = id;
+		this.fnodeId = fnodeId;
+		this.time = time;
+		this.uuid = uuid;
+		host.m_routeTable.set(id, this);
+		host.m_markOffline.delete(id);
+	}
+}
+
+/**
  * @class FastMessageTransferCenter_IMPL
  * @private
  */
@@ -163,49 +185,59 @@ class FastMessageTransferCenter_IMPL {
 		this.m_fnode_id = uuid(); // center server global id
 		this.m_publish_url = publish ? new path.URL(publish): null;
 		this.m_fnodes = null;
-		this.m_fnodes_cfg = {}; // node server cfg
+		this.m_fnodesCfg = {}; // node server cfg
 		this.m_fmtservice = new Map(); // client service handle
-		this.m_route = new Map(); // { 0_a: 'fnodeId-abcdefg-1', 1_b: 'fnodeId-abcdefg-2' }
+		this.m_routeTable = new Map(); // { 0_a: {fnodeId:'fnodeId-abcdefg-1',uuid,time} }
 		this.m_connecting = new Set();
-		this.m_broadcast_mark = new Set();
+		this.m_broadcastMark = new Set();
+		this.m_markOffline = new Map(); // Date.now() + OFFLINE_CACHE_TIME;
 
 		this.m_host.addEventListener('AddNode', e=>{ // New Node connect
-			if (e.data.fnode)
-				this.addFnodeCfg(e.data.fnode);
+			if (e.data.publish)
+				this.addFnodeCfg(e.data.publish);
 			if (utils.dev)
-				console.log('FastMessageTransferCenter_IMPL.onAddNode', e.data.fnode);
+				console.log('FastMessageTransferCenter_IMPL.onAddNode', e.data.publish);
 		});
 
 		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
-			var {fnodeId} = e.data;
-			for (var [id,fid] of this.m_route) {
-				if (fnodeId == fid) {
-					this.m_route.delete(id);
-				}
-			}
+			if (utils.dev)
+				console.log('FastMessageTransferCenter_IMPL.DeleteNode', e.data.fnodeId);
 		});
 
 		this.m_host.addEventListener('Login', e=>{ // client connect
-			var { id, fnodeId, time, uuid} = e.data;
+			var { id, uuid, time, fnodeId } = e.data;
 			var fmt = this.m_fmtservice.get(id);
 			if (fmt) {
-				if (fmt.time < time || (fmt.time == time && uuid != fmt.uuid)) {
-					fmt.repeatLoginError(); // Duplicate logon, close conv
+				if (uuid != fmt.uuid) {
+					if (fmt.time <= time)
+						fmt.forceLogout(); // force logout, offline
+					if (time <= fmt.time)
+						return // Invalid login
+				}
+			} else {
+				var route = this.m_routeTable.get(id);
+				if (route) {
+					if (time <= route.time)
+						return // Invalid login
 				}
 			}
-			this.m_route.set(id, fnodeId);
+			new Route(this, id, uuid, time, fnodeId);
 
 			for (var [,fmt] of this.m_fmtservice) {
 				if (fmt.id != e.data.id)
-					fmt.reportState('Login', e.data.id);
+					fmt.reportState('Login', id);
 			}
 		});
 
 		this.m_host.addEventListener('Logout', e=>{ // client disconnect
-			this.m_route.delete(e.data.id);
-			for (var [,fmt] of this.m_fmtservice) {
-				if (fmt.id != e.data.id)
-					fmt.reportState('Logout', e.data.id);
+			var {id, uuid} = e.data;
+			var route = this.m_routeTable.get(id);
+			if (route && route.uuid == uuid) {
+				this.m_routeTable.delete(id);
+				for (var [,fmt] of this.m_fmtservice) {
+					if (fmt.id != id)
+						fmt.reportState('Logout', id);
+				}
 			}
 		});
 
@@ -217,9 +249,9 @@ class FastMessageTransferCenter_IMPL {
 	}
 
 	addFnodeCfg(url, init = false) {
-		if (url && !this.m_fnodes_cfg.hasOwnProperty(url)) {
+		if (url && !this.m_fnodesCfg.hasOwnProperty(url)) {
 			if (!this.m_publish_url || url != this.m_publish_url.href) {
-				this.m_fnodes_cfg[url] = { url, init, retry: 0 };
+				this.m_fnodesCfg[url] = { url, init, retry: 0 };
 			}
 		}
 	}
@@ -233,14 +265,14 @@ class FastMessageTransferCenter_IMPL {
 		// witch nodes
 		while ( fmtc._fmtc(this.m_server) === this ) {
 			await utils.sleep(utils.random(0, 4e3)); // 0-4s
-			for (var cfg of Object.values(this.m_fnodes_cfg)) {
+			for (var cfg of Object.values(this.m_fnodesCfg)) {
 				if ( !this.getFnodeFrom(cfg.url) ) {
 					cfg.retry++;
 					// console.log('FastMessageTransferCenter_IMPL.run(), connect', cfg.url);
 					this.connect(cfg.url).catch(err=>{
 						if (err.code != errno.ERR_REPEAT_FNODE_CONNECT[0]) {
 							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
-								delete this.m_fnodes_cfg[cfg.url];
+								delete this.m_fnodesCfg[cfg.url];
 							}
 							console.error(err);
 						} else {
@@ -250,7 +282,7 @@ class FastMessageTransferCenter_IMPL {
 				}
 			}
 			await utils.sleep(8e3); // 8s
-			this.m_broadcast_mark.clear(); // clear broadcast mark
+			this.m_broadcastMark.clear(); // clear broadcast mark
 		}
 
 		for (var node of Object.values(this.m_fnodes)) {
@@ -303,67 +335,61 @@ class FastMessageTransferCenter_IMPL {
 		return this.exec(id, [], 'user');
 	}
 
+	markOffline(id) {
+		this.m_markOffline.set(id, Date.now() + OFFLINE_CACHE_TIME);
+	}
+
 	async exec(id, args = [], method = null) {
 
-		var fnodeId = this.m_route.get(id);
-		while (fnodeId) {
-			var fnode = this.m_fnodes[fnodeId];
+		var route = this.m_routeTable.get(id);
+		if (route) {
+			var fnode = this.m_fnodes[route.fnodeId];
 			if (fnode) {
 				try {
-					if (method)
-						return await fnode[method](id, ...args);
-					else
-						return utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
+					return method ? await fnode[method](id, ...args):
+						utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
 				} catch(err) {
 					if (err.code != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
 						throw err;
 					}
 				}
-			} else if (typeof fnodeId == 'number') { // OFFLINE cache
-				if (fnodeId > Date.now()) {
-					throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
-				}
-				break; // skip Trigger again Logout event
 			}
 			// Trigger again:
-			this.m_route.delete(id);
-			this.m_host.getNoticer('Logout').trigger({ fnodeId, id });
-			break;
+			this.m_host.getNoticer('Logout').trigger({ id, uuid: route.uuid, fnodeId: route.fnodeId });
 		}
 
-		var {fnode,time,uuid} = await new Promise((resolve, _reject)=>{
-			var fnodes = Object.values(this.m_fnodes);
-			var l = fnodes.length, i = 0, complete = 0;
-			var reject = e=>{
-				this.m_route.set(id, Date.now() + OFFLINE_CACHE_TIME); // use OFFLINE cache
-				_reject(e);
-			};
-			fnodes.forEach(fnode=>{
-				fnode.query(id, true).then(e=>{
-					if (complete) return;
-					i++;
-					if (e) {
-						complete = 1;
-						resolve(Object.assign({fnode}, e));
-					} else if (l == i) {
-						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
-					}
-				}).catch(e=>{
-					if (complete) return;
-					i++;
-					if (l == i) {
-						reject(Error.new(errno.ERR_FMT_CLIENT_OFFLINE));
-					}
-				});
-			});
-		});
+		var mark = this.m_markOffline.get(id);
+		if (mark) { // OFFLINE mark
+			utils.assert(mark > Date.now(), errno.ERR_FMT_CLIENT_OFFLINE);
+		}
 
+		// random query status ..
+		var fnodes = Object.values(this.m_fnodes);
+		while (fnodes.length) {
+			var i = utils.random(0, fnodes.length - 1);
+			if (utils.dev)
+				console.log('FastMessageTransferCenter_IMPL.exec', i, fnodes.length - 1, id);
+			var _fnode = fnodes[i];
+			if (this.m_fnodes[_fnode.id]) {
+				try {
+					var {uuid,time} = await _fnode.query(id, true);
+					fnode = _fnode; // ok
+					break;
+				} catch(e) {}
+			}
+			fnodes.splice(i, 1);
+		}
+
+		if (!fnode) {
+			this.markOffline(id); // mark Offline
+			throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
+		}
 		// Trigger again
-		this.m_route.set(id, fnode.id);
-		this.m_host.getNoticer('Login').trigger({ fnodeId: fnode.id, id, time, uuid });
+		this.m_host.getNoticer('Login').trigger({ id, uuid, time, fnodeId: fnode.id });
 
-		if (method)
+		if (method) {
 			return await fnode[method](id, ...args);
+		}
 	}
 
 	publish(event, data) {
@@ -377,8 +403,8 @@ class FastMessageTransferCenter_IMPL {
 	}
 
 	_forwardBroadcast(event, data, id, source = null) {
-		if (!this.m_broadcast_mark.has(id)) {
-			this.m_broadcast_mark.add(id);
+		if (!this.m_broadcastMark.has(id)) {
+			this.m_broadcastMark.add(id);
 			for (let f of Object.values(this.m_fnodes)) {
 				if (!source || source !== f) {
 					f.broadcast(event, data, id)
@@ -396,14 +422,16 @@ class FastMessageTransferCenter_IMPL {
 	 */
 	async loginFrom(fmtservice) {
 		utils.assert(fmtservice.id);
-		utils.assert(!await this.hasOnline(fmtservice.id), errno.ERR_REPEAT_LOGIN_FMTC);
-		utils.assert(!this.m_fmtservice.has(fmtservice.id), errno.ERR_REPEAT_LOGIN_FMTC);
+		var fmt = this.m_fmtservice.has(fmtservice.id);
+		if (fmt) {
+			utils.assert(fmtservice.time <= fmt.time, errno.ERR_REPEAT_LOGIN_FMTC);
+			fmt.forceLogout(); // force offline
+			await this.logoutFrom(fmt);
+		}
 		this.m_fmtservice.set(fmtservice.id, fmtservice);
 		this.publish('Login', {
-			fnodeId: this.id, 
-			id: fmtservice.id, 
-			time: fmtservice.time,
-			uuid: fmtservice.uuid,
+			id: fmtservice.id, uuid: fmtservice.uuid,
+			time: fmtservice.time, fnodeId: this.id, 
 		});
 		if (utils.dev)
 			console.log('Login', fmtservice.id);
@@ -414,11 +442,11 @@ class FastMessageTransferCenter_IMPL {
 	*/
 	async logoutFrom(fmtservice) {
 		utils.assert(fmtservice.id);
-		utils.assert(this.m_fmtservice.has(fmtservice.id));
+		if (!this.m_fmtservice.has(fmtservice.id))
+			return;
 		this.m_fmtservice.delete(fmtservice.id);
 		this.publish('Logout', {
-			fnodeId: this.id, 
-			id: fmtservice.id,
+			id: fmtservice.id, uuid: fmtservice.uuid, fnodeId: this.id,
 		});
 		if (utils.dev)
 			console.log('Logout', fmtservice.id);
@@ -453,14 +481,14 @@ class FastMessageTransferCenter_IMPL {
 		if (publish) {
 			if (!this.publishURL || this.publishURL.href != publish.href) {
 				// this.addFnodeCfg(publish.href);
-				var cfg = this.m_fnodes_cfg[publish.href];
+				var cfg = this.m_fnodesCfg[publish.href];
 				if (cfg) {
 					cfg.retry = 0;
 				}
 			}
 		}
 		// this.m_host.getNoticer('AddNode').trigger({ fnodeId: fnode.id });
-		this.broadcast('AddNode', { fnodeId: fnode.id, fnode: this.publishURL ? this.publishURL.href: null });
+		this.broadcast('AddNode', { fnodeId: fnode.id, publish: this.publishURL ? this.publishURL.href: null });
 	}
 
 	/**
