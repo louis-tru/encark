@@ -30,7 +30,7 @@
 
 var utils = require('../../util');
 var event = require('../../event');
-var { userAgent } = require('../../request');
+var { userAgent, Signer } = require('../../request');
 var url = require('../../url');
 var errno = require('../../errno');
 var { DataFormater, T_BIND, T_PING, T_PONG, PING_BUFFER, PONG_BUFFER } = require('../data');
@@ -259,6 +259,7 @@ class Conversation {
 	}
 
 	set signer(value) {
+		utils.assert(value instanceof Signer, 'Type Error');
 		this.m_signer = value;
 	}
 

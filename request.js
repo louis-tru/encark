@@ -267,15 +267,12 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
  * @class Signer
  */
 class Signer {
-
-	constructor(host) {
-		this.m_host = host
+	get options() {
+		return this.m_options;
 	}
-
-	get host() {
-		return this.m_host;
+	constructor(options) {
+		this.m_options = options || {};
 	}
-
 	sign(path, data = null) { /* subclass rewrite */ }
 }
 
@@ -485,6 +482,7 @@ class Request {
 	}
 
 	set signer(value) {
+		utils.assert(value instanceof Signer, 'Type Error');
 		this.m_signer = value;
 	}
 
