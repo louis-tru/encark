@@ -335,7 +335,7 @@ function read_buffer(bin) {
 		assert(bin.length > bin.index + 8);
 		dataLen = 0;
 		for (var i = 0; i < 8; i++) {
-			dataLen <<= 8;
+			dataLen *= 256;
 			dataLen |= bin.next();
 		}
 		end = bin.index + dataLen;

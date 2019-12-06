@@ -239,11 +239,12 @@ class ThatClient {
 		return this.m_host.m_cli.call('hasOnline', [this.m_id]);
 	}
 	trigger(event, data) {
-		return this.m_host.m_cli.call('triggerTo', [this.m_id, event, data]);
+		return this.m_host.m_cli.send('triggerTo', [this.m_id, event, data]);
 	}
 	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
+		timeout = Number(timeout) || cli.METHOD_CALL_TIMEOUT;
 		var args = [this.m_id, method, data];
-		if (timeout && timeout != cli.METHOD_CALL_TIMEOUT)
+		if (timeout != cli.METHOD_CALL_TIMEOUT)
 			args.push(timeout);
 		return this.m_host.m_cli.call('callTo', args, timeout);
 	}

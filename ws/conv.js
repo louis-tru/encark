@@ -38,9 +38,11 @@ var crypto = require('crypto');
 var uuid = require('../hash/uuid');
 var errno = require('../errno');
 var { Conversation: _Conversation } = require('./cli/conv');
-var { PacketParser, sendDataPacket, sendPingPacket } = require('./parser');
-var {DataFormater, T_BIND, T_PING, T_PONG, PONG_BUFFER } = require('./data');
+var { PacketParser, sendDataPacket, sendPingPacket, sendPongPacket } = require('./parser');
+var {DataFormater, T_BIND, T_PING, T_PONG, PING_BUFFER, PONG_BUFFER } = require('./data');
+
 var KEEP_ALIVE_TIME = 5e4; // 50s
+var ZERO_BUFFER = new Uint8Array(0);
 
 /**
  * @class Conversation
@@ -75,6 +77,7 @@ var Conversation = utils.class('Conversation', {
 	token: '',
 
 	isGzip: false,
+	replyPong: true,
 
 	// @event:
 	onPing: null,
@@ -286,10 +289,10 @@ var Conversation = utils.class('Conversation', {
 				this._bind([data.service]).catch(console.warn);
 				break;
 			case T_PING: // ping Extension protocol 
-				this.handlePing();
+				this.handlePing(ZERO_BUFFER);
 				break;
 			case T_PONG: // pong Extension protocol 
-				this.onPong.trigger();
+				this.handlePong(ZERO_BUFFER);
 				break;
 			default:
 				var handle = this.m_services[data.service || this.m_default_service];
@@ -302,10 +305,16 @@ var Conversation = utils.class('Conversation', {
 		}
 	},
 
-	handlePing: function() {
+	handlePing: function(data) {
 		this.m_last_packet_time = Date.now();
-		this.send(PONG_BUFFER).catch(console.error);;
-		this.onPing.trigger();
+		if (this.replyPong)
+			this.pong().catch(console.error);
+		this.onPing.trigger(data);
+	},
+
+	handlePong: function(data) {
+		this.m_last_packet_time = Date.now();
+		this.onPong.trigger(data);
 	},
 
 	/**
@@ -332,6 +341,11 @@ var Conversation = utils.class('Conversation', {
 	 * @func ping()
 	 */
 	ping: function() {},
+
+	/**
+	 * @func pong()
+	 */
+	pong: function() {},
 
 	/**
 	 * close the connection
@@ -425,7 +439,8 @@ class Hybi extends Conversation {
 
 		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
 		parser.onData.on(e=>self.handlePacket(e.data, 0));
-		parser.onPing.on(e=>self.handlePing());
+		parser.onPing.on(e=>self.handlePing(e.data));
+		parser.onPong.on(e=>self.handlePong(e.data));
 		parser.onClose.on(e=>self.close());
 		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
 
@@ -445,7 +460,19 @@ class Hybi extends Conversation {
 	 */
 	ping() {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return _Conversation.write(this, sendPingPacket, [this.socket]);
+		// return _Conversation.write(this, sendPingPacket, [this.socket]);
+		// TODO Browser does not support standard Ping and Pong API, So the extension protocol is used here
+		return _Conversation.write(this, sendDataPacket, [this.socket, PING_BUFFER]);
+	}
+
+	/**
+	 * @overwrite
+	 */
+	pong() {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		// return _Conversation.write(this, sendPongPacket, [this.socket]);
+		// TODO Browser does not support standard Ping and Pong API, So the extension protocol is used here
+		return _Conversation.write(this, sendDataPacket, [this.socket, PONG_BUFFER]);
 	}
 
 	/**

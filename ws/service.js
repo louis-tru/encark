@@ -168,7 +168,7 @@ class WSService extends Service {
 		}
 	}
 
-	_call(type, name, data, timeout, sender, target = null) {
+	_call(type, name, data, timeout, sender) {
 		return util.promise(async (resolve, reject)=>{
 			var id = util.id;
 			var calls = this.m_calls;
@@ -182,31 +182,16 @@ class WSService extends Service {
 				data: data,
 				cb: id,
 				sender: sender,
-				target: target,
 			}));
 			// console.log('SER send', name);
 		});
 	}
 
-	async _trigger(event, data, sender = null) {
+	async _trigger(event, data, sender) {
 		await this._send({
 			service: this.conv._service(this.name),
 			type: T_EVENT,
 			name: event,
-			data: data,
-			sender: sender,
-		});
-	}
-
-	/**
-	 * @func send(method, data, sender) method call, No response
-	 * @async
-	 */
-	async send(method, data, sender = null) {
-		await this._send({
-			service: this.conv._service(this.name),
-			type: T_CALL,
-			name: method,
 			data: data,
 			sender: sender,
 		});
@@ -224,17 +209,23 @@ class WSService extends Service {
 	 * @func  trigger(event, data)
 	 * @async
 	 */
-	trigger(event, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
+	async trigger(event, data, sender = null) {
+		return this._trigger(event, data, sender);
 	}
 
-	// callTo(target, method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-	// 	return this._call(T_CALL, method, data, timeout, sender, target);
-	// }
-
-	// triggerTo(target, method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-	// 	return this._call(T_EVENT, event, data, timeout || exports.METHOD_CALL_TIMEOUT, sender);
-	// }
+	/**
+	 * @func send(method, data, sender) method call, No response
+	 * @async
+	 */
+	async send(method, data, sender = null) {
+		await this._send({
+			service: this.conv._service(this.name),
+			type: T_CALL,
+			name: method,
+			data: data,
+			sender: sender,
+		});
+	}
 
 	// @end
 }

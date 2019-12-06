@@ -46,12 +46,13 @@ if (haveWeb) {
 	var crypto = require('crypto');
 	var {
 		PacketParser, sendDataPacket,
-		sendPingPacket } = require('../parser');
+		sendPingPacket, sendPongPacket } = require('../parser');
 } else {
 	throw 'Unimplementation';
 }
 
 var KEEP_ALIVE_TIME = 5e4; // 50s
+var ZERO_BUFFER = new Uint8Array(0);
 
 /**
  * @class Conversation 
@@ -74,6 +75,7 @@ class Conversation {
 	// onError: null,
 	// onClose: null,
 	// m_KEEP_ALIVE_TIME: KEEP_ALIVE_TIME,
+	// replyPong: true,
 
 	/**
 	 * @get token
@@ -137,6 +139,7 @@ class Conversation {
 		this.m_isGzip = false;
 		this.m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
 		this.m_overflow = false;
+		this.replyPong = true;
 	}
 
 	/**
@@ -223,10 +226,10 @@ class Conversation {
 
 		switch (data.type) {
 			case T_PING: // ping Extension protocol 
-				this.handlePing();
+				this.handlePing(ZERO_BUFFER);
 				break;
 			case T_PONG: // pong Extension protocol 
-				this.onPong.trigger();
+				this.handlePong(ZERO_BUFFER);
 				break;
 			default:
 				var handle = this.m_clients[data.service || this.m_default_service];
@@ -239,10 +242,16 @@ class Conversation {
 		}
 	}
 
-	handlePing() {
+	handlePing(data) {
 		this.m_last_packet_time = Date.now();
-		this.send(PONG_BUFFER).catch(console.error);
-		this.onPing.trigger();
+		if (this.replyPong)
+			this.pong().catch(console.error);
+		this.onPing.trigger(data);
+	}
+
+	handlePong(data) {
+		this.m_last_packet_time = Date.now();
+		this.onPong.trigger(data);
 	}
 
 	get signer() {
@@ -317,9 +326,14 @@ class Conversation {
 	send(data) {}
 
 	/**
-	 * @func sendPing()
+	 * @func ping()
 	 */
 	ping() {}
+
+	/**
+	 * @func pong()
+	 */
+	pong() {}
 
 	// @end
 }
@@ -448,6 +462,14 @@ class WebConversation extends WSConversationBasic {
 		this.m_req.send(PING_BUFFER);
 	}
 
+	/**
+	 * @ovrewrite 
+	 */
+	async pong() {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		this.m_req.send(PONG_BUFFER);
+	}
+
 }
 
 // Node implementation
@@ -544,7 +566,8 @@ class NodeConversation extends WSConversationBasic {
 
 			parser.onText.on(e=>self.handlePacket(e.data, 1));
 			parser.onData.on(e=>self.handlePacket(e.data, 0));
-			parser.onPing.on(e=>self.handlePing());
+			parser.onPing.on(e=>self.handlePing(e.data));
+			parser.onPong.on(e=>self.handlePong(e.data));
 			parser.onClose.on(e=>self.close());
 			parser.onError.on(e=>(self._error(e.data),self.close()));
 
@@ -608,11 +631,19 @@ class NodeConversation extends WSConversationBasic {
 	}
 
 	/**
-	 * @ovrewrite 
+	 * @overwrite
 	 */
 	ping() {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		return Conversation.write(this, sendPingPacket, [this.m_socket]);
+	}
+
+	/**
+	 * @overwrite
+	 */
+	pong() {
+		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
+		return Conversation.write(this, sendPongPacket, [this.m_socket]);
 	}
 
 }

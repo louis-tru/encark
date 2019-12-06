@@ -154,7 +154,7 @@ class FMTService extends wss.WSService {
 	// /**
 	//  * @func publishTo() publish multicast,broadcast event message
 	//  */
-	// publishTo({ event, data, gid = '0' }){}
+	// publishTo({ event, data, gid = null }){}
 
 	/**
 	 * @func triggerTo() event message
@@ -167,7 +167,7 @@ class FMTService extends wss.WSService {
 	 * @func callTo()
 	 */
 	callTo([id, method, data, timeout]) {
-		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
+		timeout = Number(timeout) || wss.METHOD_CALL_TIMEOUT; // disable not timeout
 		return this.m_center.delegate.callTo(id, method, data, timeout, this.m_id);
 	}
 
@@ -203,7 +203,7 @@ class FMTServerClient {
 	}
 
 	call(method, data, timeout = wss.METHOD_CALL_TIMEOUT, sender = null) {
-		timeout = timeout || wss.METHOD_CALL_TIMEOUT; // disable not timeout
+		timeout = Number(timeout) || wss.METHOD_CALL_TIMEOUT; // disable not timeout
 		return this.m_center.delegate.callTo(this.m_id, method, data, timeout, sender);
 	}
 

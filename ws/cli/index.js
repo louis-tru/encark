@@ -210,6 +210,14 @@ class WSClient extends Notification {
 	}
 
 	/**
+	 * @func call(method, data, timeout)
+	 * @async
+	 */
+	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
+		return this._call(T_CALL, method, data, timeout, sender);
+	}
+
+	/**
 	 * @func send(method, data, sender) method call
 	 * @async
 	 */
@@ -219,17 +227,8 @@ class WSClient extends Notification {
 			type: T_CALL,
 			name: method,
 			data: data,
-			cb: null,
 			sender: sender,
 		});
-	}
-
-	/**
-	 * @func call(method, data, timeout)
-	 * @async
-	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._call(T_CALL, method, data, timeout, sender);
 	}
 
 }

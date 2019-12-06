@@ -39,10 +39,14 @@ var Buffer = require('buffer').Buffer;
 
 function _unpack(buffer) {
 	var n = 0;
-	for (var i = 0; i < buffer.length; ++i) {
-		n = (i == 0) ? buffer[i] : (n * 256) + buffer[i];
+	for (var i = 0; i < buffer.length; i++) {
+		n = i ? (n * 256) + buffer[i]: buffer[i];
 	}
 	return n;
+}
+
+function _concat(buffers) {
+	return buffers.length == 1 ? buffers[0]: Buffer.concat(buffers);
 }
 
 /**
@@ -56,7 +60,7 @@ class PacketParser {
 	 * @api public
 	 */
 	constructor() {
-		event.initEvents(this, 'Close', 'Text', 'Data', 'Error', 'Ping');
+		event.initEvents(this, 'Close', 'Text', 'Data', 'Error', 'Ping', 'Pong');
 		
 		this.state = {
 			activeFragmentedOperation: null,
@@ -69,110 +73,79 @@ class PacketParser {
 		this.expectBuffer = null;
 		this.expectHandler = null;
 		this.currentMessage = '';
-
 		var self = this;
+
+		function expectData(length, finish) {
+			if (self.state.masked) {
+				self.expect('Mask', 4, function(data) {
+					var mask = data;
+					self.expect('Data', length, function (data) {
+						finish(mask, data);
+					});
+				});
+			}
+			else {
+				self.expect('Data', length, function(data) {
+					finish(null, data);
+				});
+			}
+		}
+
+		function decode(data, finish) {
+			// decode length
+			var firstLength = data[1] & 0x7f;
+			if (firstLength < 126) {
+				expectData(firstLength, finish);
+			}
+			else if (firstLength == 126) {
+				self.expect('Length', 2, function (data) {
+					expectData(_unpack(data), finish);
+				});
+			}
+			else if (firstLength == 127) {
+				self.expect('Length', 8, function (data) {
+					if (_unpack(data.slice(0, 4)) != 0) {
+						self.error('packets with length spanning more than 32 bit is currently not supported');
+						return;
+					}
+					// var lengthBytes = data.slice(4); // note: cap to 32 bit length
+					expectData(_unpack(data.slice(4, 8)), finish);
+				});
+			}
+		}
 
 		this.opcodeHandlers = {
 			// text
 			'1': function(data) {
-				var finish = function (mask, data) {
-					self.currentMessage += self.unmask(mask, data);
+				decode(data, function(mask, data) {
+					if (self.currentMessage) {
+						self.currentMessage += self.unmask(mask, data).toString('utf8');
+					} else {
+						self.currentMessage = self.unmask(mask, data).toString('utf8');
+					}
 					if (self.state.lastFragment) {
-						var msg = self.currentMessage;
-						self.onText.trigger(msg);
-						self.currentMessage = '';
+						self.onData.trigger(self.currentMessage);
+						self.currentMessage = null;
 					}
 					self.endPacket();
-				};
-
-				var expectData = function (length) {
-					if (self.state.masked) {
-						self.expect('Mask', 4, function (data) {
-							var mask = data;
-							self.expect('Data', length, function (data) {
-								finish(mask, data);
-							});
-						});
-					}
-					else {
-						self.expect('Data', length, function (data) {
-							finish(null, data);
-						});
-					}
-				};
-
-				// decode length
-				var firstLength = data[1] & 0x7f;
-				if (firstLength < 126) {
-					expectData(firstLength);
-				}
-				else if (firstLength == 126) {
-					self.expect('Length', 2, function (data) {
-						expectData(_unpack(data));
-					});
-				}
-				else if (firstLength == 127) {
-					self.expect('Length', 8, function (data) {
-						if (_unpack(data.slice(0, 4)) != 0) {
-							self.error('packets with length spanning more than 32 bit is currently not supported');
-							return;
-						}
-						var lengthBytes = data.slice(4); // note: cap to 32 bit length
-						expectData(_unpack(data));
-					});
-				}
+				});
 			},
 			// binary
 			'2': function(data) {
-				var finish = function (mask, data) {
-					if (typeof self.currentMessage == 'string') {
-						self.currentMessage = []; // build a buffer list
+				decode(data, function(mask, data) {
+					if (self.currentMessage) {
+						self.currentMessage.push(self.unmask(mask, data));
+					} else {
+						self.currentMessage = [self.unmask(mask, data)];
 					}
-					self.currentMessage.push(self.unmask(mask, data, true));
 					if (self.state.lastFragment) {
-						self.onData.trigger(self.concatBuffers(self.currentMessage));
-						self.currentMessage = '';
+						self.onData.trigger(_concat(self.currentMessage));
+						self.currentMessage = null;
 					}
 					self.endPacket();
-				};
-				
-				var expectData = function (length) {
-					if (self.state.masked) {
-						self.expect('Mask', 4, function (data) {
-							var mask = data;
-							self.expect('Data', length, function (data) {
-								finish(mask, data);
-							});
-						});
-					}
-					else {
-						self.expect('Data', length, function (data) {
-							finish(null, data);
-						});
-					}
-				};
-
-				// decode length
-				var firstLength = data[1] & 0x7f;
-				if (firstLength < 126) {
-					expectData(firstLength);
-				}
-				else if (firstLength == 126) {
-					self.expect('Length', 2, function (data) {
-						expectData(_unpack(data));
-					});
-				}
-				else if (firstLength == 127) {
-					self.expect('Length', 8, function (data) {
-						if (_unpack(data.slice(0, 4)) != 0) {
-							self.error('packets with length spanning more than 32 bit is currently not supported');
-							return;
-						}
-						var lengthBytes = data.slice(4); // note: cap to 32 bit length
-						expectData(_unpack(data));
-					});
-				}
+				});
 			},
+			// 0x3 - 0x7: Retain, for non-control frame
 			// close
 			'8': function(data) {
 				self.onClose.trigger();
@@ -184,46 +157,21 @@ class PacketParser {
 					self.error('fragmented ping is not supported');
 					return;
 				}
-
-				var finish = function (mask, data) {
+				decode(data, function(mask, data) {
 					self.onPing.trigger(self.unmask(mask, data));
 					self.endPacket();
-				};
-
-				var expectData = function (length) {
-					if (self.state.masked) {
-						self.expect('Mask', 4, function (data) {
-							var mask = data;
-							self.expect('Data', length, function (data) {
-								finish(mask, data);
-							});
-						});
-					}
-					else {
-						self.expect('Data', length, function (data) {
-							finish(null, data);
-						});
-					}
-				};
-
-				// decode length
-				var firstLength = data[1] & 0x7f;
-				if (firstLength === 0) {
-					finish(null, null);
+				});
+			},
+			// pong
+			'10': function(data) {
+				if (self.state.lastFragment == false) {
+					self.error('fragmented pong is not supported');
+					return;
 				}
-				else if (firstLength < 126) {
-					expectData(firstLength);
-				}
-				else if (firstLength == 126) {
-					self.expect('Length', 2, function (data) {
-						expectData(_unpack(data));
-					});
-				}
-				else if (firstLength == 127) {
-					self.expect('Length', 8, function (data) {
-						expectData(_unpack(data));
-					});
-				}
+				decode(data, function(mask, data) {
+					self.onPong.trigger(self.unmask(mask, data));
+					self.endPacket();
+				});
 			},
 		};
 
@@ -357,7 +305,7 @@ class PacketParser {
 		this.expectBuffer = null;
 		this.expectHandler = null;
 		this.overflow = null;
-		this.currentMessage = '';
+		this.currentMessage = null;
 	}
 
 	/*
@@ -365,33 +313,13 @@ class PacketParser {
 	 *
 	 * @api private
 	 */
-	unmask(mask, buf, binary) {
+	unmask(mask, buf) {
 		if (mask != null) {
 			for (var i = 0, ll = buf.length; i < ll; i++) {
 				buf[i] ^= mask[i % 4];
 			}
 		}
-		if (binary) return buf;
-		return buf != null ? buf.toString('utf8') : '';
-	}
-
-	/**
-	 * Concatenates a list of buffers.
-	 *
-	 * @api private
-	 */
-	concatBuffers(buffers) {
-		var length = 0;
-		for (var i = 0, l = buffers.length; i < l; ++i) {
-			length += buffers[i].length;
-		}
-		var mergedBuffer = Buffer.alloc(length);
-		var offset = 0;
-		for (var i = 0, l = buffers.length; i < l; ++i) {
-			buffers[i].copy(mergedBuffer, offset);
-			offset += buffers[i].length;
-		}
-		return mergedBuffer;
+		return buf;
 	}
 
 	/**
@@ -436,6 +364,7 @@ function sendDataPacket(socket, data, cb) {
 		0x82: binary
 		0x88: close
 		0x89: ping
+		0x8a: pong
 	*/
 
 	if (dataLength > 65535) {
@@ -470,7 +399,6 @@ function sendDataPacket(socket, data, cb) {
 
 /**
  * @func sendPingPacket()
- * @static
  */
 function sendPingPacket(socket, cb) {
 	var header = Buffer.alloc(2);
@@ -479,8 +407,19 @@ function sendPingPacket(socket, cb) {
 	return socket.write(header, cb);
 }
 
+/**
+ * @func sendPongPacket()
+ */
+function sendPongPacket(socket, cb) {
+	var header = Buffer.alloc(2);
+	header[0] = 0x8a;
+	header[1] = 0;
+	return socket.write(header, cb);
+}
+
 module.exports = {
 	PacketParser,
 	sendDataPacket,
 	sendPingPacket,
+	sendPongPacket,
 };

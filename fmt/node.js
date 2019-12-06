@@ -73,7 +73,7 @@ class FNodeLocal extends FNode {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
 	triggerTo(id, event, data, sender) {
-		return this.m_center.getFMTService(id).trigger(event, data, 0, sender); // trigger event
+		return this.m_center.getFMTService(id).trigger(event, data, sender); // trigger event
 	}
 	callTo(id, method, data, timeout, sender) {
 		return this.m_center.getFMTService(id).call(method, data, timeout, sender); // call method
@@ -89,7 +89,7 @@ class FNodeLocal extends FNode {
 		if (more) {
 			return s ? {time:s.time,uuid:s.uuid}: null;
 		} else {
-			return s ? 1: 0;
+			return s ? true: false;
 		}
 	}
 }
@@ -98,18 +98,6 @@ class FNodeLocal extends FNode {
  * @class FNodeRemote
  */
 class FNodeRemote extends FNode {
-
-	get id() {
-		return this.m_node_id;
-	}
-
-	get publishURL() {
-		return this.m_impl.getThatFnode();
-	}
-
-	get initTime() {
-		return this.m_initTime;
-	}
 
 	constructor(center, impl, id) {
 		super(center);
@@ -152,30 +140,35 @@ class FNodeRemote extends FNode {
 		await this.m_center.deleteNode(this);
 	}
 
+	// ---------------- IMPL ----------------
+
+	get id() {
+		return this.m_node_id;
+	}
+	get publishURL() {
+		return this.m_impl.getThatFnode();
+	}
+	get initTime() {
+		return this.m_initTime;
+	}
 	publish(event, data) { // publish event to fnode
 		return this.m_impl.send('publish', [event,data]);
 	}
-
 	broadcast(event, data, id) { // broadcast event to fnode
 		return this.m_impl.send('broadcast', [event,data,id]);
 	}
-
 	triggerTo(id, event, data, sender) { // trigger event to client
 		return this.m_impl.call('triggerTo', [id, event, data, sender]); // trigger event
 	}
-
 	callTo(id, method, data, timeout, sender) { // call client
 		return this.m_impl.call('callTo', [id, method, data, timeout, sender], timeout); // call method
 	}
-
 	sendTo(id, method, data, sender) {
-		return this.m_impl.send('sendTo', [id, method, data, sender]); // call method
+		return this.m_impl.call('sendTo', [id, method, data, sender]); // call method
 	}
-
 	user(id) {
 		return this.m_impl.call('user', [id]); // call method
 	}
-
 	query(id, more = 0) { // query client
 		return this.m_impl.call('query', [id, more?true:false]);
 	}
@@ -185,35 +178,27 @@ class FNodeRemote extends FNode {
  * @class FNodeRemoteIMPL
  */
 class FNodeRemoteIMPL {
-
 	getThatFnode() {
 		return this.m_that_fnode;
 	}
-
 	publish([event, data]) { // publish event to fnode
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
-
 	broadcast([event, data, id]) { // broadcast event to fnode
 		this.m_center._forwardBroadcast(event, data, id, this.m_fnode);
 	}
-
 	triggerTo([id, event, data, sender]) { // trigger event to client
-		return this.m_center.getFMTService(id).trigger(event, data, 0, sender);
+		return this.m_center.getFMTService(id).trigger(event, data, sender);
 	}
-
 	callTo([id, method, data, timeout, sender]) { // call client
 		return this.m_center.getFMTService(id).call(method, data, timeout, sender);
 	}
-
 	sendTo([id, method, data, sender]) { // call client
 		return this.m_center.getFMTService(id).send(method, data, sender);
 	}
-
 	user([id]) {
 		return this.m_center.getFMTService(id).user;
 	}
-
 	query([id,more]) { // query client
 		var s = this.m_center.getFMTServiceNoError(id);
 		if (more) {
