@@ -42,6 +42,8 @@ function close(self) {
 	var connect = self._connect;
 	self._connect = null;
 	if (connect) {
+		connect.onPacket.off('using');
+		connect.onError.off('using');
 		connect.idle();
 	} else if (self._connecting) {
 		self._connecting = false;
@@ -108,8 +110,8 @@ function connect(self) {
 		if (err) {
 			handlError(self, err);
 		} else {
-			connect.onPacket.on2(handlePacket, self);
-			connect.onError.on(e=>handlError(self, e.data));
+			connect.onPacket.on2(handlePacket, self, 'using');
+			connect.onError.on(e=>handlError(self, e.data), 'using');
 			self._connect = connect;
 			self._connecting = false;
 			self._queue[0].exec();

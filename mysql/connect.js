@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
+var utils = require('../util');
 var event = require('../event');
 var parser = require('./parser');
 var constants = require('./constants');
@@ -89,23 +89,18 @@ function sendOldAuth(self, greeting) {
 }
 
 function destroyConnect(self) {
+	utils.assert(!self._isUse, 'useing');
+	clearTimeout(self._tomeout);
+	if (!self._socket) return;
 	self.onError.off();
 	self.onPacket.off();
 	self.onReady.off();
 	self._socket.destroy();
 	self._socket = null;
-
-	var key = self.opt.host + ':' + self.opt.port;
-	connect_pool[key].deleteValue(self);
-
-	var req = require_connect.shift();
-	if (req) {
-		clearTimeout(req.timeout);
-		resolve(...req.args);
-	}
+	connect_pool[self.opt.host + ':' + self.opt.port].deleteValue(self);
 }
 
-var Connect = util.class('Connect', {
+var Connect = utils.class('Connect', {
 	//private:
 	_greeting: null,
 	_socket: null,
@@ -139,8 +134,9 @@ var Connect = util.class('Connect', {
 		var socket = self._socket = new Socket();
 
 		function error(err) {
-			destroyConnect(self);
+			self._connectError = true;
 			self.onError.trigger(Error.new(err));
+			destroyConnect(self);
 		}
 		socket.setNoDelay(true);
 		socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
@@ -179,12 +175,14 @@ var Connect = util.class('Connect', {
 	 * return connection pool
 	 */
 	idle: function() {
-		if (!this._socket) return; // destroy
-
-		this.onError.off();
-		this.onPacket.off();
-		this.onReady.off();
+		utils.assert(this.onPacket.length === 0, 'Connect.idle(), this.onPacket.length');
+		utils.assert(this._isUse, 'Connect.idle(), _isUse');
 		this._isUse = false;
+		this.onPacket.off();
+		this.onError.off();
+		this.onReady.off();
+
+		if (self._connectError) return; // connect error
 
 		for (var i = 0, l = require_connect.length; i < l; i++) {
 			var req = require_connect[i];
@@ -246,14 +244,16 @@ function resolve(opt, cb) {
 
 	for (var c of pool) {
 		var options = c.opt;
-		if (!c._isUse && options.user == opt.user && options.password == opt.password) {
-			c._use();
-			if (options.database == opt.database) {
-				util.nextTick(cb, null, c);
-			} else {
-				c._changeDB(opt.database, cb);
+		if (!c._isUse && !c._connectError) {
+			if (options.user == opt.user && options.password == opt.password)
+				c._use();
+				if (options.database == opt.database) {
+					utils.nextTick(cb, null, c);
+				} else {
+					c._changeDB(opt.database, cb);
+				}
+				return;
 			}
-			return;
 		}
 	}
 	//is max connect
