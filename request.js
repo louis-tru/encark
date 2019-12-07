@@ -482,7 +482,7 @@ class Request {
 	}
 
 	set signer(value) {
-		utils.assert(value instanceof Signer, 'Type Error');
+		util.assert(value instanceof Signer, 'Type Error');
 		this.m_signer = value;
 	}
 
