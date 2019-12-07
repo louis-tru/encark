@@ -182,7 +182,7 @@ var Connect = utils.class('Connect', {
 		this.onError.off();
 		this.onReady.off();
 
-		if (self._connectError) return; // connect error
+		if (this._connectError) return; // connect error
 
 		for (var i = 0, l = require_connect.length; i < l; i++) {
 			var req = require_connect[i];
@@ -245,7 +245,7 @@ function resolve(opt, cb) {
 	for (var c of pool) {
 		var options = c.opt;
 		if (!c._isUse && !c._connectError) {
-			if (options.user == opt.user && options.password == opt.password)
+			if (options.user == opt.user && options.password == opt.password) {
 				c._use();
 				if (options.database == opt.database) {
 					utils.nextTick(cb, null, c);
@@ -256,6 +256,7 @@ function resolve(opt, cb) {
 			}
 		}
 	}
+
 	//is max connect
 	if (pool.length < exports.MAX_CONNECT_COUNT) {
 		var con = new Connect(opt);
