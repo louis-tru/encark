@@ -165,7 +165,7 @@ class FMTClient extends event.Notification {
 		return new ThatClient(this, id);
 	}
 
-	user(id) {
+	user(id = this.id) {
 		return this.m_cli.call('getUser', [id]);
 	}
 
