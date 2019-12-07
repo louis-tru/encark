@@ -102,6 +102,7 @@ class Console extends Notification {
 		console.dir = this.dir.bind(this);
 		console.warn = this.warn.bind(this);
 		console.dlog = this.dlog.bind(this);
+		console.print = this.print.bind(this);
 		console.time = this.time.bind(this);
 		console.timeline = this.timeline.bind(this);
 		console.timeEnd = this.timeEnd.bind(this);
@@ -131,8 +132,12 @@ class Console extends Notification {
 
 	dlog(...args) {
 		if (utils.dev || utils.config.moreLog) {
-			print(this, 'LOG', log, ...args);
+			print(this, 'DLOG', log, ...args);
 		}
+	}
+
+	print(tag, ...args) {
+		return print(this, tag, log, ...args);
 	}
 
 	time(tag = '') {
