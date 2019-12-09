@@ -261,7 +261,7 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 }
 
 // Web implementation
-: util.unrealized;
+: utils.unrealized;
 
 /**
  * @class Signer
@@ -283,7 +283,7 @@ function request(pathname, options) {
 	options = Object.assign({}, defaultOptions, options);
 	var { params, method, timeout, headers = {}, signer } = options;
 
-	if (util.config.moreLog) {
+	if (utils.config.moreLog) {
 		var data = [];
 		if (params) {
 			if (method == 'GET') {
@@ -418,7 +418,7 @@ class Cache {
 	}
 
 	static hash(object) {
-		return util.hash(JSON.stringify(object));
+		return utils.hash(JSON.stringify(object));
 	}
 
 }
@@ -442,7 +442,7 @@ class Request {
 
 	constructor(serverURL, mock, mockSwitch) {
 		this.m_user_agent = user_agent;
-		this.m_server_url = serverURL || util.config.web_service;
+		this.m_server_url = serverURL || utils.config.web_service;
 		this.m_mock = mock || {};
 		this.m_mock_switch = mockSwitch;
 		this.m_data_type = 'urlencoded';
@@ -482,8 +482,10 @@ class Request {
 	}
 
 	set signer(value) {
-		util.assert(value instanceof Signer, 'Type Error');
-		this.m_signer = value;
+		if (value) {
+			utils.assert(value instanceof Signer, 'Type Error');
+			this.m_signer = value;
+		}
 	}
 
 	/**

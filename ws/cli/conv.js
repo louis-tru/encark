@@ -259,8 +259,10 @@ class Conversation {
 	}
 
 	set signer(value) {
-		utils.assert(value instanceof Signer, 'Type Error');
-		this.m_signer = value;
+		if (value) {
+			utils.assert(value instanceof Signer, 'Type Error');
+			this.m_signer = value;
+		}
 	}
 
 	/**
