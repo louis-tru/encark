@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var utils = require('./util');
-var { haveNgui, haveNode, haveWeb } = util;
+var { haveNgui, haveNode, haveWeb } = utils;
 var url = require('./url');
 var errno = require('./errno');
 var default_user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
