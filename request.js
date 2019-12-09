@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
+var utils = require('./util');
 var { haveNgui, haveNode, haveWeb } = util;
 var url = require('./url');
 var errno = require('./errno');
