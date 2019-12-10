@@ -39,15 +39,18 @@ var Buffer = require('./buffer').Buffer;
 if (haveNgui) {
 	var user_agent = default_user_agent;
 	var http = requireNative('_http');
-} else if (haveWeb) {
+}
+else if (haveWeb) {
 	var user_agent = navigator.userAgent;
 	var XMLHttpRequest = global.XMLHttpRequest;
-} else if (haveNode) {
+}
+else if (haveNode) {
 	var user_agent = default_user_agent;
 	var http = require('http');
 	var https = require('https');
-} else {
-	throw 'Unimplementation';
+}
+if (!haveNgui && !haveNode && !haveWeb) {
+	throw Error.new('Unimplementation');
 }
 
 var shared = null;
@@ -229,6 +232,7 @@ function requestNode(options, soptions, resolve, reject, is_https, method, post_
 		});
 		res.on('end', ()=> {
 			// console.log('No more data in response.');
+			console.log('---requestNode', data + '');
 			resolve({
 				data: data,
 				headers: res.headers,
@@ -258,9 +262,10 @@ function requestNode(options, soptions, resolve, reject, is_https, method, post_
 
 // request implementation
 var _request_platform = 
-	haveNgui ? requestNgui: 
-	haveNode ? requestNode: 
-	haveWeb ? requestWeb: utils.unrealized;
+	haveNgui ? requestNgui:
+	haveWeb ? requestWeb:
+	haveNode ? requestNode:
+	utils.unrealized;
 
 /**
  * @class Signer
