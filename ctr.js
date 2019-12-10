@@ -116,18 +116,26 @@ function require_ejs(filename, options, __mainfilename) {
 class ViewController extends HttpService {
 
 	view(name, data) {
-		var self = this;
+		var dirname = util.config.viewDirname;
+		if (!dirname) {
+			var mainModule = process.mainModule;
+			if (mainModule) {
+				dirname = path.dirname(mainModule.filename);
+			} else {
+				dirname = '';
+			}
+		}
 		var ext = path.extname(name);
-		var filename = path.resolve(ext ? name: name + '.ejs');
+		var filename = path.resolve(dirname, ext ? name: name + '.ejs');
+
 		data = data || {};
-		
 		try {
 			var func = require_ejs(filename, data, filename);
 			// fs.writeFileSync(__dirname + '/test.js', func + '');
 			var str = func(data);
-			self.returnHtml(str);
+			this.returnHtml(str);
 		} catch(err) {
-			self.returnErrorStatus(500, '<pre>' + err.message + '\n' + err.stack + '</pre>');
+			this.returnErrorStatus(500, '<pre>' + err.message + '\n' + err.stack + '</pre>');
 		}
 	}
 }
