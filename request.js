@@ -127,10 +127,8 @@ function stringify_xml(obj) {
 	return result.join('');
 }
 
-var _request_platform = // request implementation
-
 // Ngui implementation
-haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestNgui(options, soptions, resolve, reject, is_https, method, post_data) {
 	var url = is_https ? 'https://': 'http://';
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
@@ -158,7 +156,7 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 	}));
 }
 
-: haveWeb ? function(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestWeb(options, soptions, resolve, reject, is_https, method, post_data) {
 	var url = is_https ? 'https://': 'http://';
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
@@ -204,7 +202,7 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 }
 
 // Node implementation
-: haveNode ? function(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestNode(options, soptions, resolve, reject, is_https, method, post_data) {
 
 	var lib = is_https ? https: http;
 
@@ -258,8 +256,11 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 	req.end();
 }
 
-// Web implementation
-: utils.unrealized;
+// request implementation
+var _request_platform = 
+	haveNgui ? requestNgui: 
+	haveNode ? requestNode: 
+	haveWeb ? requestWeb: utils.unrealized;
 
 /**
  * @class Signer
