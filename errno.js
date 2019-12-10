@@ -50,4 +50,5 @@ module.exports = {
 	ERR_REPEAT_LOGIN_FMTC: [-10053, 'REPEAT LOGIN FMTC'],
 	ERR_PREV_PING_NOT_RESOLVE: [-10054, 'Previous Ping not resolved'],
 	ERR_PING_TIMEOUT: [-10055, 'Ping timeout'],
+	ERR_BAD_ARGUMENT: [-10056, 'bad argument.'],
 };

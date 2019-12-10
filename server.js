@@ -97,17 +97,14 @@ function initializ(self, server) {
 
 		try {
 			var ser = new cls(req, res, info);
-
-			if (util.isAsync(ser.requestAuth)) {
+			var ok = ser.requestAuth(info); // 认证请求的合法性
+			if (ok instanceof Promise) {
 				req.pause();
-				if (!await ser.requestAuth(info)) { // 认证请求的合法性
+				if (! await ok)
 					return req.socket.destroy(); // 立即断开连接
-				}
 				req.resume();
-			} else {
-				if (!ser.requestAuth(info)) {
-					return req.socket.destroy();
-				}
+			} else if (!ok) {
+				return req.socket.destroy();
 			}
 		} catch(err) {
 			console.error(err);

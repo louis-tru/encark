@@ -34,6 +34,7 @@ var url = require('./url');
 var errno = require('./errno');
 var default_user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
+var Buffer = require('./buffer').Buffer;
 
 if (haveNgui) {
 	var user_agent = default_user_agent;
@@ -41,20 +42,10 @@ if (haveNgui) {
 } else if (haveWeb) {
 	var user_agent = navigator.userAgent;
 	var XMLHttpRequest = global.XMLHttpRequest;
-	var Buffer = class Buffer {
-		constructor(arraybuffer, text = '') {
-			this.buffer = arraybuffer;
-			this.text = text;
-		}
-		toString(type) {
-			return this.text;
-		}
-	};
 } else if (haveNode) {
 	var user_agent = default_user_agent;
 	var http = require('http');
 	var https = require('https');
-	var Buffer = require('buffer').Buffer;
 } else {
 	throw 'Unimplementation';
 }
@@ -176,8 +167,8 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 
 	var xhr = new XMLHttpRequest();
 	xhr.open(method, url, true);
-	//xhr.responseType = 'arraybuffer';
-	xhr.responseType = 'text';
+	xhr.responseType = 'arraybuffer';
+	// xhr.responseType = 'text';
 	xhr.timeout = soptions.timeout;
 
 	delete soptions.headers['User-Agent'];
@@ -185,15 +176,22 @@ haveNgui ? function(options, soptions, resolve, reject, is_https, method, post_d
 	for (var key in soptions.headers) {
 		xhr.setRequestHeader(key, soptions.headers[key]);
 	}
-	xhr.onload = ()=>{
-		resolve({
-			data: new Buffer(/*xhr.response*/null, xhr.responseText),
+	xhr.onload = async ()=>{
+		var data = xhr.response;
+		var r = {
 			headers: xhr.getAllResponseHeaders(),
 			statusCode: xhr.status,
 			httpVersion: '1.1',
 			requestHeaders: soptions.headers,
 			requestData: options.params,
-		});
+		};
+		if (data instanceof ArrayBuffer) {
+			resolve(Object.assign(r, { data: Buffer.from(data) }));
+		} else if (data instanceof Blob && data.arrayBuffer) {
+			data.arrayBuffer().then(e=>resolve(Object.assign(r, { data: Buffer.from(e) })));
+		} else {
+			resolve(Object.assign(r, { data }))
+		}
 	};
 	xhr.onerror = (e)=>{
 		var err = Error.new(e.message);

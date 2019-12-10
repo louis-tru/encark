@@ -378,7 +378,7 @@ function template(string, options, guard) {
 	try {
 		result = Function(importsKeys, sourceURL + 'return ' + source).apply(undefined, importsValues)
 	} catch (e) {
-		result = err = util.err(e);
+		result = err = Error.new(e);
 	}
 
 	// Provide the compiled function's source by its `toString` method or

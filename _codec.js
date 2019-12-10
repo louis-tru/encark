@@ -28,10 +28,19 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+var utils = require('./util');
+var errno = require('./errno');
 var b64pad = '=';
 var hex_tab = '0123456789abcdef';
 var base64_tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+var hex_keys = {}, base64_keys = { '=': 65 };
 
+hex_tab.split('').forEach((e,i)=>(hex_keys[e]=i, hex_keys[e.toUpperCase()]=i));
+base64_tab.split('').forEach((e,i)=>base64_keys[e]=i);
+
+// encode
+
+// string => bytes
 // convert unicode to utf-8 codeing
 function encodeUTF8Word(unicode) {
 	var bytes = [];
@@ -66,6 +75,68 @@ function encodeUTF8Word(unicode) {
 		bytes[0] |= unicode;
 	}
 	return bytes;
+}
+
+// string => bytes
+// Convert str to utf8 to a bytes
+function encodeUTF8(str) {
+	var bytes = [];
+	for (var i = 0, l = str.length; i < l; i++) {
+		bytes.push( ...encodeUTF8Word(str.charCodeAt(i)) );
+	}
+	return bytes;
+}
+
+// string => bytes
+function encodeLatin1From(str) {
+	var bytes = [];
+	for (var i = 0, l = str.length; i < l; i++)
+		bytes.push(str.charCodeAt(i) % 256 );
+	return bytes;
+}
+
+// string => bytes
+function encodeAsciiFrom(str) {
+	var bytes = [];
+	for (var i = 0, l = str.length; i < l; i++)
+		bytes.push(str.charCodeAt(i) % 128 );
+	return bytes;
+}
+
+// bytes => string
+function encodeHexFrom(bytes, start, end) {
+	checkOffset(bytes, start, end);
+	var str = '';
+	for(var i = start; i < end; i++) {
+		str += hex_tab.charAt(bytes[i] >> 4) + hex_tab.charAt(bytes[i] & 0xF);
+	}
+	return str;
+}
+
+// bytes => string
+function encodeBase64From(bytes, start, end) {
+	checkOffset(bytes, start, end);
+	var size = end - start;
+	var str = '';
+	for (var i = start; i < end; i += 3) {
+		var triplet = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
+		for (var j = 0; j < 4; j++) {
+			if (i * 8 + j * 6 > size * 8)
+				str += b64pad;
+			else 
+				str += base64_tab.charAt((triplet >> 6*(3-j)) & 0x3F);
+		}
+	}
+	return str;
+}
+
+// decode
+
+function checkOffset(bytes, start, end) {
+	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
+	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
+	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
+	utils.assert(start <= end, errno.ERR_BAD_ARGUMENT);
 }
 
 // convert utf8 bytes to unicode
@@ -139,17 +210,9 @@ function decodeUTF8Word(bytes, offset) {
 	return [1,0]; // skip char
 }
 
-// Convert str to utf8 to a bytes
-function encodeUTF8(str) {
-	var bytes = [];
-	for (var i = 0, l = str.length; i < l; i++) {
-		bytes.push( ...encodeUTF8Word(str.charCodeAt(i)) );
-	}
-	return bytes;
-}
-
 // convert utf8 bytes to a str
 function decodeUTF8From(bytes, start, end) {
+	checkOffset(bytes, start, end);
 	var str = [];
 	for(var i = start; i < end;) {
 		var [len,unicode] = decodeUTF8Word(bytes, i);
@@ -159,45 +222,108 @@ function decodeUTF8From(bytes, start, end) {
 	return str.join('');
 }
 
-// convert utf8 bytes to a str
+// bytes => string
 function decodeUTF8(bytes) {
 	return decodeUTF8From(bytes, 0, bytes.length);
 }
+
+// bytes => string
+function decodeLatin1From(bytes, start, end) {
+	checkOffset(bytes, start, end);
+	var str = '';
+	for(var i = start; i < end; i++)
+		str += String.fromCharCode(bytes[i]);
+	return str;
+}
+
+// bytes => string
+function decodeAsciiFrom(bytes, start, end) {
+	checkOffset(bytes, start, end);
+	var str = '';
+	for(var i = start; i < end; i++)
+		str += String.fromCharCode(bytes[i] % 128);
+	return str;
+}
+
+// hex string => bytes
+function decodeHex(str) {
+	var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
+	utils.assert(str.length % 2 === 0, ERR_BAD_ARGUMENT);
+	var bytes = [];
+	for (var i = 0, l = str.length; i < l; i+=2) {
+		var a = hex_keys[str[i]];
+		var b = hex_keys[str[i+1]];
+		// utils.assert(a !== undefined, ERR_BAD_ARGUMENT);
+		// utils.assert(b !== undefined, ERR_BAD_ARGUMENT);
+		bytes.push( a << 4 | b );
+	}
+	return bytes;
+}
+
+// base64 string => bytes
+function decodeBase64(str) {
+	var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
+	utils.assert(str.length % 4 === 0, ERR_BAD_ARGUMENT);
+	var bytes = [];
+	for (var i = 0, l = str.length; i < l; i+=4) {
+		var a = base64_keys[str[i]];
+		var b = base64_keys[str[i+1]];
+		var c = base64_keys[str[i+2]];
+		var d = base64_keys[str[i+3]];
+		// utils.assert(a !== undefined, ERR_BAD_ARGUMENT);
+		// utils.assert(b !== undefined, ERR_BAD_ARGUMENT);
+		// utils.assert(c !== undefined, ERR_BAD_ARGUMENT);
+		// utils.assert(d !== undefined, ERR_BAD_ARGUMENT);
+		// console.log(str[i],str[i+1],str[i+2],str[i+3])
+		// console.log(a,b,c,d)
+		var triplet;
+		triplet = (a << 18) | (b << 12);
+		bytes.push((triplet >> 16) & 0xff); // 1 bytes
+		if (c == 65)
+			continue; 
+		triplet |= (c << 6); 
+		bytes.push((triplet >> 8) & 0xff); // 2 bytes
+		if (d == 65)
+			continue;
+		triplet |= d;
+		bytes.push(triplet & 0xff); // 3 bytes
+	}
+	return bytes;
+}
+
+// ext
 
 /*
  * Convert an array of bytes to a hex string.
  */
 function convertHexString(bytes) {
-	var str = '';
-	for(var i = 0; i < bin.length; i++) {
-		str += hex_tab.charAt(bytes[i] >> 4) + hex_tab.charAt(bytes[i] & 0xF);
-	}
-	return str;
+	return encodeHexFrom(bytes, 0, bytes.length);
 }
 
 /*
  * Convert an array of bytes to a base64 string.
  */
 function convertBase64String(bytes) {
-	var str = '';
-	for (var i = 0; i < bytes.length; i += 3) {
-		var triplet = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
-		for (var j = 0; j < 4; j++) {
-			if (i * 8 + j * 6 > bytes.length * 8)
-				str += b64pad;
-			else 
-				str += base64_tab.charAt((triplet >> 6*(3-j)) & 0x3F);
-		}
-	}
-	return str;
+	return encodeBase64From(bytes, 0, bytes.length);
 }
 
 module.exports = {
+	// encode
 	encodeUTF8Word,
-	decodeUTF8Word,
 	encodeUTF8,
+	encodeLatin1From,
+	encodeAsciiFrom,
+	encodeHexFrom,
+	encodeBase64From,
+	// decode
+	decodeUTF8Word,
 	decodeUTF8From,
 	decodeUTF8,
+	decodeLatin1From,
+	decodeAsciiFrom,
+	decodeHex,
+	decodeBase64,
+	// ext
 	convertHexString,
 	convertBase64String,
 };

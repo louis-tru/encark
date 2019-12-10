@@ -93,7 +93,7 @@ function require_ejs(filename, options, __mainfilename) {
 		filename: filename,
 	};
 	
-	var result = `const __mainfilename = '${__mainfilename}';
+	var result = `const __mainFilename = '${__mainfilename}';
 								module.exports = ${template(ejs.source, options)}`;
 	var wrapper = Module.wrap(result);
 
