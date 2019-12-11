@@ -232,7 +232,7 @@ function requestNode(options, soptions, resolve, reject, is_https, method, post_
 		});
 		res.on('end', ()=> {
 			// console.log('No more data in response.');
-			console.log('---requestNode', data + '');
+			// console.log('---requestNode', data + '');
 			resolve({
 				data: data,
 				headers: res.headers,
