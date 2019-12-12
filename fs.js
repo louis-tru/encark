@@ -560,7 +560,7 @@ exports.cp_sync = function (path, target, options) {
 	*/
 exports.mkdir_p = function (path, mode, cb) {
 
-	if(typeof mode == 'function'){
+	if (typeof mode == 'function') {
 		cb = mode;
 		mode = null;
 	}

@@ -48,7 +48,26 @@ function wget(www, save, options) { // 206
 	renewal = renewal || options.broken_point || false;
 	onProgress = onProgress || options.progress || util.noop;
 
+	var _reject, _req;
+	var ok = false;
+
+	function abort() {
+		if (!ok) { // abrot
+			ok = true;
+			if (_reject) {
+				_reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
+			}
+			if (_req) {
+				_req.abort();
+			}
+		}
+	}
+
 	var promise = new Promise((resolve, reject)=> {
+		_reject = reject;
+		if (ok) // abort
+			return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
+
 		var uri = url.parse(String(www));
 		var isSSL = uri.protocol == 'https:';
 		var lib =	isSSL ? https: http;
@@ -80,6 +99,7 @@ function wget(www, save, options) { // 206
 						start_range = stat.size;
 						download_size = start_range;
 					} else {
+						ok = true; // abort
 						return reject(Error.new(errno.ERR_DOWNLOAD_FAIL));
 					}
 				}
@@ -88,7 +108,6 @@ function wget(www, save, options) { // 206
 				}
 			}
 
-			var ok = false;
 			var fd = 0;
 			var res_end = false;
 			var buffers = new List();
@@ -127,7 +146,9 @@ function wget(www, save, options) { // 206
 
 			// new request 
 			var req = lib.request(options, (res)=> {
-				promise.request = req;
+				if (ok) // abort
+					return;
+				_req = req;
 
 				if (res.statusCode == 200 || res.statusCode == 206) {
 					res.pause();
@@ -239,7 +260,7 @@ function wget(www, save, options) { // 206
 		// 
 	});
 
-	promise.request = null;
+	promise.abort = abort;
 
 	return promise;
 }
