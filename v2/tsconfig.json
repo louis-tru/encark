@@ -1,0 +1,37 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "ESNext",
+		"noImplicitAny": true,
+		"moduleResolution": "node",
+		"sourceMap": false,
+		"outDir": "out",
+		"baseUrl": ".",
+		// "outFile": "out/out.js",
+		"declaration": true,
+		"declarationDir": "out/@types",
+		"alwaysStrict": true,
+		"allowJs": true,
+		"strict": true,
+		"strictNullChecks": true,
+		// "checkJs": true,
+		// "build": false,
+		// "allowUnreachableCode": true,
+		// "esModuleInterop": true,
+		// "allowSyntheticDefaultImports": true,
+		// "types": ["node"],
+		// "paths": {
+		// 	"*": ["../node_modules/*"],
+		// },
+	},
+	"include": [
+		"**/*",
+	],
+	"exclude": [
+		"out",
+		"node_modules",
+		"var",
+		".git",
+		".svn",
+	]
+}

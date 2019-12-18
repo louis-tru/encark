@@ -1,0 +1,41 @@
+{
+	"name": "nxkit",
+	"version": "0.9.50",
+	"description": "This is a collection of tools, independent of any other libraries",
+	"main": "util.js",
+	"author": {
+		"name": "xuewen.chu",
+		"email": "louistru@hotmail.com",
+		"url": "https://github.com/louis-tru/nxkit/"
+	},
+	"keywords": [
+		"mysql",
+		"mqtt",
+		"mbus",
+		"fmt",
+		"websocket",
+		"web",
+		"server",
+		"ejs",
+		"express",
+		"md5",
+		"sha1",
+		"uuid",
+		"hash",
+		"memcached",
+		"xml",
+		"request",
+		"wget",
+		"shell",
+		"storage"
+	],
+	"devDependencies": {
+		"@types/node": "~12.12.20"
+	},
+	"license": "BSD-2-Clause",
+	"bugs": {
+		"url": "https://github.com/louis-tru/nxkit/issues",
+		"email": "louistru@hotmail.com"
+	},
+	"homepage": "https://github.com/louis-tru/nxkit/"
+}
