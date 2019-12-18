@@ -69,6 +69,14 @@ interface CallableFunction extends Function {
 	setTimeout<A extends any[], R>(this: (...args: A) => R, time: number, ...args: A): TimeoutResult;
 }
 
+interface Array<T> {
+	last(idx: number): T;
+}
+
+interface Number {
+	toFixedBefore(before: number, after?: number): string;
+}
+
 (function() {
 
 if (Date.prototype.toStringRaw !== undefined)
@@ -116,7 +124,7 @@ definePropertys(Object.prototype, {
 	/**
 	 * @func hashCode()
 	 */
-	hashCode: function() {
+	hashCode: function(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
 		G_hash_code_set.add(this);
@@ -149,7 +157,7 @@ definePropertys(Function.prototype, {
 		* @arg time {Number}  要延迟时间长度单位(毫秒)
 		* @arg ...args        提前传入的参数1
 		*/
-	setTimeout: function(time: number, ...args: any[]): NodeJS.Timeout | number {
+	setTimeout: function(time: number, ...args: any[]): TimeoutResult {
 		var fn = this;
 		return setTimeout(function() {
 			fn(...args);
@@ -159,7 +167,7 @@ definePropertys(Function.prototype, {
 });
 
 definePropertys(Array, {
-	toArray: function (obj: any, index: number, end: number) {
+	toArray: function (obj: any, index: number, end: number): any[] {
 		return G_slice.call(obj, index, end);
 	},
 });
@@ -169,7 +177,7 @@ definePropertys(Array.prototype, {
 	/**
 	 * @func hashCode()
 	 */
-	hashCode: function() {
+	hashCode: function(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
 		G_hash_code_set.add(this);
@@ -187,7 +195,7 @@ definePropertys(Array.prototype, {
 	 * @func deleteValue(val) 移除指定值元素
 	 * @arg value {Object}
 	 */
-	deleteValue: function(value: any) {
+	deleteValue: function(value: any): any[] {
 		var i = this.indexOf(value);
 		if (i != -1) {
 			this.splice(i, 1);
@@ -198,21 +206,22 @@ definePropertys(Array.prototype, {
 	/**
 	 * 倒叙索引数组元素
 	 */
-	last: function (index: number) {
+	last: function (index: number): any {
 		return this[this.length - 1 - index];
 	},
 
 });
 
 definePropertys(String, {
-	format: function(str: string): string {
-		// return String.prototype.format.apply(str, G_slice.call(arguments, 1));
-		return '';
+	format: function(str: string, ...args: any[]): string {
+		var val = String(str);
+		for (var i = 0, len = args.length; i < len; i++)
+			val = val.replace(new RegExp('\\{' + i + '\\}', 'g'), args[i]);
+		return val;
 	}
 });
 
 definePropertys(String.prototype, {
-
 	hashCode: function(): number {
 		var _hash = 5381;
 		var len = this.length;
@@ -220,18 +229,6 @@ definePropertys(String.prototype, {
 			_hash += (_hash << 5) + this.charCodeAt(len);
 		return _hash;
 	},
-
-	/**
-	 * var str = 'xxxxxx{0}xxxxx{1}xxxx{2},xxx{0}xxxxx{2}';
-	 * var newStr = str.format('A', 'B', 'C');
-	 * @ret : xxxxxxAxxxxxBxxxxC,xxxAxxxxxB
-	 */
-	format: function(): string {
-		var val = String(this);
-		for (var i = 0, len = arguments.length; i < len; i++)
-			val = val.replace(new RegExp('\\{' + i + '\\}', 'g'), arguments[i]);
-		return val;
-	}
 });
 
 definePropertys(Number.prototype, {
@@ -290,13 +287,19 @@ definePropertys(Date, {
 	 * @arg [timezone] {Number} 要解析的时间所在时区,默认为当前时区
 	 * @ret {Date}              返回新时间
 	 */
-	parseDate: function(date_str, format, timezone) {
+	parseDate: function(
+		date_str: string, 
+		format: string = 'yyyyMMddhhmmssfff', 
+		timezone: number = currentTimezone
+	): Date 
+	{
 		var s = String(date_str).replace(/[^0-9]/gm, '');
 		var f = '';
 
 		format = format || 'yyyyMMddhhmmssfff';
 		format.replace(/(yyyy|MM|dd|hh|mm|ss|fff)/gm, e=>{
 			f += e;
+			return '';
 		});
 		
 		if (timezone === undefined)
@@ -334,10 +337,8 @@ definePropertys(Date, {
 		* @arg [format]  {String} 要格式化的时间戳格式
 		* @ret {String} 返回的格式化后的时间戳
 		*/
-	formatTimeSpan: function(time_span, format) {
+	formatTimeSpan: function(time_span: number, format: string = 'dd hh:mm:ss') {
 		
-		format = format || 'dd hh:mm:ss';
-
 		var data = [];
 		var items = [
 			[1, 1000, /fff/g],
@@ -351,7 +352,7 @@ definePropertys(Date, {
 
 		for (var i = 0; i < 5; i++) {
 			var item = items[i];
-			var reg = item[2];
+			var reg = <RegExp>item[2];
 
 			if (format.match(reg)) {
 				start = true;
@@ -359,8 +360,8 @@ definePropertys(Date, {
 			else if (start) {
 				break;
 			}
-			time_span = time_span / item[0];
-			data.push([time_span % item[1], time_span]);
+			time_span = time_span / <number>item[0];
+			data.push([time_span % <number>item[1], time_span]);
 		}
 
 		if (!start) {
@@ -370,7 +371,7 @@ definePropertys(Date, {
 		data.last(0).reverse();
 		data.forEach(function (item, index) {
 			format =
-				format.replace(items[index][2], Math.floor(item[0]).toFixedBefore(2));
+				format.replace(<RegExp>items[index][2], Math.floor(<number>item[0]).toFixedBefore(2));
 		});
 		return format;
 	},
@@ -382,7 +383,7 @@ definePropertys(Date.prototype, {
 	/**
 	 * @func hashCode()
 	 */
-	hashCode: function() {
+	hashCode: function(): number {
 		return this.valueOf();
 	},
 
@@ -391,7 +392,7 @@ definePropertys(Date.prototype, {
 	 * @arg ms {Number}  要添追加的毫秒值
 	 * @ret {Date}
 	 */
-	addMs: function(ms) {
+	addMs: function(ms: number) {
 		this.setMilliseconds(this.getMilliseconds() + ms);
 		return this;
 	},
@@ -414,8 +415,8 @@ definePropertys(Date.prototype, {
 	* @arg [format] {String} 要转换的字符串格式
 	* @ret {String} 返回格式化后的时间字符串
 	*/
-	toString: function(format, timezone) {
-		if (typeof format == 'string') {
+	toString: function(format?: string, timezone?: number) {
+		if (format/*typeof format == 'string'*/) {
 			var d = new Date(this.valueOf());
 			
 			if (typeof timezone == 'number') {
@@ -423,7 +424,7 @@ definePropertys(Date.prototype, {
 				var offset = timezone - cur_time_zone;
 				d.setHours(d.getHours() + offset);
 			}
-			return format.replace('yyyy', d.getFullYear())
+			return format.replace('yyyy', String(d.getFullYear()))
 				.replace('MM', (d.getMonth() + 1).toFixedBefore(2))
 				.replace('dd', d.getDate().toFixedBefore(2))
 				.replace('hh', d.getHours().toFixedBefore(2))
@@ -464,17 +465,17 @@ definePropertys(Error, {
 		}
 		return err;
 	},
-	
-	new: function(e, code) {
+
+	new: function(e: ErrorDetails, code?: number): Error {
 		if (! (e instanceof Error)) {
 			if (typeof e == 'object') {
 				if (Array.isArray(e)) {
 					code = e[0];
 					var description = e.slice(2).join() || '';
 					e = new Error(e[1] || 'Unknown error');
-					e.description = description;
+					(<any>e).description = description;
 				} else {
-					var Err = global[e.name] || Error;
+					var Err = /*globalThis[(<Error>e).name] ||*/ Error;
 					var msg = e.message || e.error || 'Unknown error';
 					e = Object.assign(new Err(msg), e);
 				}
@@ -482,7 +483,7 @@ definePropertys(Error, {
 				e = new Error(e);
 			}
 		}
-		code = code || e.code;
+		code = code || (<any>e).code;
 		if (code)
 			e.rawCode = code;
 		e.code = Number(code) || -1;
