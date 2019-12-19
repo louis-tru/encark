@@ -28,113 +28,75 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-if (typeof requireNative != 'function') { // ngui
-// 	require('./_ext');
-}
-
 import './_ext';
 
-const haveNode = !!global.process;
-const haveNgui = !!global.requireNative;
-const haveWeb = !!global.location;
+const haveNode: boolean = !!globalThis.process;
+const haveNgui: boolean = !!globalThis.__requireNgui__;
+const haveWeb: boolean = !!globalThis.location;
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 const assign = Object.assign;
 
+type Platform = NodeJS.Platform | 'android' | 'linux' | 'darwin' | 'web';
+var platform: Platform;
+var argv: string[];
+var webFlags: WebPlatformFlags | null = null;
+
+export interface WebPlatformFlags {
+	windows: boolean,
+	windowsPhone: boolean,
+	linux: boolean,
+	android: boolean,
+	macos: boolean,
+	ios: boolean,
+	iphone: boolean,
+	ipad: boolean,
+	ipod: boolean,
+	mobile: boolean,
+	touch: boolean,
+	trident: boolean,
+	presto: boolean,
+	webkit: boolean,
+	gecko: boolean
+}
+
 if (haveNgui) {
-	var _util = requireNative('_util');
-	var platform = _util.platform;
-	var argv = _util.argv;
-}
-else if (haveNode) {
-	var platform = process.platform;
-	var argv = process.argv;
-}
-else if (haveWeb) {
-	var platform = 'web';
-	var argv = [location.origin + location.pathname].concat(location.search.substr(1).split('&'));
-
-	var flags = function() {
-		var USER_AGENT = navigator.userAgent;
-		var mat = USER_AGENT.match(/\(i[^;]+?; (U; )?CPU.+?OS (\d).+?Mac OS X/);
-		var ios = !!mat;
-		return {
-			windows: USER_AGENT.indexOf('Windows') > -1,
-			windowsPhone: USER_AGENT.indexOf('Windows Phone') > -1,
-			linux: USER_AGENT.indexOf('Linux') > -1,
-			android: /Android|Adr/.test(USER_AGENT),
-			macos: USER_AGENT.indexOf('Mac OS X') > -1,
-			ios: ios,
-			iphone: USER_AGENT.indexOf('iPhone') > -1,
-			ipad: USER_AGENT.indexOf('iPad') > -1,
-			ipod: USER_AGENT.indexOf('iPod') > -1,
-			mobile: USER_AGENT.indexOf('Mobile') > -1 || 'ontouchstart' in global,
-			touch: 'ontouchstart' in global,
-			//--
-			trident: !!USER_AGENT.match(/Trident|MSIE/),
-			presto: !!USER_AGENT.match(/Presto|Opera/),
-			webkit: 
+	var _util = __requireNgui__('_util');
+	platform = <Platform>_util.platform;
+	argv = _util.argv;
+} else if (haveNode) {
+	platform = <Platform>process.platform;
+	argv = process.argv;
+} else if (haveWeb) {
+	let USER_AGENT = navigator.userAgent;
+	let mat = USER_AGENT.match(/\(i[^;]+?; (U; )?CPU.+?OS (\d).+?Mac OS X/);
+	let ios = !!mat;
+	webFlags = {
+		windows: USER_AGENT.indexOf('Windows') > -1,
+		windowsPhone: USER_AGENT.indexOf('Windows Phone') > -1,
+		linux: USER_AGENT.indexOf('Linux') > -1,
+		android: /Android|Adr/.test(USER_AGENT),
+		macos: USER_AGENT.indexOf('Mac OS X') > -1,
+		ios: ios,
+		iphone: USER_AGENT.indexOf('iPhone') > -1,
+		ipad: USER_AGENT.indexOf('iPad') > -1,
+		ipod: USER_AGENT.indexOf('iPod') > -1,
+		mobile: USER_AGENT.indexOf('Mobile') > -1 || 'ontouchstart' in globalThis,
+		touch: 'ontouchstart' in globalThis,
+		//--
+		trident: !!USER_AGENT.match(/Trident|MSIE/),
+		presto: !!USER_AGENT.match(/Presto|Opera/),
+		webkit: 
 			USER_AGENT.indexOf('AppleWebKit') > -1 || 
-			!!global.WebKitCSSKeyframeRule,
-			gecko:
+			!!globalThis.WebKitCSSMatrix,
+		gecko:
 			USER_AGENT.indexOf('Gecko') > -1 &&
-			USER_AGENT.indexOf('KHTML') == -1 || !!global.MozCSSKeyframeRule
-		};
-	}();
-}
-
-/**
- * defined class members func
- */
-function def_class_members(klass, base, members) {
-	if (base) {
-		members.__proto__ = base.prototype;
-		klass.__proto__ = base;
-	}
-	klass.prototype = members;
-}
-
-function $class() {
-	var args = Array.toArray(arguments);
-	var name = args.shift();
-
-	var base = args[0];
-	var members = args[1];
-
-	if (typeof base == 'object') {
-		members = base;
-		base = null;
-	}
-	var klass = null;
-
-	if (members) {
-		klass = members.constructor;
-		if (typeof klass != 'function' || klass === Object) {
-			klass = base ? function () { base.apply(this, arguments) } : function (){ };
-		}
-	} else {
-		members = { };
-		klass = base ? function () { base.apply(this, arguments) } : function (){ };
-	}
-	def_class_members(klass, base, members);
-	klass.prototype.constructor = klass;
-	klass.class_name = name;
-	klass.base = base;
-	klass.members = members;
-	
-	return klass;
-}
-
-function hashCode(data) {
-	data = String(data);
-	var _hash = 5381;
-	var len = data.length;
-	// if (typeof data == 'string') {
-	while (len--) _hash += (_hash << 5) + data.charCodeAt(len);
-	// } else {
-	// 	while (len--) _hash += (_hash << 5) + data[len];
-	// }
-	return _hash & 0x7FFFFFFF
+			USER_AGENT.indexOf('KHTML') == -1, // || !!globalThis.MozCSSKeyframeRule
+	};
+	platform = <Platform>'web';
+	argv = [location.origin + location.pathname].concat(location.search.substr(1).split('&'));
+} else {
+	throw new Error('no support');
 }
 
 /**
@@ -142,31 +104,31 @@ function hashCode(data) {
 	* @arg input {Object} 
 	* @ret {String}
 	*/
-function hash(data) {
-	var value = hashCode(data);
+function hash(data: any): string {
+	var value = Object.hashCode(data);
 	var retValue = '';
-	do {
+	do
 		retValue += base64_chars[value & 0x3F];
-	}
 	while ( value >>= 6 );
 	return retValue;
 }
+
+var nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void = 
+haveNode ? process.nextTick: function(cb, ...args): void {
+	if (typeof cb != 'function')
+		throw new Error('callback must be a function');
+	if (haveNgui) {
+		_util.nextTick(()=>cb(...args));
+	} else {
+		setImmediate(()=>cb(...args));
+	}
+};
 
 function unrealized() {
 	throw new Error('Unrealized');
 }
 
-var nextTick = haveNode ? process.nextTick: function(cb, ...args) {
-	if (typeof cb != 'function')
-		throw new Error('callback must be a function');
-	if (haveNgui) {
-		_util.nextTick(e=>cb(...args));
-	} else {
-		setTimeout(e=>cb(...args), 1);
-	}
-};
-
-module.exports = {
+export default {
 	unrealized: unrealized,
 	version: unrealized,
 	addNativeEventListener: unrealized,
@@ -175,9 +137,7 @@ module.exports = {
 	runScript: unrealized,
 	transformJsx: unrealized,
 	transformJs: unrealized,
-	hashCode: hashCode,
 	hash: hash,
-	class: $class,
 	_eval: eval,
 	nextTick: nextTick,
 	platform: platform,
@@ -185,5 +145,5 @@ module.exports = {
 	haveNgui: haveNgui,
 	haveWeb: haveWeb,
 	argv: argv,
-	flags: flags || {},
+	webFlags: webFlags,
 };

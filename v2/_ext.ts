@@ -28,40 +28,25 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-declare type ErrnoCode = [number, string, string?];
-
-declare interface ErrorObj {
-	name?: string;
-	message?: string;
-	error?: string;
-	[prop: string]: any;
+interface RequireFunction {
+	(require: string): any;
 }
 
-declare type ErrorDetails = ErrnoCode | Error | string | ErrorObj;
-
-interface ErrorConstructor {
-	'new'(err: ErrorDetails, code?: number): Error;
-}
+declare var __requireNgui__: RequireFunction;
+declare var __webpack_require__: RequireFunction;
 
 interface ObjectConstructor {
 	hashCode(obj: any): number;
 }
 
 interface Object {
-	hashCode(obj: any): number;
-}
-
-interface Function {
-	hashCode(obj: any): number;
-}
-
-interface Date {
-	toStringRaw(): string;
+	hashCode(): number;
 }
 
 type TimeoutResult = any; // NodeJS.Timeout | number;
 
 interface Function {
+	hashCode(): number;
 	setTimeout(this: Function, time: number, ...argArray: any[]): TimeoutResult;
 }
 
@@ -69,17 +54,151 @@ interface CallableFunction extends Function {
 	setTimeout<A extends any[], R>(this: (...args: A) => R, time: number, ...args: A): TimeoutResult;
 }
 
+interface ArrayConstructor {
+	toArray(obj: any, index?: number, end?: number): any[];
+}
+
 interface Array<T> {
-	last(idx: number): T;
+	hashCode(): number;
+	deleteOf(value: T): T[];
+	indexReverse(index: number): T;
+}
+
+interface StringConstructor {
+	format(str: string, ...args: any[]): string;
+}
+
+interface String {
+	hashCode(): number;
 }
 
 interface Number {
+
+	hashCode(): number;
+
+	/**
+	* 转换为前后固定位数的字符串
+	* @arg before {Number}  小数点前固定位数
+	* @arg [after] {Number} 小数点后固定位数
+	*/
 	toFixedBefore(before: number, after?: number): string;
+
+}
+
+interface Boolean {
+	hashCode(): number;
+}
+
+interface DateConstructor {
+
+	/**
+	 * @field current timezone
+	 */
+	currentTimezone: number;
+
+	/**
+	 * 解析字符串为时间
+	 * <pre><code>
+	 * var i = '2008-02-13 01:12:13';
+	 * var date = Date.parseDate(i); //返回的新时间
+	 * </code></pre>
+	 * @func parseDate(str[,format[,timezone]])
+	 * @arg str {String}        要解析的字符串
+	 * @arg [format] {String}   date format   default yyyyMMddhhmmssfff
+	 * @arg [timezone] {Number} 要解析的时间所在时区,默认为当前时区
+	 * @ret {Date}              返回新时间
+	 */
+	parseDate(date_str: string, format?: string, timezone?: number): Date;
+
+	/**
+		* 格式化时间戳(单位:毫秒)
+		* <pre><code>
+		* var time_span = 10002100;
+		* var format = 'dd hh:mm:ss';
+		* var str = Date.formatTimeSpan(time_span, format); // str = '0 2:46:42'
+		* var format = 'dd天hh时mm分ss秒';
+		* var str = Date.formatTimeSpan(time_span, format); // str = '0天2时46分42秒'
+		* format = 'hh时mm分ss秒';
+		* str = Date.formatTimeSpan(time_span, format); // str = '2时46分42秒'
+		* format = 'mm分ss秒';
+		* str = Date.formatTimeSpan(time_span, format); // str = '166分42秒'
+		* </code></pre>
+		* @func formatTimeSpan(ts[,format])
+		* @arg ts {Number} 要格式化的时间戳
+		* @arg [format]  {String} 要格式化的时间戳格式
+		* @ret {String} 返回的格式化后的时间戳
+		*/
+	formatTimeSpan(time_span: number, format?: string): string;
+
+}
+
+interface Date {
+
+	hashCode(): number;
+
+	/**
+	 * @func add 给当前Date时间追加毫秒,改变时间值
+	 * @arg ms {Number}  要添追加的毫秒值
+	 * @ret {Date}
+	 */
+	add(ms: number): Date;
+
+	/**
+		* 给定日期格式返回日期字符串
+		* <pre><code>
+		* var date = new Date();
+		* var format = 'yyyy-MM-dd hh:mm:ss.fff';
+		* var dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10：32：23'
+		* format = 'yyyy-MM-dd hh:mm:ss';
+		* dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10：32：23'
+		* format = 'yyyy/MM/dd';
+		* dateStr = date.toString(format); // dateStr的值为 '2008/12/10'
+		* format = 'yyyy-MM-dd hh';
+		* dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10'
+		* </code></pre>
+		* @func date_to_string(date[,foramt])
+		* @arg date {Date}
+		* @arg [format] {String} 要转换的字符串格式
+		* @ret {String} 返回格式化后的时间字符串
+		*/
+	toString(format?: string, timezone?: number): string;
+
+}
+
+interface ErrorDescribe {
+	name?: string;
+	message?: string;
+	error?: string;
+	description?: string;
+	errno?: number;
+	code?: string;
+	path?: string;
+	syscall?: string;
+	stack?: string;
+	[prop: string]: any;
+}
+
+type ErrnoCode = [number/*errno*/, string/*message*/, string?/*description*/];
+type ErrorNewArg = ErrnoCode | Error | string | ErrorDescribe;
+
+interface ErrorConstructor {
+	'new'(err: ErrorNewArg, errno?: number): Error;
+	toJSON(err: Error): any;
+}
+
+interface Error {
+	description?: string;
+	errno?: number;
+	code?: any;
+	path?: string;
+	syscall?: string;
+	stack?: string;
+	[prop: string]: any;
 }
 
 (function() {
 
-if (Date.prototype.toStringRaw !== undefined)
+if (Date.formatTimeSpan !== undefined)
 	return;
 
 // ----------------------------- impl -----------------------------
@@ -88,7 +207,7 @@ var currentTimezone = new Date().getTimezoneOffset() / -60;
 var G_slice = Array.prototype.slice;
 var G_hash_code_id = 1;
 var G_hash_code_set = new WeakSet();
-var dateToStringRaw = Date.prototype.toStringRaw;
+var dateToString = Date.prototype.toString;
 
 /**
  * @fun ext_class #  EXT class prototype objects
@@ -113,36 +232,25 @@ function indexOf(str: string, str1: string): number {
 }
 
 definePropertys(Object, {
-	/**
-	 * @func hashCode(obj)
-	*/
 	hashCode: hashCode,
 });
 
 definePropertys(Object.prototype, {
-
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
 		G_hash_code_set.add(this);
 		var _hash = 5381;
 		for (var key in this) {
-			// _hash += (_hash << 5) + (key.hashCode() + hashCode(this[key]));
+			_hash += (_hash << 5) + (key.hashCode() + hashCode(this[key]));
 		}
 		G_hash_code_set.delete(this);
 		return _hash;
 	},
-
 });
 
 definePropertys(Function.prototype, {
 	
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		if (!this.hasOwnProperty('M_hashCode')) {
 			Object.defineProperty(this, 'M_hashCode', { 
@@ -152,11 +260,6 @@ definePropertys(Function.prototype, {
 		return this.M_hashCode;
 	},
 
-	/**
-		* @func setTimeout 延迟执行函数单位毫秒
-		* @arg time {Number}  要延迟时间长度单位(毫秒)
-		* @arg ...args        提前传入的参数1
-		*/
 	setTimeout: function(time: number, ...args: any[]): TimeoutResult {
 		var fn = this;
 		return setTimeout(function() {
@@ -174,9 +277,6 @@ definePropertys(Array, {
 
 definePropertys(Array.prototype, {
 
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
@@ -191,11 +291,7 @@ definePropertys(Array.prototype, {
 		return _hash;
 	},
 
-	/**
-	 * @func deleteValue(val) 移除指定值元素
-	 * @arg value {Object}
-	 */
-	deleteValue: function(value: any): any[] {
+	deleteOf: function(value: any): any[] {
 		var i = this.indexOf(value);
 		if (i != -1) {
 			this.splice(i, 1);
@@ -203,10 +299,7 @@ definePropertys(Array.prototype, {
 		return this;
 	},
 
-	/**
-	 * 倒叙索引数组元素
-	 */
-	last: function (index: number): any {
+	indexReverse: function (index: number): any {
 		return this[this.length - 1 - index];
 	},
 
@@ -233,18 +326,10 @@ definePropertys(String.prototype, {
 
 definePropertys(Number.prototype, {
 
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		return this;
 	},
 
-	/**
-	* 转换为前后固定位数的字符串
-	* @arg before {Number}  小数点前固定位数
-	* @arg [after] {Number} 小数点后固定位数
-	*/
 	toFixedBefore: function(before: number, after: number): string {
 		if (!isFinite(this)) {
 			return String(this);
@@ -257,15 +342,11 @@ definePropertys(Number.prototype, {
 				num = new Array(len + 1).join('0') + num;
 			return num;
 		}
-	}
+	},
 
 });
 
 definePropertys(Boolean.prototype, {
-
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		return this == true ? -1186256: -23547257;
 	},
@@ -275,22 +356,10 @@ definePropertys(Date, {
 
 	currentTimezone: currentTimezone,
 
-	/**
-	 * 解析字符串为时间
-	 * <pre><code>
-	 * var i = '2008-02-13 01:12:13';
-	 * var date = Date.parseDate(i); //返回的新时间
-	 * </code></pre>
-	 * @func parseDate(str[,format[,timezone]])
-	 * @arg str {String}        要解析的字符串
-	 * @arg [format] {String}   date format   default yyyyMMddhhmmssfff
-	 * @arg [timezone] {Number} 要解析的时间所在时区,默认为当前时区
-	 * @ret {Date}              返回新时间
-	 */
 	parseDate: function(
 		date_str: string, 
-		format: string = 'yyyyMMddhhmmssfff', 
-		timezone: number = currentTimezone
+		format?: string, /* = 'yyyyMMddhhmmssfff', */
+		timezone?: number, /* = currentTimezone*/
 	): Date 
 	{
 		var s = String(date_str).replace(/[^0-9]/gm, '');
@@ -319,26 +388,8 @@ definePropertys(Date, {
 		);
 	},
 
-	 /**
-		* 格式化时间戳(单位:毫秒)
-		* <pre><code>
-		* var time_span = 10002100;
-		* var format = 'dd hh:mm:ss';
-		* var str = Date.formatTimeSpan(time_span, format); // str = '0 2:46:42'
-		* var format = 'dd天hh时mm分ss秒';
-		* var str = Date.formatTimeSpan(time_span, format); // str = '0天2时46分42秒'
-		* format = 'hh时mm分ss秒';
-		* str = Date.formatTimeSpan(time_span, format); // str = '2时46分42秒'
-		* format = 'mm分ss秒';
-		* str = Date.formatTimeSpan(time_span, format); // str = '166分42秒'
-		* </code></pre>
-		* @func formatTimeSpan(ts[,format])
-		* @arg ts {Number} 要格式化的时间戳
-		* @arg [format]  {String} 要格式化的时间戳格式
-		* @ret {String} 返回的格式化后的时间戳
-		*/
-	formatTimeSpan: function(time_span: number, format: string = 'dd hh:mm:ss') {
-		
+	formatTimeSpan: function(time_span: number, format: string = 'dd hh:mm:ss'): string {
+
 		var data = [];
 		var items = [
 			[1, 1000, /fff/g],
@@ -368,7 +419,7 @@ definePropertys(Date, {
 			return format;
 		}
 
-		data.last(0).reverse();
+		data.indexReverse(0).reverse();
 		data.forEach(function (item, index) {
 			format =
 				format.replace(<RegExp>items[index][2], Math.floor(<number>item[0]).toFixedBefore(2));
@@ -380,45 +431,18 @@ definePropertys(Date, {
 
 definePropertys(Date.prototype, {
 
-	/**
-	 * @func hashCode()
-	 */
 	hashCode: function(): number {
 		return this.valueOf();
 	},
 
-	/**
-	 * @func addMs 给当前Date时间追加毫秒,改变时间值
-	 * @arg ms {Number}  要添追加的毫秒值
-	 * @ret {Date}
-	 */
-	addMs: function(ms: number) {
+	add: function(ms: number): Date {
 		this.setMilliseconds(this.getMilliseconds() + ms);
 		return this;
 	},
 
-	/**
-	* 给定日期格式返回日期字符串
-	* <pre><code>
-	* var date = new Date();
-	* var format = 'yyyy-MM-dd hh:mm:ss.fff';
-	* var dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10：32：23'
-	* format = 'yyyy-MM-dd hh:mm:ss';
-	* dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10：32：23'
-	* format = 'yyyy/MM/dd';
-	* dateStr = date.toString(format); // dateStr的值为 '2008/12/10'
-	* format = 'yyyy-MM-dd hh';
-	* dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10'
-	* </code></pre>
-	* @func date_to_string(date[,foramt])
-	* @arg date {Date}
-	* @arg [format] {String} 要转换的字符串格式
-	* @ret {String} 返回格式化后的时间字符串
-	*/
-	toString: function(format?: string, timezone?: number) {
+	toString: function(format?: string, timezone?: number): string {
 		if (format/*typeof format == 'string'*/) {
 			var d = new Date(this.valueOf());
-			
 			if (typeof timezone == 'number') {
 				var cur_time_zone = d.getTimezoneOffset() / -60;
 				var offset = timezone - cur_time_zone;
@@ -431,91 +455,80 @@ definePropertys(Date.prototype, {
 				.replace('HH', d.getHours().toFixedBefore(2))
 				.replace('mm', d.getMinutes().toFixedBefore(2))
 				.replace('ss', d.getSeconds().toFixedBefore(2))
-				.replace('fff', d.getMilliseconds().toFixedBefore(3))
+				.replace('fff', d.getMilliseconds().toFixedBefore(3));
 		} else {
-			return dateToStringRaw.call(this);
+			return dateToString.call(this);
 		}
 	},
-	toStringRaw: dateToStringRaw,
+
 });
+
+interface Errors {
+	[name: string]: Function;
+}
+
+const errors: Errors = {
+	Error,
+	SyntaxError,
+	ReferenceError,
+	TypeError,
+	RangeError,
+	EvalError,
+	URIError,
+};
 
 definePropertys(Error, {
 
-	toJSON: function(err) {
-		if ( err ) {
-			if ( typeof err == 'string' ) {
-				return { message: err || 'unknown error', code: -1, name: '', description: '' };
-			} else if ( typeof err == 'number' ) {
-				return { message: 'unknown error', code: err, name: '', description: '' };
-			} else {
-				var r = Object.assign({}, err);
-				if (typeof r.code == 'string') {
-					r.rawCode = err.code;
-					r.code = -1;
-				}
-				r.code = Number(err.code) || -1;
-				r.name = err.name || '';
-				r.description = err.description || '';
-				r.message = err.message || 'unknown error';
-				r.stack = err.stack || '';
-				return r;
+	new: function(arg: ErrorNewArg, errno?: number): Error {
+		var err: Error;
+		if (arg as Object) { // ErrnoCode | Error | ErrorDescribe;
+			if (arg as Error) {
+				err = <Error>arg;
+			} if (Array.isArray(arg)) { // ErrnoCode
+				var errno_code = <ErrnoCode>arg;
+				err = new Error(errno_code[1] || errno_code[2] || 'unknown');
+				err.errno = errno_code[0];
+				err.description = errno_code[2] || '';
+			} else { // ErrorDescribe
+				var describe = <ErrorDescribe>arg;
+				var Err = <ErrorConstructor>(errors[(<Error>arg).name] || Error);
+				var msg = describe.message || describe.error || 'unknown';
+				err = <Error>Object.assign(new Err(msg), arg);
 			}
-		} else {
-			return { message: 'unknown error', code: 0, name: '', description: '' };
+		} else { // string
+			err = new Error(String(arg));
 		}
+
+		err.errno = Number(errno || err.errno) || -1;
 		return err;
 	},
 
-	new: function(e: ErrorDetails, code?: number): Error {
-		if (! (e instanceof Error)) {
-			if (typeof e == 'object') {
-				if (Array.isArray(e)) {
-					code = e[0];
-					var description = e.slice(2).join() || '';
-					e = new Error(e[1] || 'Unknown error');
-					(<any>e).description = description;
-				} else {
-					var Err = /*globalThis[(<Error>e).name] ||*/ Error;
-					var msg = e.message || e.error || 'Unknown error';
-					e = Object.assign(new Err(msg), e);
-				}
-			} else {
-				e = new Error(e);
-			}
-		}
-		code = code || (<any>e).code;
-		if (code)
-			e.rawCode = code;
-		e.code = Number(code) || -1;
-		return e;
-	},
-
-	furl: function(err) {
-		err = Error.new(err);
-		var Err = global[err.name] || Error;
-		var msg = err.message +'\n' + Object.entries(err).map(([k,v])=>{
-			return k + ': ' + (typeof v == 'object' ? JSON.stringify(v, null, 2): v);
-		}).join('\n');
-		var r = new Err(msg);
-		r.stack = err.stack;
-		return r;
+	toJSON(err: any): Error {
+		return Error.new(err).toJSON()
 	},
 
 });
 
 definePropertys(Error.prototype, {
 
-	/**
-	 * @func hashCode()
-	 */
-	hashCode: function() {
+	hashCode: function(): number {
 		var _hash = Object.prototype.hashCode.call(this);
 		_hash += (_hash << 5) + this.message.hashCode();
 		return _hash;
 	},
 
-	toJSON: function() {
-		return Error.toJSON(this);
+	toJSON: function(): any {
+		var err = this;
+		var r = Object.assign({}, err);
+		r.name = err.name || '';
+		r.message = err.message || 'unknown';
+		r.errno = Number(err.errno) || -1;
+		if (r.code) // compatible old
+			r.rawCode = r.code;
+		r.code = r.errno; // compatible old
+		r.description = err.description || '';
+		r.stack = err.stack || '';
+		return r;
 	},
 });
 
