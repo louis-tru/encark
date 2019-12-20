@@ -31,9 +31,9 @@
 var _id = 0;
 
 class LiteItem<T> {
-	protected _host: List<T> | null;
-	protected _prev: LiteItem<T> | null; 
-	protected _next: LiteItem<T> | null;
+	private _host: List<T> | null;
+	private _prev: LiteItem<T> | null; 
+	private _next: LiteItem<T> | null;
 	private _value: T | null;
 	constructor(host: List<T>, prev: LiteItem<T> | null, next: LiteItem<T> | null, value: T) {
 		this._host = host;
@@ -46,18 +46,6 @@ class LiteItem<T> {
 	get next() { return this._next }
 	get value(): T | null { return this._value }
 	set value(value: T | null) { this._value = value }
-}
-
-class LiteItemExt<T> extends LiteItem<T> {
-	setHost(host: List<T> | null) {
-		this._host = host;
-	}
-	setPrev(item: LiteItem<T> | null) {
-		this._prev = item;
-	}
-	setNext(item: LiteItem<T> | null) {
-		this._next = item;
-	}
 }
 
 /**
@@ -86,18 +74,18 @@ export class List<T> {
 			var prev = item.prev;
 			var next = item.next;
 			if (prev) {
-				(<LiteItemExt<T>>prev).setNext(next);
+				(<any>prev)._next = next;
 			} else {
 				this._first = next;
 			}
 			if (next) {
-				(<LiteItemExt<T>>next).setPrev(prev);
+				(<any>next)._prev = prev;
 			} else {
 				this._last = prev;
 			}
-			(<LiteItemExt<T>>item).setHost(null);
-			(<LiteItemExt<T>>item).setPrev(null);
-			(<LiteItemExt<T>>item).setNext(null);
+			(<any>item)._host = null;
+			(<any>item)._prev = null;
+			(<any>item)._next = null;
 			this._length--;
 			return next;
 		}
@@ -108,7 +96,7 @@ export class List<T> {
 		var item: LiteItem<T>;
 		if ( this._first ) {
 			item = new LiteItem(this, null, this._first, value);
-			(<LiteItemExt<T>>this._first).setPrev(item);
+			(<any>this._first)._prev = item;
 			this._first = item;
 		} else {
 			item = new LiteItem(this, null, null, value);
@@ -123,7 +111,7 @@ export class List<T> {
 		var item: LiteItem<T>;
 		if ( this._last ) {
 			item = new LiteItem(this, this._last, null, value);
-			(<LiteItemExt<T>>this._last).setNext(item);
+			(<any>this._last)._next = item;
 			this._last = item;
 		} else {
 			item = new LiteItem(this, null, null, value);
@@ -136,18 +124,18 @@ export class List<T> {
 
 	pop(): T | null {
 		if ( this._length ) {
-			var r: LiteItem<T> = <LiteItem<T>>this._last;
+			var r = <LiteItem<T>>this._last;
 			if ( this._length > 1 ) {
-				(<LiteItemExt<T>>r.prev).setNext(null);
+				(<any>r.prev)._next = null;
 				this._last = r.prev;
 			} else {
 				this._first = null;
 				this._last = null;
 			}
 			this._length--;
-			(<LiteItemExt<T>>r).setHost(null);
-			(<LiteItemExt<T>>r).setPrev(null);
-			(<LiteItemExt<T>>r).setNext(null);
+			(<any>r)._host = null;
+			(<any>r)._prev = null;
+			(<any>r)._next = null;
 			return r.value;
 		}
 		return null;
@@ -155,18 +143,18 @@ export class List<T> {
 
 	shift(): T | null {
 		if ( this._length ) {
-			var r: LiteItem<T> = <LiteItem<T>>this._first;
+			var r= <LiteItem<T>>this._first;
 			if ( this._length > 1 ) {
-				(<LiteItemExt<T>>r.next).setPrev(null);
+				(<any>r.next)._prev = null;
 				this._first = r.next;
 			} else {
 				this._first = null;
 				this._last = null;
 			}
 			this._length--;
-			(<LiteItemExt<T>>r).setHost(null);
-			(<LiteItemExt<T>>r).setPrev(null);
-			(<LiteItemExt<T>>r).setNext(null);
+			(<any>r)._host = null;
+			(<any>r)._prev = null;
+			(<any>r)._next = null;
 			return r.value;
 		}
 		return null;
@@ -234,14 +222,14 @@ export class Event<Sender = any, Data = any, Return = number> {
 	// @end
 }
 
-class EventExt<Sender = any, Data = any, Return = number> extends Event<Sender, Data, Return> {
-	getNoticer() {
-		return this.m_noticer;
-	}
-	setNoticer(noticer: EventNoticer<Sender, Data, Return> | null) {
-		this.m_noticer = noticer;
-	}
-}
+// class EventExt<Sender = any, Data = any, Return = number> extends Event<Sender, Data, Return> {
+// 	getNoticer() {
+// 		return this.m_noticer;
+// 	}
+// 	setNoticer(noticer: EventNoticer<Sender, Data, Return> | null) {
+// 		this.m_noticer = noticer;
+// 	}
+// }
 
 type DefaultEvent = Event;
 
@@ -265,14 +253,19 @@ function check_noticer(noticer: any) {
 		throw new Error('Event listener function type is incorrect ');
 }
 
+function check_fun(origin: any) {
+	if ( typeof origin != 'function' ) {
+		throw new Error('Event listener function type is incorrect ');
+	}
+}
+
 function forwardNoticeNoticer<Sender, Data, Return>(
 	forward_noticer: EventNoticer<Sender, Data, Return>, 
-	evt: Event<Sender, Data, Return>) 
-	{
-	var evt2 = <EventExt<Sender, Data, Return>>evt;
-	var noticer = evt2.getNoticer();
+	evt: Event<Sender, Data, Return>
+) {
+	var noticer = (<any>evt).m_noticer;
 	forward_noticer.triggerWithEvent(evt);
-	evt2.setNoticer(noticer);
+	(<any>evt).m_noticer = noticer;
 }
 
 /**
@@ -288,7 +281,7 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	private m_enable: boolean = true
 
 	/* @fun add # Add event listen */
-	private add(origin_listen: any, listen: any, scope: any, id?: string): string {
+	private _add(origin_listen: any, listen: any, scope: any, id?: string): string {
 		var self = this;
 
 		var listens_map = self.m_listens_map;
@@ -323,14 +316,6 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 		}
 
 		return id;
-	}
-
-	private check_add(origin_listen: any, listen: any, scope: any, id?: string): string {
-		if ( typeof origin == 'function' ) {
-			return this.add(origin_listen, listen, scope, id);
-		} else {
-			throw new Error('Event listener function type is incorrect ');
-		}
 	}
 
 	/**
@@ -386,7 +371,8 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [id]  {String}     # 侦听器别名,可通过id删除
 	 */
 	on<Scope>(listen: Listen<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
-		return this.check_add(listen, listen, scope, id);
+		check_fun(listen);
+		return this._add(listen, listen, scope, id);
 	}
 
 	/**
@@ -396,8 +382,9 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [id] {String}     #         侦听器别名,可通过id删除
 	 */
 	once<Scope>(listen: Listen<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+		check_fun(listen);
 		var self = this;
-		var _id = this.check_add(listen, {
+		var _id = this._add(listen, {
 			call: function (scope: Scope, evt: Event<Sender, Data, Return>) {
 				self.off(_id);
 				listen.call(scope, evt);
@@ -415,7 +402,8 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [id] {String}     #     侦听器别名,可通过id删除
 	 */
 	on2<Scope>(listen: Listen2<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
-		return this.check_add(listen, { call: listen }, scope, id);
+		check_fun(listen);
+		return this._add(listen, { call: listen }, scope, id);
 	}
 
 	/**
@@ -427,8 +415,9 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [id] {String}         # 侦听器id,可通过id删除
 	 */
 	once2<Scope>(listen: Listen2<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+		check_fun(listen);
 		var self = this;
-		var _id = this.check_add(listen, {
+		var _id = this._add(listen, {
 			call: function (scope: Scope, evt: Event<Sender, Data, Return>) {
 				self.off(_id);
 				listen(scope, evt);
@@ -439,13 +428,13 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	
 	forward(noticer: EventNoticer<Sender, Data, Return>, id?: string): string {
 		check_noticer(noticer);
-		return this.add(noticer, { call: forwardNoticeNoticer }, noticer, id);
+		return this._add(noticer, { call: forwardNoticeNoticer }, noticer, id);
 	}
 
 	forwardOnce(noticer: EventNoticer<Sender, Data, Return>, id?: string): string {
 		check_noticer(noticer);
 		var self = this;
-		var _id = this.add(noticer, function(evt: Event<Sender, Data, Return>) {
+		var _id = this._add(noticer, function(evt: Event<Sender, Data, Return>) {
 			self.off(_id);
 			forwardNoticeNoticer(noticer, evt);
 		}, noticer, id);

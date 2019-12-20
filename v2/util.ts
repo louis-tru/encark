@@ -36,29 +36,20 @@ import {List} from './_event';
 
 /**************************************************************************/
 
-var currentTimezone = new Date().getTimezoneOffset() / -60; // 当前时区
-// var default_throw = Function.prototype.throw;
 var id = 10;
-// var extendObject = _pkg.extendObject;
-// var assign = Object.assign;
+var currentTimezone = new Date().getTimezoneOffset() / -60; // 当前时区
 var AsyncFunctionConstructor = (async function() {}).constructor;
 var scopeLockQueue = new Map();
 
-function is_async(func: any) {
+function isAsync(func: any): boolean {
 	return func && func.constructor === AsyncFunctionConstructor;
 }
 
-//
-// util
-// ======
-//
-function obj_constructor() { }
+class obj_constructor {}
 
-function clone_object(new_obj, obj) {
-	var names = Object.getOwnPropertyNames(obj);
-	for (var i = 0, len = names.length; i < len; i++) {
-		var name = names[i];
-		var property = Object.getOwnPropertyDescriptor(obj, name);
+function clone_object(new_obj: any, obj: any): any {
+	for (var name of Object.getOwnPropertyNames(obj)) {
+		var property = <PropertyDescriptor>Object.getOwnPropertyDescriptor(obj, name);
 		if (property.writable) {
 			new_obj[name] = clone(property.value);
 		}
@@ -69,13 +60,18 @@ function clone_object(new_obj, obj) {
 	return new_obj;
 }
 
-function clone(obj) {
+/**
+ * @fun clone # 克隆一个Object对像
+ * @arg obj {Object} # 要复制的Object对像
+ * @arg {Object}
+ */
+function clone(obj: any): any {
 	if (obj && typeof obj == 'object') {
-		var new_obj = null, i;
-		
+		var new_obj: any = null, i;
+
 		switch (obj.constructor) {
 			case Object:
-				new_obj = { };
+				new_obj = {};
 				for(i in obj) {
 					new_obj[i] = clone(obj[i]);
 				}
@@ -97,13 +93,15 @@ function clone(obj) {
 	return obj;
 }
 
-function extend(obj, extd) {
-	if (extd.__proto__ && extd.__proto__ !== Object.prototype) {
+/**
+ * @func extend(obj, extd)
+ */
+function extend(obj: any, extd: any): any {
+	if (extd.__proto__ && extd.__proto__ !== Object.prototype)
 		extend(obj, extd.__proto__);
-	}
 	for (var i of Object.getOwnPropertyNames(extd)) {
 		if (i != 'constructor') {
-			var desc = Object.getOwnPropertyDescriptor(extd, i);
+			var desc = <PropertyDescriptor>Object.getOwnPropertyDescriptor(extd, i);
 			desc.enumerable = false;
 			Object.defineProperty(obj, i, desc);
 		}
@@ -111,7 +109,22 @@ function extend(obj, extd) {
 	return obj;
 }
 
-function extendClass(cls, ...extds) {
+/**
+ * Empty function
+ */
+function noop() {}
+
+/**
+ * @func isNull(value)
+ */
+function isNull(value: any): boolean {
+	return value === null || value === undefined
+}
+
+/**
+ * @fun extendClass #  EXT class prototype objects
+ */
+function extendClass(cls: Function, ...extds: Function[]) {
 	var proto = cls.prototype;
 	for (var extd of extds) {
 		if (extd instanceof Function) {
@@ -122,7 +135,7 @@ function extendClass(cls, ...extds) {
 	return cls;
 }
 
-async function scopeLockDequeue(mutex) {
+async function scopeLockDequeue(mutex: any): Promise<void> {
 	var item, queue = scopeLockQueue.get(mutex);
 	while( item = queue.shift() ) {
 		try {
@@ -134,7 +147,10 @@ async function scopeLockDequeue(mutex) {
 	scopeLockQueue.delete(mutex);
 }
 
-function scopeLock(mutex, cb) {
+/**
+ * @func scopeLock(mutex, cb)
+ */
+function scopeLock(mutex: any, cb: ()=>void): Promise<void> {
 	exports.assert(mutex, 'Bad argument');
 	exports.assert(typeof cb == 'function', 'Bad argument');
 	return new Promise((resolve, reject)=>{
@@ -147,22 +163,22 @@ function scopeLock(mutex, cb) {
 	})
 }
 
-	/**
-	 * @fun get(name[,self]) # get object value by name
-	 * @arg name {String} 
-	 * @arg [self] {Object}
-	 * @ret {Object}
-	 */
-	function get(name: string, self: any): any {
-		var names = name.split('.');
-		var item;
-		while ( (item = names.shift()) ) {
-			self = self[item];
-			if (!self)
-				return self;
-		}
-		return self;
+/**
+ * @fun get(name[,self]) # get object value by name
+ * @arg name {String} 
+ * @arg [self] {Object}
+ * @ret {Object}
+ */
+function get(name: string, self: any): any {
+	var names = name.split('.');
+	var item;
+	while ( (item = names.shift()) ) {
+		self = self[item];
+		if (!self)
+			return self;
 	}
+	return self;
+}
 
 /**
 * @fun set(name,value[,self]) # Setting object value by name
@@ -216,21 +232,22 @@ function random(start: number = 0, end: number = 1E8): number {
 * @arg args.. {Number} # 输入百分比
 * @ret {Number}
 */
-function fixRandom(...args: number[]): number {
-	var total = 0;
-	var argus = [];
-	var i = 0;
+function fixRandom(arg: number, ...args: number[]): number {
+	if (!args.length)
+		return 0;
+	var total = arg;
+	var argus = [arg];
 	var len = args.length;
-	for (; (i < len); i++) {
-		var e = args[i];
-		total += e;
+	for (var i = 0; i < len; i++) {
+		total += args[i];
 		argus.push(total);
 	}
 	var r = random(0, total - 1);
-	for (i = 0; (i < len); i++) {
+	for (var i = 0; (i < len); i++) {
 		if (r < argus[i])
 			return i;
 	}
+	return 0;
 }
 
 /**
@@ -267,10 +284,10 @@ function filter(obj: any, exp: string[] | ((key: string, value: any)=>boolean), 
  * @arg extd {Object}    #         update object
  * @arg {Object}
  */
-function update(obj, extd) {
+function update<T>(obj: T, extd: any): T {
 	for (var key in extd) {
 		if (key in obj) {
-			obj[key] = exports.select(obj[key], extd[key]);
+			(<any>obj)[key] = select((<any>obj)[key], extd[key]);
 		}
 	}
 	return obj;
@@ -282,9 +299,9 @@ function update(obj, extd) {
  * @arg value   {Object} 
  * @reg {Object}
  */
-function select(default_, value) {
+function select<T>(default_: T, value: any): T {
 	if ( typeof default_ == typeof value ) {
-		return value;
+		return <T>value;
 	} else {
 		return default_;
 	}
@@ -295,9 +312,11 @@ function select(default_, value) {
  * @arg baseclass {class}
  * @arg subclass {class}
  */
-function equalsClass(baseclass, subclass) {
-	if (!baseclass || !subclass || !subclass.prototype) return false;
-	if (baseclass === subclass) return true;
+function equalsClass(baseclass: Function, subclass: Function): boolean {
+	if (!baseclass || !subclass || !subclass.prototype)
+		return false;
+	if (baseclass === subclass)
+		return true;
 	
 	var prototype = baseclass.prototype;
 	var subprototype = subclass.prototype;
@@ -311,8 +330,52 @@ function equalsClass(baseclass, subclass) {
 	}
 	return false;
 }
-	
+
+/**
+ * @fun assert
+ */
+function assert(condition: any, code?: ErrnoCode | number | string, ...args: string[]): void {
+	if (condition)
+		return;
+	if (Array.isArray(code)) {
+		throw Error.new(code);
+	} else {
+		var str: string;
+		if (typeof code == 'number') {
+			str = 'assert fail, unforeseen exceptions';
+		} else {
+			code = -2;
+			str = String(code);
+		}
+		throw Error.new(String.format(str, ...args), code);
+	}
+}
+
+/**
+ * @func sleep()
+ */
+function sleep<T>(time: number, defaultValue?: T): Promise<T> {
+	return new Promise((ok, err)=>setTimeout(e=>ok(defaultValue), time));
+}
+
+/**
+ * @func promise(executor)
+ */
+function promise<T>(executor: (resolve: (value?: T)=>void, reject: (reason?: any)=>void)=>any): Promise<T> {
+	return new Promise(function(resolve, reject) {
+		try {
+			var r = executor(resolve, reject);
+			if (r instanceof Promise) {
+				r.catch(reject);
+			}
+		} catch(err) {
+			reject(err);
+		}
+	});
+}
+
 export default {
+	// _util
 	unrealized: _util.unrealized,
 	version: _util.version,
 	addNativeEventListener: _util.addNativeEventListener,
@@ -330,121 +393,32 @@ export default {
 	haveWeb: _util.haveWeb,
 	argv: _util.argv,
 	webFlags: _util.webFlags,
-
+	// _pkgutil
 	timezone: currentTimezone,
 	resolve: _pkg.resolve,
 	isAbsolute: _pkg.isAbsolute,
-	extendObject: _pkg.extendObject,
 	get options() { return _pkg.options },
 	get config() { return _pkg.config },
 	dev: _pkg.dev,
-
-	/**
-	 * Empty function
-	 */
-	noop: function() {},
-
-	/**
-	 * @func isAsync(func)
-	 */
-	isAsync: function(func: any): boolean {
-		return is_async(func);
-	},
-
-	/**
-	 * @func isNull(value)
-	 */
-	isNull: function(value: any): boolean {
-		return value === null || value === undefined
-	},
-
-	/**
-	 * @func extend(obj, extd)
-	 */
-	extend: extend,
-
-	/**
-	 * @get id
-	 */
+	// util
+	isAsync,
 	get id() { return id++ },
-
-	random: random,
-	fixRandom: fixRandom,
-
-	get: get,
-	set: set,
-	del: del,
-
-	/**
-	 * @fun clone # 克隆一个Object对像
-	 * @arg obj {Object} # 要复制的Object对像
-	 * @arg {Object}
-	 */
-	clone: clone,
-
-
-
-
-
-
-
-	/**
-	 * @fun extendClass #  EXT class prototype objects
-	 */
-	extendClass: extendClass,
-	
-	/**
-	 * @fun assert
-	 */
-	assert: function(is, code) {
-		if (is) {
-			return;
-		}
-		if (Array.isArray(code)) {
-			throw Error.new(code);
-		} else {
-			var args = Array.toArray(arguments);
-			if (typeof code == 'number') {
-				args = args.slice(2);
-			} else {
-				args = args.slice(1);
-				code = -2;
-			}
-			if (args.length) {
-				throw Error.new(String.format.apply(null, args), code);
-			} else {
-				throw Error.new('assert fail, unforeseen exceptions', code);
-			}
-		}
-	},
-
-	/**
-	 * @func sleep()
-	 */
-	sleep: function(time, defaultValue) {
-		return new Promise((ok, err)=>setTimeout(e=>ok(defaultValue), time));
-	},
-
-	/**
-	 * @func scopeLock(mutex, cb)
-	 */
-	scopeLock: scopeLock,
-
-	/**
-	 * @func promise(cb)
-	 */
-	promise: function(cb) {
-		return new Promise(function(resolve, reject) {
-			try {
-				var r = cb(resolve, reject);
-				if (r instanceof Promise) {
-					r.catch(reject);
-				}
-			} catch(err) {
-				reject(err);
-			}
-		});
-	},
-
-	// @end
-});
+	clone,
+	extend,
+	noop,
+	isNull,
+	extendClass,
+	scopeLock,
+	get,
+	set,
+	del,
+	random,
+	fixRandom,
+	filter,
+	update,
+	select,
+	equalsClass,
+	assert,
+	sleep,
+	promise,
+}

@@ -215,13 +215,6 @@ function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-function extendObject<T, T2>(obj: T, extd: T2): T & T2 {
-	for (var item of Object.entries(extd)) {
-		(<any>obj)[item[0]] = item[1];
-	}
-	return <T & T2>obj;
-}
-
 if (haveNode && !haveNgui) {
 	var fs = _require('fs');
 	_require('module').Module._extensions['.keys'] = function(module: NodeModule, filename: string): any {
@@ -358,7 +351,6 @@ export default {
 	isLocal,				// 
 	isLocalZip,
 	isNetwork,
-	extendObject,
 	get options() { return options },
 	get config() { return get_config() },
 	cwd: _cwd,
