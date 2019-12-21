@@ -237,7 +237,7 @@ export function initEvents(self: any) {
 		}
 	} else {
 		var args = Array.toArray(arguments);
-		for (var i = 1, name; (name = args[i]); i++) {
+		for (var i = 1, name: string; (name = args[i]); i++) {
 			self[PREFIX + name] = new EventNoticer(name, self);
 		}
 	}
