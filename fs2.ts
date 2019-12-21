@@ -28,15 +28,57 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var _pkgutil = require('./_pkgutil');
-var { unrealized } = require('./_util');
+import * as fs from './fs';
 
-module.exports = {
-	executable: unrealized,
-	documents: unrealized,
-	temp: unrealized,
-	resources: unrealized,
-	fallbackPath: _pkgutil.fallbackPath,
-	chdir: _pkgutil.chdir,
-	cwd: _pkgutil.cwd,
-};
+type PathLike = fs.PathLike;
+
+export function readdir(dir: PathLike) {
+	return new Promise<string[]>((resolve, reject)=>{
+		fs.readdir(dir, (err, ls)=>{
+			if (err)
+				reject(err);
+			else 
+				resolve(ls);
+		});
+	});
+}
+
+export function rename(source: PathLike, target: PathLike) {
+	return new Promise((resolve, reject)=>{
+		fs.rename(source, target, (err)=>err ? reject(err): resolve());
+	});
+}
+
+export function remove(path: PathLike): Promise<void> {
+	return new Promise(function(resolve, reject) {
+		fs.unlink(path, function(err) {
+			if (err)
+				reject(err)
+			else
+				resolve();
+		});
+	})
+}
+
+export interface RemoverResult extends Promise<void> {
+	cancel(): void;
+}
+
+export function remover(path: string): RemoverResult {
+	var p = <RemoverResult>new Promise((resolve, reject)=>{
+		p.cancel = fs.remover(path, (err)=>err ? reject(err): resolve()).cancel;
+	});
+	return p;
+}
+
+export function exists(path: PathLike) {
+	return new Promise((resolve)=>{
+		fs.exists(path, (ok)=>resolve(ok));
+	});
+}
+
+export function mkdirp(path: string, mode: fs.MkdirOptopns) {
+	return new Promise<void>((resolve, reject)=>{
+		fs.mkdirp(path, mode, (err)=>err ? reject(err): resolve());
+	});
+}

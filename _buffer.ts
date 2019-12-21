@@ -28,33 +28,38 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-"use strict";
+import utils from './util';
 
-const utils = require('./util');
 // Temporary buffers to convert numbers.
 const float32Array = new Float32Array(1);
 const uInt8Float32Array = new Uint8Array(float32Array.buffer);
 const float64Array = new Float64Array(1);
 const uInt8Float64Array = new Uint8Array(float64Array.buffer);
-var _bigint = null;
+var _bigint: any = null;
 
-module.exports = exports = {
-	get isBigInt() { return !!_bigint }
-};
+var _readBigUIntBE: (self: Uint8Array, offset: number, end: number)=>bigint;
+var _writeBigIntLE: (bytes: number[], bigint: bigint)=>number;
 
-if (global.BigInt) {
-	(function(ok) {
+function readBigUIntBE(self: Uint8Array, offset: number, end: number): bigint {
+	return _readBigUIntBE(self, offset, end);
+}
+
+function writeBigIntLE(bytes: number[], bigint: bigint): number {
+	return _writeBigIntLE(bytes, bigint);
+}
+
+if (!!globalThis.BigInt) {
+	(function(ok: any, ...args: any[]) {
 		if (utils.haveWeb) {
 			import('./_bigint').then(ok); // bigint syntax, webpack delay load
 		} else {
 			ok(arguments[1]("./_bigint"));
 		}
-	})(function(m) {
-		_bigint = m;
+	})(function(bigint: any) {
+		_bigint = bigint;
 		_bigint._set(checkInt);
-		exports.readBigIntBE = m._readBigIntBE;
-		exports.writeBigIntLE = m._writeBigIntLE;
-		// console.log('exports.writeBigIntLE', exports.writeBigIntLE)
+		_readBigUIntBE = bigint._readBigUIntBE;
+		_writeBigIntLE = bigint._writeBigIntLE;
 	}, require);
 }
 
@@ -64,29 +69,29 @@ float32Array[0] = -1; // 0xBF800000
 // check self with `os.endianness()` because that is determined at compile time.
 const bigEndian = uInt8Float32Array[3] === 0;
 
-function ERR_BUFFER_OUT_OF_BOUNDS(name) {
+function ERR_BUFFER_OUT_OF_BOUNDS(name?: string) {
 	if (name) {
 		return new RangeError(`"${name}" is outside of buffer bounds`);
 	}
 	return new RangeError('Attempt to access memory outside buffer bounds');
 }
 
-function ERR_OUT_OF_RANGE(str,range,input) {
+function ERR_OUT_OF_RANGE(str: string, range: string, input: number) {
 	return new RangeError(`ERR_OUT_OF_RANGE ${str}, ${range}, ${input}`);
 }
 
-function validateNumber(value, name) {
+function validateNumber(value: any, name?: string) {
 	if (typeof value !== 'number')
 		throw new TypeError(`ERR_INVALID_ARG_TYPE ${name} number ${value}`);
 }
 
-function checkBounds(buf, offset, byteLength) {
+function checkBounds(buf: Uint8Array, offset: number, byteLength: number) {
 	validateNumber(offset, 'offset');
 	if (buf[offset] === undefined || buf[offset + byteLength] === undefined)
 		boundsError(offset, buf.length - (byteLength + 1));
 }
 
-function checkInt(value, min, max, buf, offset, byteLength) {
+function checkInt(value: number, min: number, max: number, buf: Uint8Array, offset: number, byteLength: number) {
 	if (value > max || value < min) {
 		const n = typeof min === 'bigint' ? 'n' : '';
 		let range;
@@ -105,7 +110,7 @@ function checkInt(value, min, max, buf, offset, byteLength) {
 	checkBounds(buf, offset, byteLength);
 }
 
-function boundsError(value, length, type) {
+function boundsError(value: number, length: number, type?: string) {
 	if (Math.floor(value) !== value) {
 		validateNumber(value, type);
 		throw ERR_OUT_OF_RANGE(type || 'offset', 'an integer', value);
@@ -120,7 +125,7 @@ function boundsError(value, length, type) {
 }
 
 // Read integers.
-function readUInt8(self, offset = 0) {
+function readUInt8(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const val = self[offset];
 	if (val === undefined)
@@ -129,7 +134,7 @@ function readUInt8(self, offset = 0) {
 	return val;
 }
 
-function readInt8(self, offset = 0) {
+function readInt8(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const val = self[offset];
 	if (val === undefined)
@@ -138,7 +143,7 @@ function readInt8(self, offset = 0) {
 	return val | (val & 2 ** 7) * 0x1fffffe;
 }
 
-function readInt16BE(self, offset = 0) {
+function readInt16BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 1];
@@ -149,7 +154,7 @@ function readInt16BE(self, offset = 0) {
 	return val | (val & 2 ** 15) * 0x1fffe;
 }
 
-function readUInt16BE(self, offset = 0) {
+function readUInt16BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 1];
@@ -159,7 +164,28 @@ function readUInt16BE(self, offset = 0) {
 	return first * 2 ** 8 + last;
 }
 
-function readInt32BE(self, offset = 0) {
+function readInt24BE(buf: Uint8Array, offset = 0) {
+	validateNumber(offset, 'offset');
+	const first = buf[offset];
+	const last = buf[offset + 2];
+	if (first === undefined || last === undefined)
+		boundsError(offset, buf.length - 3);
+
+	const val = first * 2 ** 16 + buf[++offset] * 2 ** 8 + last;
+	return val | (val & 2 ** 23) * 0x1fe;
+}
+
+function readUInt24BE(buf: Uint8Array, offset = 0) {
+	validateNumber(offset, 'offset');
+	const first = buf[offset];
+	const last = buf[offset + 2];
+	if (first === undefined || last === undefined)
+		boundsError(offset, buf.length - 3);
+
+	return first * 2 ** 16 + buf[++offset] * 2 ** 8 + last;
+}
+
+function readInt32BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 3];
@@ -172,7 +198,7 @@ function readInt32BE(self, offset = 0) {
 		last;
 }
 
-function readUInt32BE(self, offset = 0) {
+function readUInt32BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 3];
@@ -185,7 +211,7 @@ function readUInt32BE(self, offset = 0) {
 		last;
 }
 
-function readInt40BE(self, offset = 0) {
+function readInt40BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 4];
@@ -199,7 +225,7 @@ function readInt40BE(self, offset = 0) {
 		last;
 }
 
-function readUInt40BE(self, offset = 0) {
+function readUInt40BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 4];
@@ -213,7 +239,7 @@ function readUInt40BE(self, offset = 0) {
 		last;
 }
 
-function readInt48BE(self, offset = 0) {
+function readInt48BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 5];
@@ -228,7 +254,7 @@ function readInt48BE(self, offset = 0) {
 		last;
 }
 
-function readUInt48BE(self, offset = 0) {
+function readUInt48BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 5];
@@ -242,7 +268,7 @@ function readUInt48BE(self, offset = 0) {
 		last;
 }
 
-function readBigInt64BE(self, offset = 0) {
+function readBigInt64BE(self: Uint8Array, offset = 0): bigint | number {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -250,7 +276,7 @@ function readBigInt64BE(self, offset = 0) {
 		boundsError(offset, self.length - 8);
 
 	if (_bigint) {
-		return _bigint._readBigInt64BE(self, offset);
+		return <bigint>_bigint._readBigInt64BE(self, offset);
 	}
 
 	console.warn('Not support bigint');
@@ -270,7 +296,7 @@ function readBigInt64BE(self, offset = 0) {
 	return hi * 2 ** 32 + lo;
 }
 
-function readBigUInt64BE(self, offset = 0) {
+function readBigUInt64BE(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -278,7 +304,7 @@ function readBigUInt64BE(self, offset = 0) {
 		boundsError(offset, self.length - 8);
 
 	if (_bigint) {
-		return _bigint._readBigUInt64BE(self, offset)
+		return <bigint>_bigint._readBigUInt64BE(self, offset)
 	}
 
 	console.warn('Not support bigint');
@@ -296,17 +322,17 @@ function readBigUInt64BE(self, offset = 0) {
 	return hi * 2 ** 32 + lo;
 }
 
-function readIntBE(self, offset = 0, byteLength = 4) {
+function readIntBE(self: Uint8Array, offset = 0, byteLength = 4) {
 	validateNumber(offset, 'offset');
 
 	if (byteLength === 6)
 		return readInt48BE(self, offset);
 	if (byteLength === 5)
 		return readInt40BE(self, offset);
-	if (byteLength === 3)
-		return readInt24BE(self, offset);
 	if (byteLength === 4)
 		return readInt32BE(self, offset);
+	if (byteLength === 3)
+		return readInt24BE(self, offset);
 	if (byteLength === 2)
 		return readInt16BE(self, offset);
 	if (byteLength === 1)
@@ -315,17 +341,17 @@ function readIntBE(self, offset = 0, byteLength = 4) {
 	boundsError(byteLength, 6, 'byteLength');
 }
 
-function readUIntBE(self, offset = 0, byteLength = 4) {
+function readUIntBE(self: Uint8Array, offset = 0, byteLength = 4) {
 	validateNumber(offset, 'offset');
 
 	if (byteLength === 6)
 		return readUInt48BE(self, offset);
 	if (byteLength === 5)
 		return readUInt40BE(self, offset);
-	if (byteLength === 3)
-		return readUInt24BE(self, offset);
 	if (byteLength === 4)
 		return readUInt32BE(self, offset);
+	if (byteLength === 3)
+	return readUInt24BE(self, offset);
 	if (byteLength === 2)
 		return readUInt16BE(self, offset);
 	if (byteLength === 1)
@@ -335,7 +361,7 @@ function readUIntBE(self, offset = 0, byteLength = 4) {
 }
 
 // Read floats
-function readFloatBackwards(self, offset = 0) {
+function readFloatBackwards(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 3];
@@ -349,7 +375,7 @@ function readFloatBackwards(self, offset = 0) {
 	return float32Array[0];
 }
 
-function readFloatForwards(self, offset = 0) {
+function readFloatForwards(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 3];
@@ -363,7 +389,7 @@ function readFloatForwards(self, offset = 0) {
 	return float32Array[0];
 }
 
-function readDoubleBackwards(self, offset = 0) {
+function readDoubleBackwards(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -381,7 +407,7 @@ function readDoubleBackwards(self, offset = 0) {
 	return float64Array[0];
 }
 
-function readDoubleForwards(self, offset = 0) {
+function readDoubleForwards(self: Uint8Array, offset = 0) {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -400,7 +426,7 @@ function readDoubleForwards(self, offset = 0) {
 }
 
 // Write integers.
-function writeU_Int8(buf, value, offset, min, max) {
+function writeU_Int8(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
 	value = +value;
 	// `checkInt()` can not be used here because it checks two entries.
 	validateNumber(offset, 'offset');
@@ -414,7 +440,7 @@ function writeU_Int8(buf, value, offset, min, max) {
 	return offset + 1;
 }
 
-function writeU_Int16BE(buf, value, offset, min, max) {
+function writeU_Int16BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
 	value = +value;
 	checkInt(value, min, max, buf, offset, 1);
 
@@ -423,7 +449,7 @@ function writeU_Int16BE(buf, value, offset, min, max) {
 	return offset;
 }
 
-function writeU_Int32BE(buf, value, offset, min, max) {
+function writeU_Int32BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
 	value = +value;
 	checkInt(value, min, max, buf, offset, 3);
 
@@ -437,7 +463,19 @@ function writeU_Int32BE(buf, value, offset, min, max) {
 	return offset + 4;
 }
 
-function writeU_Int40BE(buf, value, offset, min, max) {
+function writeU_Int24BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
+  value = +value;
+  checkInt(value, min, max, buf, offset, 2);
+
+  buf[offset + 2] = value;
+  value = value >>> 8;
+  buf[offset + 1] = value;
+  value = value >>> 8;
+  buf[offset] = value;
+  return offset + 3;
+}
+
+function writeU_Int40BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
 	value = +value;
 	checkInt(value, min, max, buf, offset, 4);
 
@@ -452,7 +490,7 @@ function writeU_Int40BE(buf, value, offset, min, max) {
 	return offset + 4;
 }
 
-function writeU_Int48BE(buf, value, offset, min, max) {
+function writeU_Int48BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
 	value = +value;
 	checkInt(value, min, max, buf, offset, 5);
 
@@ -469,47 +507,47 @@ function writeU_Int48BE(buf, value, offset, min, max) {
 	return offset + 4;
 }
 
-function writeInt8(self, value, offset = 0) {
+function writeInt8(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int8(self, value, offset, -0x80, 0x7f);
 }
 
-function writeUInt8(self, value, offset = 0) {
+function writeUInt8(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int8(self, value, offset, 0, 0xff);
 }
 
-function writeInt16BE(self, value, offset = 0) {
+function writeInt16BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int16BE(self, value, offset, -0x8000, 0x7fff);
 }
 
-function writeUInt16BE(self, value, offset = 0) {
+function writeUInt16BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int16BE(self, value, offset, 0, 0xffff);
 }
 
-function writeInt32BE(self, value, offset = 0) {
+function writeInt32BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int32BE(self, value, offset, -0x80000000, 0x7fffffff);
 }
 
-function writeUInt32BE(self, value, offset = 0) {
+function writeUInt32BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int32BE(self, value, offset, 0, 0xffffffff);
 }
 
-function writeInt48BE(self, value, offset = 0) {
+function writeInt48BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int48BE(self, value, offset, -0x800000000000, 0x7fffffffffff);
 }
 
-function writeUInt48BE(self, value, offset = 0) {
+function writeUInt48BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int48BE(self, value, offset, 0, 0xffffffffffffff);
 }
 
-function writeBigInt64BE(self, value, offset = 0) {
+function writeBigInt64BE(self: Uint8Array, value: number, offset = 0) {
 	return _bigint._writeBigInt64BE(self, value, offset);
 }
 
-function writeBigUInt64BE(self, value, offset = 0) {
+function writeBigUInt64BE(self: Uint8Array, value: number, offset = 0) {
 	return _bigint._writeBigUInt64BE(self, value, offset);
 }
 
-function writeIntBE(self, value, offset = 0, byteLength = 4) {
+function writeIntBE(self: Uint8Array, value: number, offset = 0, byteLength = 4) {
 	if (byteLength === 6)
 		return writeU_Int48BE(self, value, offset, -0x800000000000, 0x7fffffffffff);
 	if (byteLength === 5)
@@ -526,7 +564,7 @@ function writeIntBE(self, value, offset = 0, byteLength = 4) {
 	boundsError(byteLength, 6, 'byteLength');
 }
 
-function writeUIntBE(self, value, offset = 0, byteLength = 4) {
+function writeUIntBE(self: Uint8Array, value: number, offset = 0, byteLength = 4) {
 	if (byteLength === 6)
 		return writeU_Int48BE(self, value, offset, 0, 0xffffffffffffff);
 	if (byteLength === 5)
@@ -544,7 +582,7 @@ function writeUIntBE(self, value, offset = 0, byteLength = 4) {
 }
 
 // Write floats.
-function writeFloatForwards(self, val, offset = 0) {
+function writeFloatForwards(self: Uint8Array, val: number, offset = 0) {
 	val = +val;
 	checkBounds(self, offset, 3);
 
@@ -556,7 +594,7 @@ function writeFloatForwards(self, val, offset = 0) {
 	return offset;
 }
 
-function writeFloatBackwards(self, val, offset = 0) {
+function writeFloatBackwards(self: Uint8Array, val: number, offset = 0) {
 	val = +val;
 	checkBounds(self, offset, 3);
 
@@ -568,7 +606,7 @@ function writeFloatBackwards(self, val, offset = 0) {
 	return offset;
 }
 
-function writeDoubleForwards(self, val, offset = 0) {
+function writeDoubleForwards(self: Uint8Array, val: number, offset = 0) {
 	val = +val;
 	checkBounds(self, offset, 7);
 
@@ -584,7 +622,7 @@ function writeDoubleForwards(self, val, offset = 0) {
 	return offset;
 }
 
-function writeDoubleBackwards(self, val, offset = 0) {
+function writeDoubleBackwards(self: Uint8Array, val: number, offset = 0) {
 	val = +val;
 	checkBounds(self, offset, 7);
 
@@ -605,7 +643,8 @@ var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
-Object.assign(exports, {
+export default {
+	get isBigInt() { return !!globalThis.BigInt },
 	// read
 	readInt8, readUInt8,
 	readInt16BE, readUInt16BE,
@@ -615,7 +654,8 @@ Object.assign(exports, {
 	readBigInt64BE, readBigUInt64BE,
 	readIntBE, readUIntBE,
 	readFloatBE, readDoubleBE,
-	// write
+	readBigUIntBE,
+	// // write
 	writeInt8, writeUInt8,
 	writeInt16BE, writeUInt16BE,
 	writeInt32BE, writeUInt32BE,
@@ -623,4 +663,5 @@ Object.assign(exports, {
 	writeBigInt64BE, writeBigUInt64BE,
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
-});
+	writeBigIntLE,
+};

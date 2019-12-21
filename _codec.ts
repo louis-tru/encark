@@ -28,22 +28,24 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var errno = require('./errno');
+import utils from './util';
+import errno from './errno';
+
 var b64pad = '=';
 var hex_tab = '0123456789abcdef';
 var base64_tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-var hex_keys = {}, base64_keys = { '=': 65 };
+var hex_keys = new Map<string, number>();
+var base64_keys = new Map<string, number>([['=', 65 ]]);
 
-hex_tab.split('').forEach((e,i)=>(hex_keys[e]=i, hex_keys[e.toUpperCase()]=i));
-base64_tab.split('').forEach((e,i)=>base64_keys[e]=i);
+hex_tab.split('').forEach((e,i)=>(hex_keys.set(e, i), hex_keys.set(e.toUpperCase(), i)));
+base64_tab.split('').forEach((e,i)=>base64_keys.set(e, i));
 
-// encode
+export type Bytes = Uint8Array | number[];
 
 // string => bytes
 // convert unicode to utf-8 codeing
-function encodeUTF8Word(unicode) {
-	var bytes = [];
+function encodeUTF8Word(unicode: number): number[] {
+	var bytes: number[] = [];
 	if (unicode < 0x7F + 1) {             // 单字节编码
 		bytes.push(unicode);
 	} else {
@@ -79,8 +81,8 @@ function encodeUTF8Word(unicode) {
 
 // string => bytes
 // Convert str to utf8 to a bytes
-function encodeUTF8(str) {
-	var bytes = [];
+function encodeUTF8(str: string): number[] {
+	var bytes: number[] = [];
 	for (var i = 0, l = str.length; i < l; i++) {
 		bytes.push( ...encodeUTF8Word(str.charCodeAt(i)) );
 	}
@@ -88,23 +90,23 @@ function encodeUTF8(str) {
 }
 
 // string => bytes
-function encodeLatin1From(str) {
-	var bytes = [];
+function encodeLatin1From(str: string): number[] {
+	var bytes: number[] = [];
 	for (var i = 0, l = str.length; i < l; i++)
 		bytes.push(str.charCodeAt(i) % 256 );
 	return bytes;
 }
 
 // string => bytes
-function encodeAsciiFrom(str) {
-	var bytes = [];
+function encodeAsciiFrom(str: string): number[] {
+	var bytes: number[] = [];
 	for (var i = 0, l = str.length; i < l; i++)
 		bytes.push(str.charCodeAt(i) % 128 );
 	return bytes;
 }
 
 // bytes => string
-function encodeHexFrom(bytes, start, end) {
+function encodeHexFrom(bytes: Bytes, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++) {
@@ -114,7 +116,7 @@ function encodeHexFrom(bytes, start, end) {
 }
 
 // bytes => string
-function encodeBase64From(bytes, start, end) {
+function encodeBase64From(bytes: Bytes, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var size = end - start;
 	var str = '';
@@ -132,7 +134,7 @@ function encodeBase64From(bytes, start, end) {
 
 // decode
 
-function checkOffset(bytes, start, end) {
+function checkOffset(bytes: Bytes, start: number, end: number): void {
 	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
@@ -140,7 +142,7 @@ function checkOffset(bytes, start, end) {
 }
 
 // convert utf8 bytes to unicode
-function decodeUTF8Word(bytes, offset) {
+function decodeUTF8Word(bytes: Bytes, offset: number) {
 	var str = offset;
 	var c = bytes[str]; str++;
 	if ((c & 0x80) == 0) { // 小于 128 (c & 10000000) == 00000000
@@ -211,7 +213,7 @@ function decodeUTF8Word(bytes, offset) {
 }
 
 // convert utf8 bytes to a str
-function decodeUTF8From(bytes, start, end) {
+function decodeUTF8From(bytes: Bytes, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = [];
 	for(var i = start; i < end;) {
@@ -223,12 +225,12 @@ function decodeUTF8From(bytes, start, end) {
 }
 
 // bytes => string
-function decodeUTF8(bytes) {
+function decodeUTF8(bytes: Bytes): string {
 	return decodeUTF8From(bytes, 0, bytes.length);
 }
 
 // bytes => string
-function decodeLatin1From(bytes, start, end) {
+function decodeLatin1From(bytes: Bytes, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++)
@@ -237,7 +239,7 @@ function decodeLatin1From(bytes, start, end) {
 }
 
 // bytes => string
-function decodeAsciiFrom(bytes, start, end) {
+function decodeAsciiFrom(bytes: Bytes, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++)
@@ -246,13 +248,13 @@ function decodeAsciiFrom(bytes, start, end) {
 }
 
 // hex string => bytes
-function decodeHex(str) {
+function decodeHex(str: string): number[] {
 	var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
 	utils.assert(str.length % 2 === 0, ERR_BAD_ARGUMENT);
 	var bytes = [];
 	for (var i = 0, l = str.length; i < l; i+=2) {
-		var a = hex_keys[str[i]];
-		var b = hex_keys[str[i+1]];
+		var a = <number>hex_keys.get(str[i]);
+		var b = <number>hex_keys.get(str[i+1]);
 		// utils.assert(a !== undefined, ERR_BAD_ARGUMENT);
 		// utils.assert(b !== undefined, ERR_BAD_ARGUMENT);
 		bytes.push( a << 4 | b );
@@ -261,15 +263,15 @@ function decodeHex(str) {
 }
 
 // base64 string => bytes
-function decodeBase64(str) {
+function decodeBase64(str: string): number[] {
 	var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
 	utils.assert(str.length % 4 === 0, ERR_BAD_ARGUMENT);
 	var bytes = [];
 	for (var i = 0, l = str.length; i < l; i+=4) {
-		var a = base64_keys[str[i]];
-		var b = base64_keys[str[i+1]];
-		var c = base64_keys[str[i+2]];
-		var d = base64_keys[str[i+3]];
+		var a = <number>base64_keys.get(str[i]);
+		var b = <number>base64_keys.get(str[i+1]);
+		var c = <number>base64_keys.get(str[i+2]);
+		var d = <number>base64_keys.get(str[i+3]);
 		// utils.assert(a !== undefined, ERR_BAD_ARGUMENT);
 		// utils.assert(b !== undefined, ERR_BAD_ARGUMENT);
 		// utils.assert(c !== undefined, ERR_BAD_ARGUMENT);
@@ -296,18 +298,18 @@ function decodeBase64(str) {
 /*
  * Convert an array of bytes to a hex string.
  */
-function convertHexString(bytes) {
+function convertHexString(bytes: Bytes) {
 	return encodeHexFrom(bytes, 0, bytes.length);
 }
 
 /*
  * Convert an array of bytes to a base64 string.
  */
-function convertBase64String(bytes) {
+function convertBase64String(bytes: Bytes) {
 	return encodeBase64From(bytes, 0, bytes.length);
 }
 
-module.exports = {
+export default {
 	// encode
 	encodeUTF8Word,
 	encodeUTF8,

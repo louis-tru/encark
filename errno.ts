@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2015, xuewen.chu
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -14,7 +14,7 @@
  *     * Neither the name of xuewen.chu nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -25,51 +25,33 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * ***** END LICENSE BLOCK ***** */
 
-var fs = require('./fs');
-
-function readdir(dir) {
-	return new Promise((resolve, reject)=>{
-		fs.readdir(dir, (err, ls)=>{
-			if (err)
-				reject(err);
-			else 
-				resolve(ls);
-		});
-	});
+class ErrnoList {
+	ERR_MONITOR_BEEN_STARTED: ErrnoCode = [-30001, 'MONITOR BEEN STARTED']
+	ERR_MONITOR_NOT_BEEN_STARTED: ErrnoCode = [-30002, 'MONITOR NOT BEEN STARTED']
+	ERR_FORBIDDEN_ACCESS: ErrnoCode = [-30003, 'FORBIDDEN ACCESS']
+	ERR_CONNECTION_DISCONNECTION: ErrnoCode = [-30004, 'Connection disconnection']
+	ERR_CONNECTION_CLOSE_STATUS: ErrnoCode = [-30005, 'Error connection close status']
+	ERR_METHOD_CALL_TIMEOUT: ErrnoCode = [-30006, 'method call timeout']
+	ERR_DOWNLOAD_FAIL: ErrnoCode = [-30007, 'Download fail']
+	ERR_ILLEGAL_ACCESS: ErrnoCode = [-30008, 'Illegal access']
+	// ERR_REQUEST_AUTH_FAIL: ErrnoCode = [-30010, 'request auth fail']
+	ERR_REQUEST_ABORT: ErrnoCode = [-30011, 'request abort']
+	ERR_HTTP_REQUEST_TIMEOUT: ErrnoCode = [-10045, 'http request timeout']
+	ERR_METHOD_UNREALIZED: ErrnoCode = [-10046, 'method unrealized']
+	ERR_PARAM_TYPE_MISMATCH: ErrnoCode = [-10047, 'param type mismatch']
+	ERR_REPEAT_FNODE_CONNECT: ErrnoCode = [-10048, 'REPEAT FNODE CONNECT']
+	ERR_FMT_CLIENT_OFFLINE: ErrnoCode = [-10049, 'FMT CLIENT OFFLINE']
+	ERR_UNABLE_PARSE_JSONB: ErrnoCode = [-10050, 'Unable to parse jsonb, data corrupted']
+	ERR_FNODE_CONNECT_TIMEOUT: ErrnoCode = [-10051, 'FNODE CONNECT TIMEOUT']
+	ERR_REQUEST_AUTH_FAIL: ErrnoCode = [-10052, 'REQUEST AUTH FAIL']
+	ERR_REPEAT_LOGIN_FMTC: ErrnoCode = [-10053, 'REPEAT LOGIN FMTC']
+	ERR_PREV_PING_NOT_RESOLVE: ErrnoCode = [-10054, 'Previous Ping not resolved']
+	ERR_PING_TIMEOUT: ErrnoCode = [-10055, 'Ping timeout']
+	ERR_BAD_ARGUMENT: ErrnoCode = [-10056, 'bad argument.']
+	ERR_WGET_FORCE_ABORT: ErrnoCode = [-10057, 'WGET FORCE ABORT']
 }
 
-function rename(source, target) {
-	return new Promise((resolve, reject)=>{
-		fs.rename(source, target, (err)=>err ? reject(err): resolve());
-	});
-}
-
-function remover(path) {
-	return new Promise((resolve, reject)=>{
-		fs.rm_r(path, (err)=>err ? reject(err): resolve());
-	});
-}
-
-function exists(path) {
-	return new Promise((resolve)=>{
-		fs.exists(path, (ok)=>resolve(ok));
-	});
-}
-
-function mkdirp(path, mode) {
-	return new Promise((resolve, reject)=>{
-		fs.mkdir_p(path, mode, (err)=>err ? reject(err): resolve());
-	});
-}
-
-module.exports = {
-	__proto__: fs,
-	readdir,
-	rename,
-	remover,
-	exists,
-	mkdirp,
-};
+export default new ErrnoList();

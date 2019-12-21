@@ -43,6 +43,10 @@ interface Object {
 	hashCode(): number;
 }
 
+interface AnyObject {
+	[key: string]: any;
+}
+
 type TimeoutResult = any; // NodeJS.Timeout | number;
 
 interface Function {

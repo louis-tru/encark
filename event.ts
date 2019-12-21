@@ -28,29 +28,30 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-Object.assign(exports, require('./_event'));
+import _util from './_util';
+import {EventNoticer,Event,Listen,Listen2} from './_event';
+export * from './_event';
 
-const _util = require('./_util');
 const PREFIX = 'on';
 
 /**********************************************************************************/
 
-const {EventNoticer,Event} = exports;
+// const {EventNoticer,Event} = event;
 const REG = new RegExp('^' + PREFIX);
 
 /**
  * @class Notification
  */
-class Notification {
-	
+export class Notification<Sender = any, Data = any, Return = number> {
+
 	/**
 	 * @func getNoticer
 	 */
-	getNoticer(name) {
-		var noticer = this[PREFIX + name];
+	getNoticer(name: string): EventNoticer<Sender, Data, Return> {
+		var noticer = (<any>this)[PREFIX + name];
 		if ( ! noticer ) {
-			noticer = new EventNoticer(name, this);
-			this[PREFIX + name] = noticer;
+			noticer = new EventNoticer<Sender, Data, Return>(name, <any>this);
+			(<any>this)[PREFIX + name] = noticer;
 		}
 		return noticer;
 	}
@@ -58,24 +59,24 @@ class Notification {
 	/**
 	 * @func hasNoticer
 	 */
-	hasNoticer(name) {
+	hasNoticer(name: string) {
 		return (PREFIX + name) in this;
 	}
 	
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name, func) {
-		if ( typeof func == 'string' ) {
-			var func2 = this[func]; // find func 
-			if ( typeof func2 == 'function' ) {
-				return this.addEventListener(name, func2, 0); // default id 0
+	addDefaultListener(name: string, listen: Listen<Event<Sender, Data, Return>>) {
+		if ( typeof listen == 'string' ) {
+			var func = (<any>this)[listen]; // find func 
+			if ( typeof func == 'function' ) {
+				return this.addEventListener(name, func, 0); // default id 0
 			} else {
-				throw Error.new(`Cannot find a function named "${func}"`);
+				throw Error.new(`Cannot find a function named "${listen}"`);
 			}
 		} else {
-			if (func) {
-				return this.addEventListener(name, func, 0); // default id 0
+			if (listen) {
+				return this.addEventListener(name, listen, 0); // default id 0
 			} else { // delete default listener
 				this.removeEventListener(name, 0)
 			}
@@ -85,9 +86,9 @@ class Notification {
 	/**
 	 * @func addEventListener(name, listen[,scope[,id]])
 	 */
-	addEventListener(name, ...args) {
+	addEventListener<Scope>(name: string, listen: Listen<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
-		var r = del.on(...args);
+		var r = del.on(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
@@ -95,9 +96,9 @@ class Notification {
 	/**
 	 * @func addEventListenerOnce(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce(name, ...args) {
+	addEventListenerOnce<Scope>(name: string, listen: Listen<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
-		var r = del.once(...args);
+		var r = del.once(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
@@ -105,9 +106,9 @@ class Notification {
 	/**
 	 * @func addEventListener2(name, listen[,scope[,id]])
 	 */
-	addEventListener2(name, ...args) {
+	addEventListener2<Scope>(name: string, listen: Listen2<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
-		var r = del.on2(...args);
+		var r = del.on2(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
@@ -115,9 +116,23 @@ class Notification {
 	/**
 	 * @func addEventListenerOnce2(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce2(name, ...args) {
+	addEventListenerOnce2<Scope>(name: string, listen: Listen2<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
-		var r = del.once2(...args);
+		var r = del.once2(listen, scope, id);
+		this.triggerListenerChange(name, del.length, 1);
+		return r;
+	}
+
+	addEventForward(name: string, noticer: EventNoticer<Sender, Data, Return>, id?: string) {
+		var del = this.getNoticer(name);
+		var r = del.forward(noticer, id);
+		this.triggerListenerChange(name, del.length, 1);
+		return r;
+	}
+
+	addEventForwardOnce(noticer: EventNoticer<Sender, Data, Return>, id?: string) {
+		var del = this.getNoticer(name);
+		var r = del.forwardOnce(noticer, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
@@ -127,8 +142,8 @@ class Notification {
 	* @arg name {String}       事件名称
 	* @arg data {Object}       要发送的消数据
 	*/
-	trigger(name, data) {
-		return this.triggerWithEvent(name, new Event(data));
+	trigger(name: string, data: Data) {
+		return this.triggerWithEvent(name, new Event<Sender, Data, Return>(data));
 	}
 
 	/**
@@ -136,8 +151,8 @@ class Notification {
 	* @arg name {String}       事件名称
 	* @arg event {Event}       Event 
 	*/
-	triggerWithEvent(name, event) {
-		var noticer = this[PREFIX + name];
+	triggerWithEvent(name: string, event: Event<Sender, Data, Return>) {
+		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			return noticer.triggerWithEvent(event);
 		}
@@ -147,13 +162,13 @@ class Notification {
 	/**
 	 * @func $trigger(name, event, is_event)
 	 */
-	$trigger(name, event, is_event) {
-		var noticer = this[PREFIX + name];
+	$trigger(name: string, event: Event<Sender, Data, Return> | Data, is_event?: boolean) {
+		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			if ( is_event ) {
-				return this.triggerWithEvent(name, event)
+				return this.triggerWithEvent(name, <Event<Sender, Data, Return>>event)
 			} else {
-				return this.trigger(name, event)
+				return this.trigger(name, <Data>event)
 			}
 		}
 		return 0;
@@ -162,10 +177,10 @@ class Notification {
 	/**
 	 * @func removeEventListener(name,[func[,scope]])
 	 */
-	removeEventListener(name, ...args) {
-		var noticer = this[PREFIX + name];
+	removeEventListener(name: string, listen: any, scope?: any) {
+		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
-			noticer.off(...args);
+			noticer.off(listen, scope);
 			this.triggerListenerChange(name, noticer.length, -1);
 		}
 	}
@@ -174,7 +189,7 @@ class Notification {
 	 * @func removeEventListenerWithScope(scope) 卸载notification上所有与scope相关的侦听器
 	 * @arg scope {Object}
 	 */
-	removeEventListenerWithScope(scope) {
+	removeEventListenerWithScope(scope: any) {
 		for ( let noticer of this.allNoticers() ) {
 			noticer.off(scope);
 			this.triggerListenerChange(name, noticer.length, -1);
@@ -192,7 +207,7 @@ class Notification {
 	/**
 	 * @func triggerListenerChange
 	 */
-	triggerListenerChange(name, count, change) {}
+	triggerListenerChange(name: string, count: number, change: number) {}
 
 }
 
@@ -201,7 +216,7 @@ class Notification {
  * @arg self     {Object} 
  * @arg argus... {String}  event name
  */
-function initEvents(self) {
+export function initEvents(self: any) {
 	if (arguments.length == 1) {
 		if (self) {
 			var root = self;
@@ -228,8 +243,8 @@ function initEvents(self) {
 	}
 }
 
-function allNoticers(notification) {
-	var result = [];
+export function allNoticers(notification: any) {
+	var result: any[] = [];
 	for ( var i in notification ) {
 		if ( REG.test(i) ) {
 			var noticer = notification[i];
@@ -240,7 +255,3 @@ function allNoticers(notification) {
 	}
 	return result;
 }
-
-exports.Notification = Notification;
-exports.initEvents = initEvents;
-exports.allNoticers = allNoticers;

@@ -28,65 +28,76 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-const keys = require('./_keys');
-const _util = require('./_util');
+import _keys from './_keys' ;
+import _util from './_util' ;
+
+export type Optopns = AnyObject;
+
 const {haveNode, haveNgui, haveWeb} = _util;
 const PREFIX = 'file:///';
-const options = {};  // start options
+const options: Optopns = {};  // start options
 
 var ignore_local_package, ignore_all_local_package;
-var config = null;
-var _pkgutil = exports;
+var config: Optopns | null = null;
 var _require = typeof require == 'function' ? require:
-	typeof __webpack_require__ == 'function' ? __webpack_require__: function() {
+	typeof __webpack_require__ == 'function' ? __webpack_require__: function(req: string) {
 	var e = new Error("Cannot find module \".\"");
 	e.code = 'MODULE_NOT_FOUND';
 	throw e;
 };
 
+var cwd:()=>string;
+var _cwd:()=>string;
+var chdir:(cwd:string)=>void;
+var win32: boolean = false;
+var _path: any;
+var _pkg: any;
+
 if (haveNgui) {
-	var _pkg = requireNative('_pkg');
-	var win32 = requireNative('_util').platform == 'win32';
-	var _path = requireNative('_path');
-	var cwd = _path.cwd;
-	var _cwd = cwd;
-	var chdir = _path.chdir;
+	_pkg = __requireNgui__('_pkg');
+	_path = __requireNgui__('_path');
+	win32 = __requireNgui__('_util').platform == 'win32';
+	cwd = _path.cwd;
+	_cwd = cwd;
+	chdir = _path.chdir;
 } else if (haveNode) {
-	var win32 = process.platform == 'win32';
-	var _path = _require('path');
-	var cwd = process.cwd;
-	var _cwd = win32 ? function() {
+	_path = _require('path');
+	win32 = process.platform == 'win32';
+	cwd = process.cwd;
+	_cwd = win32 ? function() {
 		return PREFIX + cwd().replace(/\\/g, '/');
 	}: function() {
 		return PREFIX + cwd().substr(1);
 	};
-	var chdir = function(cwd) {
+	chdir = function(cwd) {
 		return process.chdir(fallbackPath(cwd));
 	};
 	process.execArgv = process.execArgv || [];
 } else if (haveWeb) { // web
-	var origin = location.origin;
-	var pathname = location.pathname;
-	var dirname = pathname.substr(0, pathname.lastIndexOf('/'));
-	var cwdPath = origin + dirname;
-	var cwd = function() { return cwdPath };
-	var _cwd = function() { return cwdPath };
-	var chdir = function() {};
+	let origin = location.origin;
+	let pathname = location.pathname;
+	let dirname = pathname.substr(0, pathname.lastIndexOf('/'));
+	let cwdPath = origin + dirname;
+	cwd = function() { return cwdPath };
+	_cwd = function() { return cwdPath };
+	chdir = function() {};
+} else {
+	throw new Error('no support');
 }
 
-const fallbackPath = win32 ? function(url) {
+const fallbackPath = win32 ? function(url: string) {
 	return url.replace(/^file:\/\/(\/([a-z]:))?/i, '$3').replace(/\//g, '\\');
-} : function(url) {
+} : function(url: string) {
 	return url.replace(/^file:\/\//i, '');
 };
 
-const join_path = win32 ? function(args) {
+const join_path = win32 ? function(args: string[]): string {
 	for (var i = 0, ls = []; i < args.length; i++) {
 		var item = args[i];
 		if (item) ls.push(item.replace(/\\/g, '/'));
 	}
 	return ls.join('/');
-}: function(args) {
+}: function(args: string[]): string {
 	for (var i = 0, ls = []; i < args.length; i++) {
 		var item = args[i];
 		if (item) ls.push(item);
@@ -107,7 +118,7 @@ const matchs = win32 ? {
 /** 
  * format part 
  */
-function resolvePathLevel(path, retain_up) {
+function resolvePathLevel(path: string, retain_up: boolean = false): string {
 	var ls = path.split('/');
 	var rev = [];
 	var up = 0;
@@ -130,8 +141,8 @@ function resolvePathLevel(path, retain_up) {
 /**
  * return format path
  */
-function resolve() {
-	var path = join_path(arguments);
+function resolve(...args: string[]) {
+	var path = join_path(args);
 	var prefix = '';
 	// Find absolute path
 	var mat = path.match(matchs.resolve);
@@ -139,7 +150,7 @@ function resolve() {
 	
 	// resolve: /^((\/|[a-z]:)|([a-z]{2,}:\/\/[^\/]+)|((file|zip):\/\/\/))/i,
 	// resolve: /^((\/)|([a-z]{2,}:\/\/[^\/]+)|((file|zip):\/\/\/))/i,
-	
+
 	if (mat) {
 		if (mat[2]) { // local absolute path /
 			if (win32 && mat[2] != '/') { // windows d:\
@@ -155,7 +166,7 @@ function resolve() {
 				prefix = mat[0];
 				slash = '/';
 			}
-			if (prefix == path.length) // file:///
+			if (prefix == path) // file:///
 				return prefix;
 			path = path.substr(prefix.length);
 		}
@@ -183,39 +194,31 @@ function resolve() {
 /**
  * @func is_absolute # 是否为绝对路径
  */
-function isAbsolute(path) {
+function isAbsolute(path: string): boolean {
 	return matchs.isAbsolute.test(path);
 }
 
 /**
  * @func is_local # 是否为本地路径
  */
-function isLocal(path) {
+function isLocal(path: string): boolean {
 	return matchs.isLocal.test(path);
 }
 
-function isLocalZip(path) {
+function isLocalZip(path: string): boolean {
 	return /^zip:\/\/\//i.test(path);
 }
 
-function isNetwork(path) {
+function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
-}
-
-function extendObject(obj, extd) {
-	for (var item of Object.entries(extd)) {
-		obj[item[0]] = item[1];
-	}
-	return obj;
 }
 
 if (haveNode && !haveNgui) {
 	var fs = _require('fs');
-	var _keys = require('./_keys');
-	_require('module').Module._extensions['.keys'] = function(module, filename) {
+	_require('module').Module._extensions['.keys'] = function(module: NodeModule, filename: string): any {
 		var content = fs.readFileSync(filename, 'utf8');
 		try {
-			module.exports = _keys.parse(stripBOM(content));
+			module.exports = _keys(stripBOM(content));
 		} catch (err) {
 			err.message = filename + ': ' + err.message;
 			throw err;
@@ -228,15 +231,15 @@ if (haveNode && !haveNgui) {
  * because the buffer-to-string conversion in `fs.readFileSync()`
  * translates it to FEFF, the UTF-16 BOM.
  */
-function stripBOM(content) {
+function stripBOM(content: string): string {
 	if (content.charCodeAt(0) === 0xFEFF) {
 		content = content.slice(1);
 	}
 	return content;
 }
 
-function Packages_require_parse_argv(self) {
-	var args = [];
+function Packages_require_parse_argv(self: any) {
+	var args: string[] = [];
 
 	if (_util.argv.length > 1) {
 		if ( String(_util.argv[1])[0] != '-' ) {
@@ -270,12 +273,12 @@ function Packages_require_parse_argv(self) {
 
 	if (haveNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
-			options.dev = 1;
+			options.dev = true;
 		}
 	}
 
-	_pkgutil.dev = options.dev = !!options.dev;
-	
+	options.dev = !!options.dev;
+
 	if ( !('url_arg' in options) ) {
 		options.url_arg = '';
 	}
@@ -301,11 +304,11 @@ function Packages_require_parse_argv(self) {
 	}
 }
 
-function inl_require_without_err(pathname) {
+function inl_require_without_err(pathname: string) {
 	try { return _require(pathname) } catch(e) {}
 }
 
-function read_config_file(pathname, pathname2) {
+function read_config_file(pathname: string, pathname2: string) {
 	var c = inl_require_without_err(pathname);
 	var c2 = inl_require_without_err(pathname2);
 	if (c || c2) {
@@ -313,7 +316,7 @@ function read_config_file(pathname, pathname2) {
 	}
 }
 
-function get_config() {
+function get_config(): Optopns {
 	if (haveNgui) {
 		return _pkg.config;
 	}
@@ -333,12 +336,12 @@ function get_config() {
 			config = {};
 		}
 	}
-	return config;
+	return <Optopns>config;
 }
 
 Packages_require_parse_argv({});
 
-module.exports = {
+export default {
 	fallbackPath,
 	resolvePathLevel,
 	resolve, 				// func pkg
@@ -346,9 +349,9 @@ module.exports = {
 	isLocal,				// 
 	isLocalZip,
 	isNetwork,
-	extendObject,
 	get options() { return options },
 	get config() { return get_config() },
 	cwd: _cwd,
 	chdir,
+	dev: <boolean>options.dev,
 };

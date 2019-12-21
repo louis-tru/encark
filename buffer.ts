@@ -28,23 +28,24 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-const utils = require('./util');
-// const _buffer = require('./_buffer');
-const _codec = require('./_codec');
-const errno = require('./errno');
+import utils from './util';
+import _codec, {Bytes} from './_codec';
+// import _buffer from './_buffer';
+
+const {haveNode} = utils;
 
 /**
  * @class SimpleBuffer
  */
-class SimpleBuffer extends Uint8Array {
+export class SimpleBuffer extends Uint8Array {
 
-	toString(encoding = 'utf8', start = 0, end = this.length) {
+	toString(encoding = 'utf8', start = 0, end = this.length): string {
 		if (encoding == 'utf8' || encoding == 'utf-8') {
 			return _codec.decodeUTF8From(this, start, end);
 		} else if (encoding == 'hex') {
-			return _codec.convertHexFrom(this, start, end);
+			return _codec.encodeHexFrom(this, start, end);
 		} else if (encoding == 'base64') {
-			return _codec.convertBase64From(this, start, end);
+			return _codec.encodeBase64From(this, start, end);
 		} else if (encoding == 'latin1' || encoding == 'binary') {
 			return _codec.decodeLatin1From(this, start, end);
 		} else if (encoding == 'ascii') {
@@ -54,40 +55,42 @@ class SimpleBuffer extends Uint8Array {
 		}
 	}
 
-	toLocaleString(...args) {
-		return this.toString(...args)
+	toLocaleString(encoding = 'utf8', start = 0, end = this.length): string {
+		return this.toString(encoding, start, end);
 	}
 
-	static from(value, ...args) {
+	// from(value: string, encoding?: string): SimpleBuffer;
+	// from(value: ArrayBuffer): SimpleBuffer;
+	static from(value: any, ...args: any[]): SimpleBuffer {
 		if (typeof value === 'string') {
 			var encoding = args[0] || 'utf8';
 			if (encoding == 'uft8' || encoding == 'utf-8') {
-				return SimpleBuffer.from(_codec.encodeUTF8(value));
+				return new SimpleBuffer(_codec.encodeUTF8(value));
 			} else if (encoding == 'hex') {
-				return SimpleBuffer.from(_codec.decodeHex(value));
+				return new SimpleBuffer(_codec.decodeHex(value));
 			} else if (encoding == 'base64') {
-				return SimpleBuffer.from(_codec.decodeBase64(value));
+				return new SimpleBuffer(_codec.decodeBase64(value));
 			} else if (encoding == 'latin1' || encoding == 'binary') {
-				return SimpleBuffer.from(_codec.encodeLatin1From(value));
+				return new SimpleBuffer(_codec.encodeLatin1From(value));
 			} else if (encoding == 'ascii') {
-				return SimpleBuffer.from(_codec.encodeAsciiFrom(value));
+				return new SimpleBuffer(_codec.encodeAsciiFrom(value));
 			} else {
-				return SimpleBuffer.from(_codec.encodeUTF8(value));
+				return new SimpleBuffer(_codec.encodeUTF8(value));
 			}
 		} else if (value instanceof ArrayBuffer) {
 			return new SimpleBuffer(value);
 		} else {
 			var bf = Uint8Array.from(value, ...args);
-			bf.__proto__ = Buffer.prototype;
+			(<any>bf).__proto__ = SimpleBuffer.prototype;
 			return bf;
 		}
 	}
 
-	static alloc(size) {
+	static alloc(size: number) {
 		return new SimpleBuffer( Number(size) || 0);
 	}
 
-	static concat(list, length) {
+	static concat(list: Bytes[], length?: number) {
 
 		if (length === undefined) {
 			length = 0;
@@ -120,5 +123,7 @@ class SimpleBuffer extends Uint8Array {
 
 const ZERO = SimpleBuffer.alloc(0);
 
-exports.SimpleBuffer = SimpleBuffer;
-exports.Buffer = utils.haveNode ? require('buffer').Buffer: SimpleBuffer;
+const _buffer: Buffer | SimpleBuffer = 
+	haveNode ? require('buffer').Buffer: SimpleBuffer;
+
+export default _buffer

@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2015, xuewen.chu
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -14,7 +14,7 @@
  *     * Neither the name of xuewen.chu nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -25,42 +25,29 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
+import util from './util';
 
-exports.Cookie = util.class('Cookie', {
+const { haveWeb } = util;
 
-	//private:
-	_req: null,
-	_res: null,
+interface ClientCookie {
 
-	/**
-	 * 构造函数
-	 * @param {http.ServerResponse} req
-	 * @param {http.ServerResponse} res
-	 * @constructor
-	 */
-	constructor: function (req, res) {
-		this._req = req;
-		this._res = res;
-	},
-	
 	/**
 	 * 根据名字取Cookie值
-	 * @param  {String}  name cookie的名称
+	 * @param {String} name cookie的名称
 	 * @return {String} 返回cookie值
+	 * @static
 	 */
-	get: function (name) {
-		var cookie = this._req.headers.cookie;
-		if (cookie) {
-			var i = cookie.match('(?:^|;\\s*){0}=([^;]+)(;|$)'.format(name));
-			return i && decodeURIComponent(i[1]);
-		}
-		return null;
-	},
+	get(name: string): string | null;
 
+	/**
+	 * 获取全部Cookie
+	 * @return {Object} 返回cookie值
+	 * @static
+	 */
+	getAll(): AnyObject;
 
 	/**
 	 * 设置cookie值
@@ -70,66 +57,91 @@ exports.Cookie = util.class('Cookie', {
 	 * @param {String}  path    (Optional)
 	 * @param {String}  domain  (Optional)
 	 * @param {Boolran} secure  (Optional)
+	 * @static
 	 */
-	set: function (name, value, expires, path, domain, secure) {
-		var setcookie = this._res.getHeader('Set-Cookie') || [];
-		
-		if (typeof setcookie == 'string')
-			setcookie = [setcookie];
-			
-		for (var i = setcookie.length - 1; i > -1; i--) {
-			if (setcookie[i].indexOf(name + '=') === 0)
-				setcookie.splice(i, 1);
-		}
-		setcookie.push(
-			'{0}={1}{2}{3}{4}{5}'.format(
-				name,
-				encodeURIComponent(value),
-				expires ? '; Expires=' + expires.toUTCString() : '',
-				path ? '; Path=' + path : '',
-				domain ? '; Domain=' + domain : '',
-				secure ? '; Secure' : ''
-			));
-		this._res.setHeader('Set-Cookie', setcookie);
-	},
-
+	set(name: string, 
+		value: string | number | boolean, 
+		expires?: Date, 
+		path?: string, 
+		domain?: string, secure?: boolean
+	): void;
 
 	/**
 	 * 删除一个cookie
 	 * @param {String}  name 名称
 	 * @param {String}  path    (Optional)
 	 * @param {String}  domain  (Optional)
+	 * @static
 	 */
-	del: function (name, path, domain) {
-		this.set(name, 'NULL', new Date(0, 1, 1), path, domain);
-	},
-
-
-	/**
-	 * 获取全部Cookie
-	 * @return {Object} 返回cookie值
-	 */
-	getAll: function () {
-		var j = (this._req.headers.cookie || '').split(';');
-		var cookie = { };
-		
-		for (var i = 0, len = j.length; i < len; i++) {
-			var item = j[i];
-			if (item) {
-				item = item.split('=');
-				cookie[item[0]] = decodeURIComponent(item[1]);
-			}
-		}
-		return cookie;
-	},
+	remove(name: string, path?: string, domain?: string): void;
 
 	/**
 	 * 删除全部cookie
+	 * @static
 	 */
-	delAll: function () {
-		var cookie = this.getAll();
-		for (var i in cookie)
-			this.del(i);
-	},
-	// @end
-});
+	removeAll(): void;
+}
+
+var ImplCookie;
+
+if (haveWeb)
+
+/**
+ * @class ClientCookie
+ */
+ImplCookie = class implements ClientCookie {
+
+	get(name: string) {
+		var i = document.cookie.match(new RegExp('(?:^|;\\s*){0}=([^;]+)(;|$)'.format(name)));
+		return i && decodeURIComponent(i[1]);
+	}
+
+	getAll() {
+		var cookie: AnyObject = {};
+		for (var item of document.cookie.split(';')) {
+			if (item) {
+				var sp = item.split('=');
+				cookie[sp[0]] = decodeURIComponent(sp[1]);
+			}
+		}
+		return cookie;
+	}
+
+	set(name: string, 
+		value: string | number | boolean, 
+		expires?: Date, 
+		path?: string, 
+		domain?: string, secure?: boolean
+	) {
+		var cookie =
+			String.format('{0}={1}{2}{3}{4}{5}',
+				name, encodeURIComponent(value),
+				expires ? '; Expires=' + expires.toUTCString() : '',
+				path ? '; Path=' + path : '',
+				domain ? '; Domain=' + domain : '',
+				secure ? '; Secure' : ''
+			);
+		document.cookie = cookie;
+	}
+
+	remove(name: string, path?: string, domain?: string) {
+		this.set(name, 'NULL', new Date(0, 1, 1), path, domain);
+	}
+
+	removeAll() {
+		for (var i in this.getAll())
+			this.remove(i);
+	}
+}
+
+else
+
+ImplCookie = class implements ClientCookie {
+	get(name: string) { return null }
+	getAll() { return {} }
+	set() {}
+	remove() {}
+	removeAll() {}
+}
+
+export default <ClientCookie>new ImplCookie();

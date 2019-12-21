@@ -28,13 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var Cookie = require('./cookie').Cookie;
-var http_service = require('./http_service');
-var SESSIONS = {};
+import util from'./util';
+import {Cookie} from './cookie';
+// var http_service = require('./http_service');
+
+var SESSIONS: AnyObject = {};
 var SESSION_TOKEN_NAME = '__SESSION_TOKEN';
 
-function deleteSession(token) {
+function deleteSession(token: number) {
 	var data = SESSIONS[token];
 	if (data) {
 		if (data.ws > 0) {
@@ -45,20 +46,20 @@ function deleteSession(token) {
 	}
 }
 
-function getData(self) {
+function getData(self: Session) {
 	var token = self.token;
 
 	if (!token) {
 		token = util.id;
-		var service = self.m_service;
+		var service = (<any>self).m_service;
 		if (service instanceof http_service.HttpService)  // http service
 			service.cookie.set(SESSION_TOKEN_NAME, token);
 		else  //ws service
 			throw new Error('Can not set the session, session must first be activated in HttpService');
-		this.token = token;
+		(<any>self).token = token;
 	}
 	
-	var expired = self.m_service.server.session * 6e4;
+	var expired = (<any>self).m_service.server.session * 6e4;
 	var value = SESSIONS[token];
 
 	if (!value) {
@@ -76,23 +77,23 @@ function getData(self) {
 /**
  * @class Session
  */
-var Session = util.class('Session', {
+export class Session {
 
 	//private:
-	m_service: null,
+	private m_service: any | undefined
 
 	/**
 	 * Conversation token
 	 * @type {Number}
 	 */
-	token: 0,
+	readonly token = 0
 
 	/**
 	 * constructor
 	 * @param {Service} service HttpService or SocketService
 	 * @constructor
 	 */
-	constructor: function(service) {
+	constructor(service: any) {
 		this.m_service = service;
 		
 		var is_http = service instanceof http_service.HttpService;
@@ -118,66 +119,64 @@ var Session = util.class('Session', {
 		conv.onOpen.on(()=>{
 			var data = getData(this);
 			data.ws++;
-			conv.onClose.on(e=>data.ws--);
+			conv.onClose.on(()=>data.ws--);
 		});
-	},
+	}
 
 	/**
 	 * get session value by name
 	 * @param  {String} name session name
 	 * @return {String}
 	 */
-	get: function (name) {
+	get(name: string) {
 		var value = SESSIONS[this.token];
 		if (value && name in value.data) {
 			return value.data[name];
 		}
 		return null;
-	},
+	}
 
 	/**
 	 * set session value
 	 * @param {String} name
 	 * @param {String} value
 	 */
-	set: function (name, value) {
+	set(name: string, value: string) {
 		getData(this).data[name] = value;
-	},
+	}
 
 	/**
 	 * delete session
 	 * @param {String} name
 	 */
-	del: function (name) {
+	del(name: string) {
 		var token = this.token;
 		if (token) {
 			var value = SESSIONS[token];
 			if (value)
 				delete value.data[name];
 		}
-	},
+	}
 
 	/**
 	 * get all session
 	 * @return {Object}
 	 */
-	getAll: function () {
+	getAll() {
 		return getData(this).data;
-	},
+	}
 
 	/**
 	 * delete all session
 	 */
-	delAll: function () {
+	delAll() {
 		var token = this.token;
 		if (token) {
 			var value = SESSIONS[token];
 			if (value)
 				value.data = {};
 		}
-	},
+	}
 
 	// @end
-});
-
-exports.Session = Session;
+}

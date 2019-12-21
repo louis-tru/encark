@@ -96,7 +96,7 @@ function initializ(self, server) {
 		}
 
 		try {
-			var ser = new cls(req, res, info);
+			var ser = new cls(req, res);
 			var ok = ser.requestAuth(info); // 认证请求的合法性
 			if (ok instanceof Promise) {
 				req.pause();
@@ -396,7 +396,7 @@ var Server = util.class('Server', event.Notification, {
 	constructor: function(config) {
 		this.m_ws_conversations = {};
 		this.m_server = new http.Server();
-		this.m_server.wrap = this;
+		this.m_server.__wrap__ = this;
 		this.gzip = /javascript|text|json|xml/i;
 		this.errorStatus = {};
 		this.disable = /^\/server/i;

@@ -28,99 +28,100 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var querystring = require('querystring');
-var Path = require('path');
+import util from './util';
+import * as querystring from 'querystring';
+import * as Path from 'path';
+import * as http from 'http';
+import * as net from 'net';
 
-var service_cls = { };
+var service_cls: AnyObject = {};
+
+type Server = AnyObject;
+type RouterInfo = AnyObject;
 
 /**
  * base service abstract class
  * @class Service
  */
-var Service = util.class('Service', {
+export class Service {
 	// @private:
-	m_pathname: null,
-	m_dirname: null,
-	m_extname: null,
-	m_params: null,
-	
+	private m_pathname: string | undefined;
+	private m_dirname: string | undefined;
+	private m_extname: string | null = null;
+	private m_params: AnyObject | undefined;
+	private m_headers: http.IncomingHttpHeaders | undefined;
+
+	static type: string = 'service';
+
 	// @public:
 	/**
 	 * @type {String} 服务名称
 	 */
-	name: '',
+	readonly name: string = '';
 	
 	/**
 	 * server
 	 * @type {Server}
 	 */
-	server: null,
+	readonly server: Server;
 
 	/**
 	 * request of server
 	 * @type {http.ServerRequest}
 	 */
-	request: null,
+	readonly request: http.IncomingMessage;
 
 	/**
 	 * @type {net.Stream}
 	 */
-	socket: null,
+	readonly socket: net.Socket;
 
 	/**
 	 * request host
 	 * @type {String}
 	 */
-	host: '',
+	readonly host: string;
 
 	/**
 	 * request path
 	 * @type {String}
 	 */
-	url: '',
-
-	/**
-	 * @get headers
-	 */
-	get headers() {
-		return this.request.headers;
-	},
+	readonly url: string;
 
 	/**
 	 * no param url
 	 * @type {String}
 	 */
-	get pathname() {
+	get pathname(): string {
 		if (!this.m_pathname) {
 			var mat = this.url.match(/^\/[^\?\#]*/);
 			this.m_pathname = mat ? mat[0] : this.url;
 		}
-		return this.m_pathname;
-	},
+		return <string>this.m_pathname;
+	}
 
 	/**
 	 * request path directory
 	 * @type {String}
 	 */
-	get dirname() {
+	get dirname(): string {
 		if (!this.m_dirname) {
 			this.m_dirname = Path.dirname(this.pathname);
 		}
-		return this.m_dirname;
-	},
+		return <string>this.m_dirname;
+	}
 
 	/**
 	 * request extended name
 	 * @type {String}
 	 */
-	get extname() {
-		if(this.m_extname === null) {
+	get extname(): string {
+		if (this.m_extname === null) {
 			var mat = this.pathname.match(/\.[^\.]+$/);
 			this.m_extname = mat ? mat[0] : '';
 		}
-		return this._extname;
-	},
+		return <string>this.m_extname;
+	}
 
 	/**
 	 * url param list
@@ -133,15 +134,15 @@ var Service = util.class('Service', {
 			delete this.m_params._;
 		}
 		return this.m_params;
-	},
+	}
 
-	get headers() {
+	get headers(): http.IncomingHttpHeaders {
 		if (!this.m_headers) {
-			var _headers = {};
+			var _headers: http.IncomingHttpHeaders = {};
 			try {
 				if (this.params._headers) {
 					for ( var [key, value] of Object.entries(JSON.parse(this.params._headers)) )
-						_headers[key.toLowerCase()] = value;
+						_headers[key.toLowerCase()] = String(value);
 				}
 			} catch(e) {
 				console.error(e);
@@ -149,48 +150,50 @@ var Service = util.class('Service', {
 			this.m_headers = { ...this.request.headers, ..._headers };
 		}
 		return this.m_headers;
-	},
+	}
 
 	/**
 	 * @func setTimeout(value)
 	 */
-	setTimeout: function(value) {
+	setTimeout(value: number) {
 		this.request.setTimeout(value);
-	},
+	}
 
 	/**
 	 * @constructor
 	 * @arg req {http.ServerRequest}
 	 */
-	constructor: function(req) {
-		this.server = req.socket.server.wrap;
+	constructor(req: http.IncomingMessage) {
+		var server = <http.Server>(<any>req.socket).server;
+		this.server = <Server>(<any>server).__wrap__;
 		this.request = req;
 		this.socket = req.socket;
-		this.host = req.headers.host;
-		this.url = decodeURI(req.url);
-	},
+		this.host = <string>(req.headers.host || '');
+		this.url = decodeURI(<string>(req.url)||'');
+	}
 
 	/**
 	 * authentication by default all, subclasses override
 	 * @param {Function} cb
 	 * @param {Object}   info
 	 */
-	requestAuth: function(info) {
+	requestAuth(info: RouterInfo) {
 		return true;
-	},
+	}
 
 	/**
 	 * call function virtual function
 	 * @param {Object} info service info
 	 */
-	action: function(info) {
-	},
+	action(info: RouterInfo) {
+	}
+
 	// @end
-});
+}
 
-Service.type = 'service';
+// Service.type = 'service';
 
-module.exports = {
+export default {
 
 	Service: Service,
 	
@@ -202,14 +205,14 @@ module.exports = {
 	/**
 	 * 通过名称获取服务class
 	 */
-	get: function(name) {
+	get(name: string) {
 		return service_cls[name];
 	},
 
 	/**
 	 * @func getServiceDescriptors()
 	 */
-	getServiceDescriptors: function() {
+	getServiceDescriptors() {
 		var r = {};
 		Object.entries(service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
@@ -248,14 +251,14 @@ module.exports = {
 		return r;
 	},
 
-	set: function(name, cls) {
+	set(name: string, cls: any) {
 		util.assert(util.equalsClass(Service, cls), '"{0}" is not a "Service" type', name);
 		util.assert(!(name in service_cls), 'service repeat definition, "{0}"', name);
 		cls.prototype.name = name; // 设置服务名称
 		service_cls[name] = cls;
 	},
 
-	del: function(name) {
+	del(name: string) {
 		delete service_cls[ name ];
-	}
+	},
 };

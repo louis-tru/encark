@@ -35,7 +35,6 @@ const haveNgui: boolean = !!globalThis.__requireNgui__;
 const haveWeb: boolean = !!globalThis.location;
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
-const assign = Object.assign;
 
 type Platform = NodeJS.Platform | 'android' | 'linux' | 'darwin' | 'web';
 var platform: Platform;

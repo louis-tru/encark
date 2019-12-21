@@ -29,6 +29,9 @@
 		"shell",
 		"storage"
 	],
+	"devDependencies": {
+		"@types/node": "~12.12.20"
+	},
 	"license": "BSD-2-Clause",
 	"bugs": {
 		"url": "https://github.com/louis-tru/nxkit/issues",

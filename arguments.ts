@@ -28,10 +28,10 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var opts = { };
-var helpInfo = [];
+export var options: AnyObject = {};
+export var helpInfo: string[] = [];
 
-function defOpts(name, defaults, info) {
+export function defOpts(name: string, defaults: any, info: string) {
 	var relation = [];
 	if ( Array.isArray(name) ) {
 		relation = name.splice(1);
@@ -41,16 +41,16 @@ function defOpts(name, defaults, info) {
 
 	relation.forEach(function(i) {
 		i = i.replace(/\-/mg, '_');
-		if ( i in opts ) {
-			opts[name] = opts[i];
+		if ( i in options ) {
+			options[name] = options[i];
 		}
 	});
 
-	if ( ! (name in opts) ) {
-		opts[name] = defaults;
+	if ( ! (name in options) ) {
+		options[name] = defaults;
 	}
 	
-	var default_val = opts[name] === 0 ? 'no' : opts[name] === 1 ? 'yes' : opts[name];
+	var default_val = options[name] === 0 ? 'no' : options[name] === 1 ? 'yes' : options[name];
 	helpInfo.push(format_string(info, default_val));
 }
 
@@ -59,7 +59,7 @@ function read_argv() {
 
 	for (var i = 0; i < argv.length; i++) {
 		var item = argv[i];
-		var key = null, value = 1;
+		var key = null, value: any = 1;
 
 		if (item.substr(0, 2) == '--') {
 			var ls = item.substr(2).split('=');
@@ -88,28 +88,25 @@ function read_argv() {
 			} else {
 				value = value;
 			}
-			if (key in opts) {
-				if (Array.isArray(opts[key])) {
-					opts[key].push(value);
+			if (key in options) {
+				if (Array.isArray(options[key])) {
+					options[key].push(value);
 				} else {
-					opts[key] = [opts[key], value];
+					options[key] = [options[key], value];
 				}
 			} else {
-				opts[key] = value;
+				options[key] = value;
 			}
 		}
 		//
 	}
 }
 
-function format_string(val) {
-	for (var i = 1, len = arguments.length; i < len; i++)
-		val = val.replace(new RegExp('\\{' + (i - 1) + '\\}', 'g'), arguments[i]);
+function format_string(...args: string[]) {
+	var val = '';
+	for (var i = 1, len = args.length; i < len; i++)
+		val = val.replace(new RegExp('\\{' + (i - 1) + '\\}', 'g'), args[i]);
 	return val;
 }
 
 read_argv();
-
-exports.options = opts;
-exports.helpInfo = helpInfo;
-exports.defOpts = defOpts;

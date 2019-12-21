@@ -1,6 +1,5 @@
 
-
-var SimpleBuffer = require('./buffer').SimpleBuffer;
+import {SimpleBuffer} from './buffer';
 
 var b = SimpleBuffer.from('你好a');
 

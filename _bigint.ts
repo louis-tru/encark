@@ -28,18 +28,18 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var checkInt = null;
+var checkInt: any = null;
 
-function _readBigIntBE(bytes) {
+function _readBigUIntBE(self: Uint8Array, offset: number, end: number): bigint {
 	var num = 0n;
-	for (var byte of bytes) {
+	while (offset < end) {
 		num <<= 8n;
-		num |= BigInt(byte);
+		num |= BigInt(self[offset]);
 	}
 	return num;
 }
 
-function _readBigInt64BE(self, offset) {
+function _readBigInt64BE(self: Uint8Array, offset: number): bigint {
 	const hi = 
 		(self[offset++] << 24) + // Overflow
 		self[offset++] * 2 ** 16 +
@@ -53,7 +53,7 @@ function _readBigInt64BE(self, offset) {
 	return (BigInt(hi) << 32n) + BigInt(lo);
 }
 
-function _readBigUInt64BE(self, offset) {
+function _readBigUInt64BE(self: Uint8Array, offset: number): bigint {
 	const hi = 
 		self[offset++] * 2 ** 24 +
 		self[offset++] * 2 ** 16 +
@@ -67,17 +67,17 @@ function _readBigUInt64BE(self, offset) {
 	return (BigInt(hi) << 32n) + BigInt(lo);
 }
 
-function _writeBigIntLE(bigint, bytes) {
+function _writeBigIntLE(bytes: number[], bigint: bigint): number {
 	var i = 0;
 	do {
 		bytes.push(Number(bigint & 0xffn));
 		bigint >>= 8n;
 		i++;
 	} while(bigint || i < 8);
-	return bytes;
+	return i;
 }
 
-function writeBigU_Int64BE(buf, value, offset, min, max) {
+function writeBigU_Int64BE(buf: Uint8Array, value: bigint, offset: number, min: bigint, max: bigint): number {
 	checkInt(value, min, max, buf, offset, 7);
 
 	let lo = Number(value & 0xffffffffn);
@@ -99,23 +99,23 @@ function writeBigU_Int64BE(buf, value, offset, min, max) {
 	return offset + 8;
 }
 
-function _writeBigInt64BE(self, value, offset = 0) {
+function _writeBigInt64BE(self: Uint8Array, value: bigint, offset: number = 0): number {
 	return writeBigU_Int64BE(
 		self, value, offset, -0x8000000000000000n, 0x7fffffffffffffffn);
 }
 
-function _writeBigUInt64BE(self, value, offset = 0) {
+function _writeBigUInt64BE(self: Uint8Array, value: bigint, offset: number = 0): number {
 	return writeBigU_Int64BE(self, value, offset, 0n, 0xffffffffffffffffn);
 }
 
-module.exports = {
-	_set(_checkInt) {
+export default {
+	_set(_checkInt: any): void {
 		checkInt = _checkInt;
 	},
-	_readBigIntBE,
+	_readBigUIntBE,
 	_readBigInt64BE,
 	_readBigUInt64BE,
 	_writeBigIntLE,
 	_writeBigInt64BE,
 	_writeBigUInt64BE,
-};
+}

@@ -28,18 +28,17 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var Buffer = require('buffer').Buffer;
-var Path = require('path');
-var fs = require('fs');
-var mkdir = fs.mkdir;
-var mkdirSync = fs.mkdirSync;
-var chmod = fs.chmod;
-var chown = fs.chown;
+import util from './util';
+import {Buffer} from 'buffer';
+import * as Path from 'path';
+import * as fs from 'fs';
+export * from 'fs';
 
-Object.assign(exports, fs);
+type NoParamCallback = fs.NoParamCallback;
 
-function inl_copy_symlink(path, target, options, cb) {
+type CancelParamCallback = (err: NodeJS.ErrnoException | null, r?: boolean) => void;
+
+function inl_copy_symlink(path: string, target: string, options: any, cb: any) {
 	if (options.is_cancel) return;
 
 	fs.lstat(target, function(err, stat) {
@@ -47,7 +46,7 @@ function inl_copy_symlink(path, target, options, cb) {
 		if (stat.isSymbolicLink() || !stat.isDirectory()) {
 			fs.unlink(target, e=>e?cb(e):cp()); // rm
 		} else {
-			inl_rm(options, target, e=>e?cb(e):cp()); // rm
+			inl_rm(options, target, (e:any)=>e?cb(e):cp()); // rm
 		}
 	});
 
@@ -62,7 +61,7 @@ function inl_copy_symlink(path, target, options, cb) {
 	}
 }
 
-function inl_copy_file(path, target, options, cb) {
+function inl_copy_file(path: string, target: string, options: any, cb: any) {
 	if (options.is_cancel) return;
 
 	fs.lstat(target, function(err, stat) {
@@ -70,7 +69,7 @@ function inl_copy_file(path, target, options, cb) {
 		if (stat.isSymbolicLink()) {
 			fs.unlink(target, e=>e?cb(e):cp()); // rm
 		} else if (!stat.isFile()) {
-			inl_rm(options, target, e=>e?cb(e):cp()); // rm
+			inl_rm(options, target, (e:any)=>e?cb(e):cp()); // rm
 		} else {
 			if ( !options.replace ) { // 不替换
 				return cb(); // 结束
@@ -84,14 +83,14 @@ function inl_copy_file(path, target, options, cb) {
 		var read = exports.createReadStream(path);
 		var write = exports.createWriteStream(target);
 
-		function error(e) {
+		function error(e:any) {
 			read.destroy();
 			write.destroy();
 			console.error(e);
 			cb(e);
 		}
 		
-		read.on('data', function (buff) {
+		read.on('data', function (buff:any) {
 			if (options.is_cancel) {
 				read.destroy();
 				write.destroy();
@@ -110,7 +109,7 @@ function inl_copy_file(path, target, options, cb) {
 	}
 }
 
-function inl_copy_dir(path, target, options, cb) {
+function inl_copy_dir(path: string, target: string, options: any, cb: any) {
 	if (options.is_cancel) return;
 
 	fs.lstat(target, function(err, stat) {
@@ -124,9 +123,9 @@ function inl_copy_dir(path, target, options, cb) {
 		}
 	});
 
-	var list = null;
+	var list: any = null;
 	
-	function cp(err) {
+	function cp(err?: any) {
 		if (err) 
 			return cb (err);
 		fs.readdir(path, function(err, ls) {
@@ -137,7 +136,7 @@ function inl_copy_dir(path, target, options, cb) {
 		});
 	}
 
-	function shift(err) {
+	function shift(err?: any): any {
 		if (err) return cb(err);
 		if (!list.length) return cb(); // 完成
 
@@ -165,11 +164,11 @@ function inl_copy_dir(path, target, options, cb) {
 	}
 }
 
-function inl_copy_symlink_sync(path, target, options, check) {
+function inl_copy_symlink_sync(path: string, target: string, options: any, check: any) {
 	if (!check(path, target)) return; // 取消
-
+	var stat;
 	try {
-		var stat = fs.lstatSync(target);
+		stat = fs.lstatSync(target);
 	} catch(e) {}
 
 	if (stat) {
@@ -183,11 +182,11 @@ function inl_copy_symlink_sync(path, target, options, check) {
 	fs.symlinkSync(fs.readlinkSync(path), target);
 }
 
-function inl_copy_file_sync(path, target, options, check) {
+function inl_copy_file_sync(path: string, target: string, options: any, check: any) {
 	if (!check(path, target)) return; // 取消
-
+	var stat;
 	try {
-		var stat = fs.lstatSync(target);
+		stat = fs.lstatSync(target);
 	} catch(e) {}
 
 	if (stat) {
@@ -219,11 +218,12 @@ function inl_copy_file_sync(path, target, options, check) {
 	fs.closeSync(wfd);
 }
 
-function inl_copy_dir_sync(path, target, options, check) {
+function inl_copy_dir_sync(path: string, target: string, options: any, check: any) {
 	if (!check(path, target)) return; // 取消
 
+	var stat
 	try {
-		var stat = fs.lstatSync(target);
+		stat = fs.lstatSync(target);
 	} catch(e) {}
 
 	if (stat) {
@@ -244,7 +244,7 @@ function inl_copy_dir_sync(path, target, options, check) {
 			
 		var path1 = path + '/' + name;
 		var target1 = target + '/' + name;
-		var stat = fs.lstatSync(path1);
+		let stat = fs.lstatSync(path1);
 
 		if (stat.isSymbolicLink() && options.symlink) { // copy symlink
 			inl_copy_symlink_sync(path1, target1, options, check);
@@ -258,7 +258,7 @@ function inl_copy_dir_sync(path, target, options, check) {
 	}
 }
 
-function inl_rm_sync(path) {
+function inl_rm_sync(path: string) {
 	
 	var stat = fs.lstatSync(path);
 	if (stat.isFile() || stat.isSymbolicLink()) {
@@ -276,7 +276,7 @@ function inl_rm_sync(path) {
 	fs.rmdirSync(path);
 }
 
-function inl_rm(handle, path, cb) {
+function inl_rm(handle: any, path: string, cb: any) {
 
 	fs.lstat(path, function (err, stat) {
 		if (err) {
@@ -293,9 +293,9 @@ function inl_rm(handle, path, cb) {
 			return cb();
 		}
 		
-		var ls = null;
+		var ls: any = null;
 		
-		function shift(err) {
+		function shift(err: any) {
 			if (err) {
 				return cb(err);
 			}
@@ -313,49 +313,50 @@ function inl_rm(handle, path, cb) {
 	});
 }
 
-function async_call(func, ...args) {
+function async_call(func: any, ...args: any[]) {
 	return new Promise(function(resolve, reject) {
-		func(...args, (e,args)=>e?reject(e):resolve(args));
+		func(...args, (e:any,args:any)=>e?reject(e):resolve(args));
 	});
 }
 
 /**
  * set dir and file
  */
-exports.chown_r = function (path, uid, gid, cb) {
+export function chownr(path: string, uid: number, gid: number, cb: NoParamCallback) {
 	path = Path.resolve(path);
 	
-	cb = err || function (err) {
-		if (err) throw util.err(err);
+	cb = cb || function (err:any) {
+		if (err)
+			throw Error.new(err);
 	};
-	
-	function shift(path, _cb) {
-		exports.stat(path, function (err, stat) {
+
+	function shift(path: string, _cb: any) {
+		fs.stat(path, function (err: any, stat: any) {
 			if (err) { return cb(err) }
 			if (!stat.isDirectory()) { return _cb() }
 			
 			var dir = path + '/';
 			
-			function shift2(ls) {
+			function shift2(ls: any) {
 				if (!ls.length) { return _cb() }
 				path = dir + ls.shift();
-				chown(path, uid, gid, function (err) {
+				fs.chown(path, uid, gid, function (err) {
 					if (err) { return cb(err) }
 					shift(path, function () { shift2(ls) });
 				});
 			}
-			exports.readdir(dir, function (err, ls) {
+			fs.readdir(dir, function (err: any, ls: any) {
 				if (err) { return cb(err) }
 				shift2(ls);
 			});
 		});
 	}
 	
-	chown(path, uid, gid, function (err) {
+	fs.chown(path, uid, gid, function (err) {
 		if (err) { return cb }
 		shift(path, cb);
 	});
-};
+}
 
 /**
  * set user file weight
@@ -363,63 +364,58 @@ exports.chown_r = function (path, uid, gid, cb) {
  * @param {String}   mode
  * @param {Function} cb    (Optional)
  */
-exports.chmod_r = function (path, mode, cb) {
+export function chmodr(path: string, mode: number, cb: NoParamCallback) {
 	path = Path.resolve(path);
 	
-	cb = cb || function (err) { 
-		if (err) throw util.err(err);
+	cb = cb || function (err: any) { 
+		if (err) throw Error.new(err);
 	}
-	
-	function shift (path, _cb) {
-		
-		exports.stat(path, function (err, stat) {
+
+	function shift (path: string, _cb: any) {
+		fs.stat(path, function(err: any, stat: any) {
 			if (err) { return cb(err) }
 			if (!stat.isDirectory()) { return _cb() }
 			
 			var dir = path + '/';
 			
-			function shift2 (ls) {
+			function shift2(ls: any) {
 				if (!ls.length) { return _cb() }
 				path = dir + ls.shift();
-				chmod(path, mode, function (err) {
+				fs.chmod(path, mode, function (err) {
 					if (err) { return cb(err) }
 					shift(path, function () { shift2(ls) })
 				});
 			}
 			
-			exports.readdir(dir, function (err, ls) {
+			fs.readdir(dir, function(err, ls) {
 				if (err) { return cb(err) }
 				shift2(ls);
 			});
 		});
 	}
-	
-	chmod(path, mode, function (err) {
+
+	fs.chmod(path, mode, function(err) {
 		if (err) { return cb(err) }
 		shift(path, cb);
 	});
-};
+}
 
-/**
-	* remove file
-	*/
-exports.rm = function (path, cb) {
-	return exports.unlink(path, cb);
-};
+export var remove = fs.unlink;
+export var removeSync = fs.unlinkSync;
 
 /**
  * remove all file async
  * @param {String}   path
  * @param {Function} cb   (Optional)
  */
-exports.rm_r = function (path, cb) {
+export function remover(path: string, cb: CancelParamCallback) {
 	var handle = { is_cancel: false };
-	cb = cb || function (err) { 
-		if (err) throw util.err(err);
+	cb = cb || function (err: any) { 
+		if (err) throw Error.new(err);
 	};
 	fs.lstat(path, function(err, stat) {
 		if (err) {
-			return cb();	
+			return cb(null);
 		}
 		if (stat.isFile() || stat.isSymbolicLink()) {
 			if (!handle.is_cancel) { // 没有取消
@@ -429,25 +425,19 @@ exports.rm_r = function (path, cb) {
 			inl_rm(handle, path, cb);
 		}
 	});
+
 	return {
 		cancel: function () {// 取消delete
 			handle.is_cancel = true; 
-			cb(null, null, true);
+			cb(null, true);
 		}
 	};
-};
-
-/**
-	* 同步删除文件
-	*/
-exports.rm_sync = function (path) {
-	return exports.unlinkSync(path);
-};
+}
 
 /**
  * 删除文件与文件夹
  */
-exports.rm_r_sync = function (path) {
+export function removerSync(path: string) {
 	try {
 		var stat = fs.lstatSync(path);
 	} catch(err) {
@@ -458,7 +448,14 @@ exports.rm_r_sync = function (path) {
 	} else {
 		inl_rm_sync(path);
 	}
-};
+}
+
+export interface CopyOptions {
+	ignore_hide?: boolean, // 忽略隐藏
+	replace?: boolean, // 如果存在替换目标
+	symlink?: boolean, // copy symlink
+	isCalcel?: ()=>boolean,
+}
 
 /**
  * copy all file 
@@ -467,53 +464,53 @@ exports.rm_r_sync = function (path) {
  * @param {Object}   options  (Optional)
  * @param {Function} cb   (Optional)
  */
-exports.cp = function (path, target, options, cb) {
+export function copy(path: string, target: string, options?: CopyOptions | CancelParamCallback, cb?: CancelParamCallback) {
 	path = Path.resolve(path);
 	target = Path.resolve(target);
 	
 	if (typeof options == 'function') {
 		cb = options;
-		options = null;
+		options = {};
 	}
-	options = util.assign({ 
+	var options2 = Object.assign({ 
 		ignore_hide: false, // 忽略隐藏
 		replace: true, // 如果存在替换目标
 		symlink: true, // copy symlink
 		is_cancel: false,
 	}, options);
-	
-	cb = cb || function (err) { 
-		if (err) throw util.err(err);
+
+	var cb2 = cb || function (err: any) { 
+		if (err) throw Error.new(err);
 	};
 	
-	if (options.ignore_hide && Path.basename(path)[0] == '.')
-		return cb(); // 忽略隐藏
+	if (options2.ignore_hide && Path.basename(path)[0] == '.')
+		return cb2(null); // 忽略隐藏
 	
-	fs.lstat(path, function (err, stat) {
+	fs.lstat(path, function (err: any, stat) {
 		if (err) {
-			return cb(err);
+			return cb2(err);
 		}
 		exports.mkdir_p(Path.dirname(target), function() {
-			if (stat.isSymbolicLink() && options.symlink) { // copy symlink
-				inl_copy_symlink(path, target, options, cb);
+			if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
+				inl_copy_symlink(path, target, options, cb2);
 			} else if (stat.isFile()) {
-				inl_copy_file(path, target, options, cb);
+				inl_copy_file(path, target, options, cb2);
 			} else if (stat.isDirectory()) {
-				inl_copy_dir(path, target, options, cb);
+				inl_copy_dir(path, target, options, cb2);
 			} else {
 				console.warn('ignore cp', path, 'to', target);
-				cb();
+				cb2(null);
 			}
 		});
 	});
 	
 	return {
 		cancel: function () {  // 取消cp
-			options.is_cancel = true;
-			cb(null, null, true);
+			options2.is_cancel = true;
+			cb2(null, true);
 		}
 	};
-};
+}
 
 /**
 	* copy all file sync
@@ -521,27 +518,27 @@ exports.cp = function (path, target, options, cb) {
 	* @param {String}   target
 	* @param {Object}   options  (Optional)
 	*/
-exports.cp_sync = function (path, target, options) {
+export function copySync(path: string, target: string, options?: CopyOptions) {
 	path = Path.resolve(path);
 	target = Path.resolve(target);
-	
-	options = util.assign({ 
+
+	var options2 = Object.assign({ 
 		ignore_hide: false, // 忽略隐藏
 		replace: true, // 如果存在替换目标
 		symlink: true, // copy symlink
-		check: function() { return true; },
+		isCalcel: function() { return true; },
 	}, options);
-	
-	var check = options.check;
-	
-	if (options.ignore_hide && Path.basename(path)[0] == '.')
+
+	var check = ()=>!options2.isCalcel();
+
+	if (options2.ignore_hide && Path.basename(path)[0] == '.')
 		return; // 忽略隐藏
 		
 	var stat = fs.lstatSync(path);
 	
 	exports.mkdir_p_sync(Path.dirname(target));
 
-	if (stat.isSymbolicLink() && options.symlink) { // copy symlink
+	if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
 		inl_copy_symlink_sync(path, target, options, check);
 	} else if (stat.isFile()) {
 		inl_copy_file_sync(path, target, options, check);
@@ -550,7 +547,9 @@ exports.cp_sync = function (path, target, options) {
 	} else {
 		console.warn('ignore cp', path, 'to', target);
 	}
-};
+}
+
+export type MkdirOptopns = string | number | fs.MakeDirectoryOptions | null | undefined;
 
 /**
 	* create all file dir
@@ -558,78 +557,88 @@ exports.cp_sync = function (path, target, options) {
 	* @param {String}   mode  (Optional)
 	* @param {Function} cb    (Optional)
 	*/
-exports.mkdir_p = function (path, mode, cb) {
-
+export function mkdirp(path: string, mode: MkdirOptopns | NoParamCallback, cb?: NoParamCallback) {
+	var mode2: any = mode;
 	if (typeof mode == 'function') {
 		cb = mode;
-		mode = null;
+		mode2 = null;
 	}
-	
-	cb = cb || function (err) { 
-		if (err) throw util.err(err);
-	};
-	
+	var cb2 = cb || function (err: any) { 
+		if (err) throw Error.new(err);
+	}
 	path = Path.resolve(path);
-	exports.exists(path, function (exists) {
-		if (exists) { return cb() }
 
-		var prefix = path.match(/^(\w+:)?\//)[0];
+	fs.exists(path, function (exists) {
+		if (exists) return cb2(null);
+
+		var mat = <RegExpMatchArray>path.match(/^(\w+:)?\//);
+		var prefix = mat[0];
 		var ls = path.substr(prefix.length).split('/');
-		
-		function shift (err) {
-			if (err) { return cb(err) }
-			if (!ls.length) { return cb() }
-			
+
+		function shift(err?:any) {
+			if (err) return cb2(err);
+			if (!ls.length) return cb2(null);
+
 			prefix += ls.shift() + '/';
-			exports.exists(prefix, function (exists) {
+			fs.exists(prefix, function(exists) {
 				if (exists) { return shift() }
-				mkdir(prefix, mode, shift);
+				fs.mkdir(prefix, mode2, shift);
 			});
 		}
 		shift();
 	});
-};
+}
 
 /**
 	* create all file dir sync
 	* @param {String}   path
 	* @param {String}   mode  (Optional)
 	*/
-exports.mkdir_p_sync = function (path, mode){
-	
+export function mkdirpSync(path: string, mode: MkdirOptopns) {
 	path = Path.resolve(path);
-	
-	if(fs.existsSync(path)){
+
+	if (fs.existsSync(path)) {
 		return;
 	}
-	
-	var prefix = path.match(/^(\w+:)?\//)[0];
+
+	var mat = <RegExpMatchArray>path.match(/^(\w+:)?\//);
+	var prefix = mat[0];
 	var ls = path.substr(prefix.length).split('/');
-	
-	for(var i = 0; i < ls.length; i++){
+
+	for (var i = 0; i < ls.length; i++) {
 		prefix += ls[i] + '/';
-		if(!fs.existsSync(prefix)){
-			mkdirSync(prefix, mode);
+		if (!fs.existsSync(prefix)) {
+			fs.mkdirSync(prefix, mode);
 		}
 	}
-};
+}
+
+export interface StatsDescribe extends fs.Stats {
+	name: string;
+	children: StatsDescribe[] | null;
+}
+
+export type EachDirectoryCallback = (stats: StatsDescribe, pathname: string)=>void;
+export type StatsDescribeCallback = (err: NodeJS.ErrnoException | null, stats: StatsDescribe[] | null)=>void;
 
 /**
  * @func inl_ls_sync
  */
-function inl_ls_sync(origin, path, depth, each_cb) {
+function inl_ls_sync(origin: string, path: string, depth: boolean, each_cb: EachDirectoryCallback) {
 	var ls = fs.readdirSync(`${origin}/${path}`);
 	var rev = [];
 	
 	for (var i = 0; i < ls.length; i++) {
 		var name = ls[i];
 		var pathname = path ? `${path}/${name}` : name;
-		var stat = fs.statSync(`${origin}/${pathname}`);
+		var stat = <StatsDescribe>fs.statSync(`${origin}/${pathname}`);
 		stat.name = name;
 		each_cb(stat, pathname);
-		
-		if (stat.isDirectory() && depth) {
-			stat.children = inl_ls_sync(origin, pathname, depth, each_cb);
+
+		if (stat.isDirectory()) {
+			stat.children = depth ? inl_ls_sync(origin, pathname, depth, each_cb): [];
+		} else {
+			stat.children = null;
 		}
 		rev.push(stat);
 	}
@@ -637,19 +646,20 @@ function inl_ls_sync(origin, path, depth, each_cb) {
 	return rev;
 }
 
-async function inl_ls(origin, path, depth, each_cb) {
-	var ls = await async_call(fs.readdir, `${origin}/${path}`);
+async function inl_ls(origin: string, path: string, depth: boolean, each_cb: EachDirectoryCallback) {
+	var ls = <string[]>await async_call(fs.readdir, `${origin}/${path}`);
 	var rev = [];
-	
+
 	for (var i = 0; i < ls.length; i++) {
 		var name = ls[i];
 		var pathname = path ? `${path}/${name}` : name;
-		var stat = await async_call(fs.stat, `${origin}/${pathname}`);
+		var stat = <StatsDescribe>await async_call(fs.stat, `${origin}/${pathname}`);
 		stat.name = name;
+		stat.children = null;
 		each_cb(stat, pathname);
-		
-		if (stat.isDirectory() && depth) {
-			stat.children = await inl_ls(origin, pathname, depth, each_cb);
+
+		if (stat.isDirectory()) {
+			stat.children = depth ? await inl_ls(origin, pathname, depth, each_cb): [];
 		}
 		rev.push(stat);
 	}
@@ -663,70 +673,74 @@ async function inl_ls(origin, path, depth, each_cb) {
 	* @param {Boolean}  depth
 	* @param {Function} cb
 	*/
-exports.ls = function (path, depth, cb, each_cb) {
-
+export function list(
+	path: string, 
+	cb: StatsDescribeCallback, 
+	depth?: boolean | EachDirectoryCallback,
+	each_cb?: EachDirectoryCallback) 
+{
 	path = Path.resolve(path);
 
+	var depth2: any = depth;
+	var each_cb2: any = each_cb;
+
 	if (typeof depth == 'function') {
-		if (typeof cb == 'function') {
-			each_cb = cb;
-		}
-		cb = depth;
-		depth = false;
+		each_cb = depth;
+		depth2 = false;
 	}
 
-	cb = cb || function (err) {
-		if (err) throw util.err(err);
-	}
+	var cb2 = cb || function (err: any) {
+		if (err) throw Error.new(err);
+	};
 
-	each_cb = util.cb(each_cb);
-	
 	fs.stat(path, function (err, stat) {
 		if (err)
-			return cb(err);
+			return cb2(err, null);
 
-		stat.name = Path.basename(path);
-		each_cb(stat, '');
+		var stat2 = <StatsDescribe>stat;
+		stat2.name = Path.basename(path);
+		stat2.children = null;
+
+		each_cb2(stat2, '');
 
 		if (stat.isDirectory()) {
-			inl_ls(path, '', depth, each_cb).then(e=>cb(null, e)).catch(cb)
+			inl_ls(path, '', depth2, each_cb2).then(e=>cb2(null, e)).catch(e=>cb2(e, null))
 		} else {
-			cb(null, null);
+			cb2(null, null);
 		}
 	});
-};
+}
 
 /**
 	* get dir info
 	*/
-exports.ls_sync = function(path, depth, each_cb) {
+export function listSync(path: string, depth?: boolean | EachDirectoryCallback, each_cb?: EachDirectoryCallback) {
 	path = Path.resolve(path);
+
+	var depth2: any = depth;
+	var each_cb2: any = each_cb;
 
 	if (typeof depth == 'function') {
 		each_cb = depth;
-		depth = false;
-	} else {
-		each_cb = util.cb(each_cb)
+		depth2 = false;
 	}
 	
-	var rev = null;
-	var stat = fs.statSync(path);
+	var stat = <StatsDescribe>fs.statSync(path);
 	stat.name = Path.basename(path);
-	each_cb(stat, '');
+	stat.children = null;
 
-	if (stat.isDirectory()) {
-		rev = inl_ls_sync(path, '', depth, each_cb);
-	}
-	return rev;
-};
+	each_cb2(stat, '');
 
-exports.list = exports.ls;
-exports.listSync = exports.ls_sync;
-exports.mkdirpSync = exports.mkdir_p_sync;
-exports.mkdirp = exports.mkdir_p;
-exports.copySync = exports.cp_sync;
-exports.copy = exports.cp;
-exports.removerSync = exports.rm_r_sync;
-exports.remover = exports.rm_r;
-exports.chmodr = exports.chmod_r;
-exports.chownr = exports.chown_r;
+	return stat.isDirectory() ? inl_ls_sync(path, '', depth2, each_cb2): null;
+}
+
+export var ls = list;
+export var ls_sync = listSync;
+export var mkdir_p_sync = mkdirpSync;
+export var mkdir_p = mkdirp;
+export var cp_sync = copySync;
+export var cp = copy;
+export var rm_r_sync = removerSync;
+export var rm_r = remover;
+export var chmod_r = chmodr;
+export var chown_r = chownr;

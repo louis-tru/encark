@@ -28,12 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var Cookie = require('./cookie').Cookie;
-var service = require('./service');
-var StaticService = require('./static_service').StaticService;
-var IncomingForm = require('./incoming_form').IncomingForm;
-var session = require('./session');
+import util from './util';
+import {Cookie} from './cookie';
+import service from './service';
+import {StaticService} from './static_service';
+import {Session} from './session';
+// var IncomingForm = require('./incoming_form').IncomingForm;
 var zlib = require('zlib');
 var Buffer = require('buffer').Buffer;
 var errno = require('./errno');
@@ -44,7 +44,7 @@ var StaticService_action = StaticService.prototype.action;
 /**
  * @private
  */
-function returnJSON(self, data) {
+function returnJSON(self: HttpService, data) {
 	var type = self.server.getMime(self.jsonpCallback ? 'js' : 'json');
 	try {
 		var rev = JSON.stringify(data);
@@ -183,37 +183,44 @@ function action_multiple(self, info) {
  * @class HttpService
  * @bases staticService::StaticService
  */
-var HttpService = util.class('HttpService', StaticService, {
-	// @public:
+export class HttpService extends StaticService {
+
+	private m_cookie: Cookie | undefined;
+	private m_session: Session | undefined;
+
 	/**
 	 * site cookie
 	 * @type {Cookie}
 	 */
-	cookie: null,
-	
-	/**
-	 * site session
-	 * @type {Session}
-	 */
-	session: null,
+	get cookie(): Cookie {
+		if (!this.m_cookie)
+			this.m_cookie = new Cookie(this.request, this.response);
+		return this.m_cookie;
+	}
+
+	get session(): Session {
+		if (!this.m_session)
+			this.m_session = new Session(this);
+		return this.m_session;
+	}
 
 	/**
 	 * ajax jsonp callback name
 	 * @tpye {String}
 	 */
-	jsonpCallback: '',
+	jsonpCallback: any = '';
 
 	/**
 	 * post form
 	 * @type {IncomingForm}
 	 */
-	form: null,
+	form: any = null;
 
 	/**
 	 * post form data
 	 * @type {Object}
 	 */
-	data: null,
+	data: any = null;
 
 	/**
 	 * @constructor
@@ -221,18 +228,18 @@ var HttpService = util.class('HttpService', StaticService, {
 	 * @arg res {http.ServerResponse}
 	 * @arg info {Object}
 	 */
-	constructor: function(req, res, info) {
+	constructor(req, res, info) {
 		StaticService.call(this, req, res, info);
 		this.cookie = new Cookie(req, res);
 		this.session = new session.Session(this);
 		this.jsonpCallback = this.params.callback || '';
 		this.data = {};
-	},
+	}
 	
 	/** 
 	 * @overwrite
 	 */
-	action: async function(info) {
+	async action(info) {
 
 		var self = this;
 		var action = info.action;
@@ -334,28 +341,28 @@ var HttpService = util.class('HttpService', StaticService, {
 		} else {
 			this.request.on('end', ok);
 		}
-	},
+	}
 
 	/**
 	 * @func hasAcceptFilestream(info) 是否接收文件流
 	 */
-	hasAcceptFilestream: function(info) {
+	hasAcceptFilestream(info) {
 		return false;
-	},
+	}
 
 	/**
 	 * @func auth(info)
 	 */
-	auth: function(info) {
+	auth(info) {
 		return true;
-	},
+	}
 	
 	/**
 	 * @fun returnData() return data to browser
 	 * @arg type {String} #    MIME type
 	 * @arg data {Object} #    data
 	 */
-	returnData: function(type, data) {
+	returnData(type, data) {
 		this.markResponse();
 
 		var self = this;
@@ -376,40 +383,40 @@ var HttpService = util.class('HttpService', StaticService, {
 			res.writeHead(200);
 			res.end(data);
 		}
-	},
+	}
 	
 	/**
 	 * @fun returnString # return string to browser
 	 * @arg type {String} #    MIME type
 	 * @arg str {String}
 	 */
-	returnString: function(str, type = 'text/plain') {
+	returnString(str, type = 'text/plain') {
 		return this.returnData(type + ';charset=utf-8', str);
-	},
+	}
 	
 	/**
 	 * @fun returnHtml # return html to browser
 	 * @arg html {String}  
 	 */
-	returnHtml: function(html) {
+	returnHtml(html) {
 		var type = this.server.getMime('html');
 		return this.returnString(html, type);
-	},
+	}
 	
 	/**
 	 * @fun rev # return data to browser
 	 * @arg data {JSON}
 	 */
-	returnJSON: function(data) {
+	returnJSON(data) {
 		this.setNoCache();
 		return returnJSON(this, { data: data, code: 0, st: new Date().valueOf() });
-	},
+	}
 
 	/**
 	 * @fun returnError() return error to browser
 	 * @arg [err] {Error} 
 	 */
-	returnError: function(err) {
+	returnError(err) {
 		this.setNoCache();
 		var accept = this.request.headers.accept || '';
 		if (/text\/html|application\/xhtml/.test(accept)) {
@@ -417,12 +424,12 @@ var HttpService = util.class('HttpService', StaticService, {
 		} else {
 			return this.returnJSONError(err);
 		}
-	},
+	}
 
 	/**
 	 * @func returnJSONError(err)
 	 */
-	returnJSONError: function(err) {
+	returnJSONError(err) {
 		err = Error.toJSON(err);
 		err.st = new Date().valueOf();
 		if ( !err.code ) {
@@ -430,12 +437,12 @@ var HttpService = util.class('HttpService', StaticService, {
 		}
 		err.st = new Date().valueOf();
 		return returnJSON(this, err);
-	},
+	}
 
 	/**
 	 * @func returnHtmlError()
 	 */
-	returnHtmlError: function(err) {
+	returnHtmlError(err) {
 		err = Error.toJSON(err);
 		var msg = [];
 		if (err.message) msg.push(err.message);
@@ -449,10 +456,10 @@ var HttpService = util.class('HttpService', StaticService, {
 			text += err.description;
 		}
 		return this.returnErrorStatus(500, text);
-	},
+	}
 
 	// @end
-});
+}
 
 /** 
  * @class HttpService
