@@ -28,24 +28,36 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var reader = require('fs');
-var parse_keys = require('./_keys').parse;
-var { haveNgui, haveNode, haveWeb } = util;
+import util from './util';
+import _keys from './_keys';
+var { haveNgui, haveNode } = util;
+
+var readFile: (path: string)=>string;
 
 if (haveNgui) {
-	var reader = requireNative('_reader');
+	let reader = __requireNgui__('_reader');
+	readFile = function(path: string) {
+		return reader.readFileSync(path, 'utf8');
+	};
 } else if (haveNode) {
-	var reader = require('fs');
+	let fs = require('fs');
+	readFile = function(path: string) {
+		return fs.readFileSync(path, 'utf8');
+	};
+} else {
+	readFile = function(path: string) {
+		util.unrealized();
+		return '';
+	};
 }
 
-function write_data(self, value) {
+function write_data(self: StringParser, value: any) {
 	self.m_out.push(
 		new Array(self.m_indent * 2 + 1).join(' ') + 
 		self.m_cur_name + ' ' + value);
 }
 
-function stringify_obj(self, value) {
+function stringify_obj(self: StringParser, value: any) {
 	for (var name in value) {
 		util.assert(/^\@?[\w\$\_\-\.]+$/.test(name), 'Key Illegal characters');
 		self.m_cur_name = name;
@@ -53,15 +65,15 @@ function stringify_obj(self, value) {
 	}
 }
 
-function stringify_arr(self, value) {
+function stringify_arr(self: StringParser, value: any) {
 	for (var i = 0; i < value.length; i++) {
 		self.m_cur_name = ',';
 		stringify(self, value[i]);
 	}
 }
 
-function stringify(self, value) {
-	var m = { '\n': '\\n', "'": "\\'" };
+function stringify(self: StringParser, value: any) {
+	var m: AnyObject = { '\n': '\\n', "'": "\\'" };
 	var is_space = false;
 	
 	switch (typeof value) {
@@ -129,17 +141,14 @@ function stringify(self, value) {
  * @private
  */
 class StringParser {
-	// m_indent = 0;
-	// m_out = null;
-	// m_cur_name = '';
+	m_indent: number = 0;
+	m_out: string[] = [];
+	m_cur_name: string = '';
 	// @public:
-	stringify(value) {
-		
+	stringify(value: any) {
 		util.assert(value && typeof value == 'object', 'Data must be object or array');
-		
 		this.m_indent = 0;
-		this.m_out = [ ];
-		
+		this.m_out = [];
 		if (Array.isArray(value)) {
 			stringify_arr(this, value);
 		} else {
@@ -149,30 +158,22 @@ class StringParser {
 	}
 }
 
-StringParser.prototype.m_indent = 0;
-StringParser.prototype.m_out = null;
-StringParser.prototype.m_cur_name = '';
-
-module.exports = {
+export default {
 
 	/**
 	 * @fun parseFile # 解析文件
 	 * @ret {Object}
 	 */
-	parseFile: function(path) {
-		if (haveWeb) {
-			util.unrealized();
-		} else {
-			return parse_keys( reader.readFileSync(path, 'utf8') );
-		}
+	parseFile(path: string) {
+		return _keys( readFile(path) );
 	},
 
 	/**
 	 * @fun parse # 解析keys字符串
 	 * @ret {Object}
 	 */
-	parse: function(str) {
-		return parse_keys(str);
+	parse(str: string) {
+		return _keys(str);
 	},
 
 	/**
@@ -180,7 +181,7 @@ module.exports = {
 	 * @arg value {Object}
 	 * @ret {String}
 	 */
-	stringify: function(value) {
+	stringify(value: any) {
 		return new StringParser().stringify(value);
 	},
 }

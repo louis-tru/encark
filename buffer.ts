@@ -34,6 +34,11 @@ import _codec, {Bytes} from './_codec';
 
 const {haveNode} = utils;
 
+// interface IBuffer {
+// 	toString(encoding?: string, start?: number, end?: number): string;
+// 	[]
+// }
+
 /**
  * @class SimpleBuffer
  */

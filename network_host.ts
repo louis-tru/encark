@@ -28,17 +28,18 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var os = require('os');
+import * as os from 'os';
 
-function getLocalNetworkHost() {
-	var r = [];
-	Object.entries(ip()).forEach(([k,v])=>r.push(...v));
-	if ( r.length == 0 ) 
-		r.push('127.0.0.1');
-	return r;
+export function getLocalNetworkHost() {
+	var result = [];
+	for (var [,addresss] of Object.entries(ip()))
+		result.push(...addresss);
+	if ( result.length == 0 ) 
+		result.push('127.0.0.1');
+	return result;
 }
 
-function ip() {
+export function ip(): AnyObject<string[]> {
 	/*
 	{ 
 	  lo0: 
@@ -57,21 +58,18 @@ function ip() {
 	}*/
 	
 	var ifaces = os.networkInterfaces();
-	var address = {}; // '127.0.0.1';
+	var address: AnyObject<string[]> = {}; // '127.0.0.1';
 	
 	for (var i in ifaces) {
 		for (var j of ifaces[i]) {
 			if (j.family == 'IPv4' && !j.internal && j.address != '127.0.0.1') {
 				var addr = j.address;
-				if (!address[i]) {
+				if (!address[i])
 					address[i] = [];
-				}
 				address[i].push(addr);
 			}
 		}
 	}
+
 	return address;
 }
-
-exports.ip = ip;
-exports.getLocalNetworkHost = getLocalNetworkHost;

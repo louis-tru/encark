@@ -28,110 +28,102 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var event = require('./event');
+import {EventNoticer} from './event';
 
 /**
  * @class Database
  */
-var Database = util.class('Database', {
+export class Database {
 	
 	// @public:
+
 	/**
 	 * host
 	 * @type {String}
 	 */
-	host: 'localhost',
-	
+	host: string = 'localhost';
+
 	/**
 	 * prot
 	 * @type {Number}
 	 */
-	port: 0,
+	port: number = 0;
 	
 	/**
 	 * username
 	 * @type {String}
 	 */
-	user: 'root',
+	user: string = 'root';
 	
 	/**
 	 * password
 	 * @type {String}
 	 */
-	password: 'root',
+	password: string = 'root';
 	
 	/**
 	 * database name
 	 * @type {String}
 	 */
-	database: '',
-	
+	database: string = '';
+
 	/**
 	 * @event onError
 	 */
-	onError: null,
-	
-	/**
-	 * constructor function
-	 * @constructor
-	 */
-	constructor: function () {
-		event.initEvents(this, 'Error');
-	},
-	
+	onError = new EventNoticer('Error', this);
+
 	/**
 	 * database statistics
 	 * @method statistics
 	 * @param {Function} cb
 	 */
-	statistics: function () {},
+	statistics() {}
 
 	/**
 	 * @func query()
 	 */
-	query: function(sql, cb) {},
+	query(sql: string, cb: any) {}
 
 	/**
 	 * exec query database
 	 * @method exec
 	 * @param  {String}   sql
 	 */
-	exec: function(sql) {
+	exec(sql: string): Promise<any> {
 		return new Promise((resolve, reject)=>{
-			this.query(sql, function(err, data) {
+			this.query(sql, function(err: any, data: any) {
 				err ? reject(err): resolve(data);
 			});
 		});
-	},
+	}
 
 	/**
 	 * close database connection
 	 * @method close
 	 */
-	close: function () { },
+	close() {}
 	
 	/**
 	 * srart transaction
 	 * @method transaction
 	 */
-	transaction: function () {},
+	transaction() {}
 	
 	/**
 	 * commit transaction
 	 * @method commit
 	 */
-	commit: function () {},
+	commit() {}
 	
 	/**
 	 * rollback transaction and clear sql command queue
 	 * @method rollback
 	 */
-	rollback: function () {},
+	rollback() {}
 	// @end
-});
+}
 
-module.exports = {
+export default {
 
 	Database: Database,
 
@@ -141,7 +133,7 @@ module.exports = {
 	 * @return {String}
 	 * @static
 	 */
-	escape: function (param) {
+	escape(param: any) {
 
 		if (param === undefined || param === null)
 			return 'NULL';
@@ -164,7 +156,7 @@ module.exports = {
 				default: return "\\" + s;
 			}
 		}) + "'";
-	},
+	}
 	// @end
 };
 

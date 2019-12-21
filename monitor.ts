@@ -28,46 +28,49 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var errno = require('./errno');
+import utils from './util';
+import errno from './errno';
 
-function clear(self) {
-	clearTimeout(self.m_timeout_id);
-	self.m_running_id = 0;
-	self.m_timeout_id = 0;
-	self.m_run_loop = null;
+function clear(self: Monitor) {
+	clearTimeout((<any>self).m_timeout_id);
+	(<any>self).m_running_id = 0;
+	(<any>self).m_timeout_id = 0;
+	(<any>self).m_run_loop = null;
 }
 
-class Monitor {
+export class Monitor {
+
+	private m_interval: number;
+	private m_maxDuration: number;
+	private m_running_id: number = 0;
+	private m_timeout_id: any = 0;
+	private m_run_loop: any = null;
+	private m_run_starttime: number = 0;
 
 	get interval() { return this.m_interval }
 	set interval(val) { this.m_interval = val }
 	get maxDuration() { return this.m_maxDuration }
-	set maxDuration(val) { this.m_maxDuration = val }	
+	set maxDuration(val) { this.m_maxDuration = val }
 
 	constructor(interval = 1e3, maxDuration = -1) {
 		this.m_interval = interval;
 		this.m_maxDuration = maxDuration;
-		this.m_running_id = 0;
-		this.m_timeout_id = 0;
-		this.m_run_loop = null;
-		this.m_run_starttime = 0;
 	}
 
-	start(run) {
-		return new Promise(async (ok, err)=>{
+	start<R>(run: (m: Monitor)=>Promise<R>|R): Promise<R|null> {
+		return new Promise(async (resolve: (r:R|null)=>void, reject)=>{
 			if (this.m_running_id) {
-				err(Error.new(errno.ERR_MONITOR_BEEN_STARTED));
+				reject(Error.new(errno.ERR_MONITOR_BEEN_STARTED));
 			} else {
 				var id = utils.id;
 				this.m_running_id = id;
 				this.m_run_starttime = Date.now();
-				var isAsync = utils.isAsync(run);
 
 				var run_loop = async()=>{
+					var r: R | null = null;
 					if (id == this.m_running_id) {
 						try {
-							var r = isAsync ? (await run(this)): run(this);
+							r = await run(this);
 							if (id == this.m_running_id) {
 								if (this.m_maxDuration == -1 || 
 										this.m_maxDuration > (Date.now() - this.m_run_starttime)) {
@@ -77,32 +80,30 @@ class Monitor {
 							}
 						} catch (e) {
 							clear(this); 
-							err(e); 
+							reject(e); 
 							return;
 						}
 					}
 					clear(this);
-					ok(r); // end
+					resolve(r); // end
 				};
-				this.m_run_loop = run_loop
+				this.m_run_loop = run_loop;
+
 				run_loop();
 			}
 		});
 	}
 
 	stop() {
-		if (!this.m_running_id) {
-			Error.new(errno.ERR_MONITOR_NOT_BEEN_STARTED)
-		}
+		utils.assert(this.m_running_id, errno.ERR_MONITOR_NOT_BEEN_STARTED);
 		clearTimeout(this.m_timeout_id);
 		this.m_running_id = 0;
 		this.m_timeout_id = 0;
 		var run_loop = this.m_run_loop;
 		if (run_loop) {
-			process.nextTick(e=>{
-				if (run_loop === this.m_run_loop) {
+			utils.nextTick(()=>{
+				if (run_loop === this.m_run_loop)
 					run_loop();
-				}
 			});
 		}
 	}
@@ -112,5 +113,3 @@ class Monitor {
 	}
 
 }
-
-exports.Monitor = Monitor;

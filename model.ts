@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
+import util from './util';
 
 /**
  * @class ModelBasic
@@ -63,7 +63,7 @@ class ModelBasic {
 
 }
 
-function value(self, keys) {
+function value(self: Model, keys) {
 	var r = self;
 	for (var key of keys) {
 		r = r.m_value[key];
@@ -83,7 +83,7 @@ function parseKeys(mkey) {
 /**
  * @class Model
  */
-class Model extends ModelBasic {
+export class Model extends ModelBasic {
 
 	async fetch(name, param, { key, table, select='select', ...opts } = {}) {
 		table = table || name;
@@ -109,7 +109,7 @@ class Model extends ModelBasic {
 /**
  * @class Collection
  */
-class Collection extends ModelBasic {
+export class Collection extends ModelBasic {
 
 	constructor(value = [], opts = {}) {
 		super(value, opts);
@@ -229,9 +229,3 @@ class Collection extends ModelBasic {
 	}
 
 }
-
-
-module.exports = {
-	Model,
-	Collection,
-};

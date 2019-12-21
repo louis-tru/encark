@@ -28,19 +28,22 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-class DelayCall {
+export class DelayCall<A extends any[]> {
+	private m_onExecute: (...args: A)=>void;
+	private m_timeoutid: any;
+	private m_delay: number;
 
-	constructor(onExecute, delay = 400) {
+	constructor(onExecute: (...args: A)=>void, delay: number = 400) {
 		this.m_onExecute = onExecute;
 		this.m_timeoutid = 0;
 		this.m_delay = delay;
 	}
 
-	notice(...args) {
+	notice(...args: A) {
 		this.call(...args);
 	}
 
-	call(...args) {
+	call(...args: A) {
 		this.clear();
 		this.m_timeoutid = setTimeout(e=>{
 			this.m_onExecute(...args);
@@ -52,5 +55,3 @@ class DelayCall {
 	}
 
 }
-
-exports.DelayCall = DelayCall;
