@@ -424,7 +424,7 @@ export class StaticService extends Service {
 	// @private:
 	// private m_root: string;
 	private m_no_cache: boolean | undefined;
-	private _response_ok: boolean | undefined;
+	protected _response_ok: boolean | undefined;
 
 	private get _root(): string {
 		return <any>this.server.root
@@ -525,7 +525,7 @@ export class StaticService extends Service {
 		return isGzip(this, filename);
 	}
 	
-	setDefaultHeader(expires: number) {
+	setDefaultHeader(expires?: number) {
 		setHeader(this, expires);
 	}
 

@@ -427,7 +427,7 @@ class Cache {
 
 }
 
-function parseJSON(json) {
+function parseJSON(json: string): any {
 	var res = JSON.parse(json, function(key, value) {
 		// 2019-05-09T00:00:00.000Z
 		if (typeof value == 'string' && value[10] == 'T' && value[23] == 'Z') {
@@ -442,7 +442,7 @@ function parseJSON(json) {
 /**
  * @class Request
  */
-class Request {
+export class Request {
 
 	constructor(serverURL, mock, mockSwitch) {
 		this.m_user_agent = user_agent;
@@ -580,7 +580,7 @@ class Request {
 	}
 }
 
-module.exports = {
+export default {
 
 	Signer: Signer,
 

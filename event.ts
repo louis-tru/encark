@@ -142,7 +142,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	* @arg name {String}       事件名称
 	* @arg data {Object}       要发送的消数据
 	*/
-	trigger(name: string, data: Data) {
+	trigger(name: string, data?: Data) {
 		return this.triggerWithEvent(name, new Event<Sender, Data, Return>(data));
 	}
 
@@ -162,7 +162,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func $trigger(name, event, is_event)
 	 */
-	$trigger(name: string, event: Event<Sender, Data, Return> | Data, is_event?: boolean) {
+	$trigger(name: string, event?: Event<Sender, Data, Return> | Data, is_event?: boolean) {
 		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			if ( is_event ) {

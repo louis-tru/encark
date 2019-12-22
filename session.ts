@@ -29,11 +29,12 @@
  * ***** END LICENSE BLOCK ***** */
 
 import util from'./util';
-import {Cookie} from './cookie';
-// var http_service = require('./http_service');
+import {ReadCookie, Cookie} from './cookie';
+import {Service} from './service';
 
-var SESSIONS: AnyObject = {};
-var SESSION_TOKEN_NAME = '__SESSION_TOKEN';
+var   HttpService: any;
+const SESSIONS: AnyObject = {};
+const SESSION_TOKEN_NAME = '__SESSION_TOKEN';
 
 function deleteSession(token: number) {
 	var data = SESSIONS[token];
@@ -51,9 +52,9 @@ function getData(self: Session) {
 
 	if (!token) {
 		token = util.id;
-		var service = (<any>self).m_service;
-		if (service instanceof http_service.HttpService)  // http service
-			service.cookie.set(SESSION_TOKEN_NAME, token);
+		var service = <Service>(<any>self).m_service;
+		if (service instanceof HttpService)  // http service
+			(<Cookie>(<any>service).cookie).set(SESSION_TOKEN_NAME, token);
 		else  //ws service
 			throw new Error('Can not set the session, session must first be activated in HttpService');
 		(<any>self).token = token;
@@ -80,7 +81,7 @@ function getData(self: Session) {
 export class Session {
 
 	//private:
-	private m_service: any | undefined
+	private m_service: any | undefined;
 
 	/**
 	 * Conversation token
@@ -93,11 +94,15 @@ export class Session {
 	 * @param {Service} service HttpService or SocketService
 	 * @constructor
 	 */
-	constructor(service: any) {
+	constructor(service: Service) {
 		this.m_service = service;
+
+		if (!HttpService) {
+			HttpService = require('./http_service').HttpService;
+		}
 		
-		var is_http = service instanceof http_service.HttpService;
-		var cookie = is_http ? service.cookie : new Cookie(service.request);
+		var is_http = service instanceof HttpService;
+		var cookie = is_http ? (<any>service).cookie : new ReadCookie(service.request);
 		var token = cookie.get(SESSION_TOKEN_NAME);
 		
 		if (!token)
@@ -114,7 +119,7 @@ export class Session {
 		if (is_http)  // socket service
 			return;
 
-		var conv = service.conv;
+		var conv = (<any>service).conv;
 
 		conv.onOpen.on(()=>{
 			var data = getData(this);

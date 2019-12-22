@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-var utils = require('./util');
-var fs = require('./fs');
-var path = require('path');
-var { options, helpInfo, defOpts } = require('./arguments');
-var { execSync } = require('./syscall');
+import utils from './util';
+import * as fs from './fs';
+import * as path from 'path';
+import { options, helpInfo, defOpts } from './arguments';
+import { execSync } from './syscall';
 
 defOpts('help', 0,									'--help, --help print help info');
 defOpts('u', 'louis',								'-u username [{0}]');
 defOpts('h', '192.168.0.115',				'-h host [{0}]');
-defOpts('t', '~/ngui',            '-t target directory [{0}]');
+defOpts('t', '~/ngui',              '-t target directory [{0}]');
 defOpts('i', '',										'-i ignore directory or file');
 
 if (options.help) {
@@ -37,7 +37,11 @@ if (options.i) {
 
 // console.log('ignore-------------', ignore)
 
-function each_directory(root, dir, cb) {
+interface Callback {
+	(pathname: string, name: string, extname: string, is_dir: boolean): boolean;
+}
+
+function each_directory(root: string, dir: string, cb: Callback) {
 	fs.readdirSync(root + '/' + dir).forEach(name=>{
 		var pathname = dir + (dir ? '/': '') + name;
 		var stat;
@@ -48,12 +52,12 @@ function each_directory(root, dir, cb) {
 			return;
 		}
 		if (!stat.isSymbolicLink()) {
+			var ext = path.extname(pathname);
 			if (stat.isDirectory()) {
 				if (cb(pathname, name, ext, true)) {
 					each_directory(root, pathname, cb);
 				}
 			} else {
-				var ext = path.extname(pathname);
 				var name = pathname.substring(0, pathname.length - ext.length);
 				cb(pathname, name, ext, false);
 			}
@@ -61,7 +65,7 @@ function each_directory(root, dir, cb) {
 	});
 }
 
-function sync(type, dir, filename) {
+function sync(type: string, dir: string, filename: string) {
 	if (ignore.indexOf(filename) != -1) return;
 	console.log('sync', type, dir, filename, '...');
 	var cmd = `scp ${root}/${dir}/${filename} ${target}/${dir}`;
@@ -72,7 +76,7 @@ function sync(type, dir, filename) {
 
 fs.watch(root, (type, filename)=>sync(type, '.', filename));
 
-each_directory(root, '', function(pathname, name, ext, is_dir) {
+each_directory(root, '', function(pathname: string, name: string, ext: string, is_dir: boolean) {
 	if (is_dir) {
 		if (ignore.indexOf(name) >= 0 || 
 				ignore.indexOf(pathname) >= 0 ||
@@ -86,6 +90,7 @@ each_directory(root, '', function(pathname, name, ext, is_dir) {
 		count++;
 		return true;
 	}
+	return false;
 });
 
 // sudo ulimit -HSn 12000

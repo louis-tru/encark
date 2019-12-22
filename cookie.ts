@@ -30,22 +30,13 @@
 
 import {IncomingMessage, ServerResponse} from 'http';
 
-export class Cookie {
-	//private:
+export class ReadCookie {
 	private _req: IncomingMessage;
-	private _res: ServerResponse;
 
-	/**
-	 * 构造函数
-	 * @param {http.ServerResponse} req
-	 * @param {http.ServerResponse} res
-	 * @constructor
-	 */
-	constructor(req: IncomingMessage, res: ServerResponse) {
+	constructor(req: IncomingMessage) {
 		this._req = req;
-		this._res = res;
 	}
-	
+
 	/**
 	 * 根据名字取Cookie值
 	 * @param  {String}  name cookie的名称
@@ -74,6 +65,22 @@ export class Cookie {
 			}
 		}
 		return cookie;
+	}
+
+}
+
+export class Cookie extends ReadCookie {
+	private _res: ServerResponse;
+
+	/**
+	 * 构造函数
+	 * @param {http.ServerResponse} req
+	 * @param {http.ServerResponse} res
+	 * @constructor
+	 */
+	constructor(req: IncomingMessage, res: ServerResponse) {
+		super(req);
+		this._res = res;
 	}
 
 	/**

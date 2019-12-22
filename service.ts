@@ -33,11 +33,10 @@ import * as querystring from 'querystring';
 import * as Path from 'path';
 import * as http from 'http';
 import * as net from 'net';
+import {Server} from './_server';
+import {RuleResult} from './router';
 
-var service_cls: AnyObject = {};
-
-type Server = AnyObject;
-type RouterInfo = AnyObject;
+const all_service_cls: AnyObject = {};
 
 /**
  * base service abstract class
@@ -177,7 +176,7 @@ export class Service {
 	 * @param {Function} cb
 	 * @param {Object}   info
 	 */
-	requestAuth(info: RouterInfo) {
+	requestAuth(info: RuleResult): Promise<boolean> | boolean {
 		return true;
 	}
 
@@ -185,13 +184,13 @@ export class Service {
 	 * call function virtual function
 	 * @param {Object} info service info
 	 */
-	action(info: RouterInfo) {
+	action(info: RuleResult) {
 	}
 
 	// @end
 }
 
-// Service.type = 'service';
+Service.type = 'service';
 
 export default {
 
@@ -200,25 +199,25 @@ export default {
 	/**
 	 * 获取所有的服务名称列表
 	 */
-	get services() { return Object.keys(service_cls) },
+	get services() { return Object.keys(all_service_cls) },
 	
 	/**
 	 * 通过名称获取服务class
 	 */
 	get(name: string) {
-		return service_cls[name];
+		return all_service_cls[name];
 	},
 
 	/**
 	 * @func getServiceDescriptors()
 	 */
 	getServiceDescriptors() {
-		var r = {};
-		Object.entries(service_cls).forEach(([key, service])=>{
+		var r: AnyObject = {};
+		Object.entries(all_service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
 
 				var type = 0;
-				var methods = [], events = [];
+				var methods: string[] = [], events: string[] = [];
 				var item = { type: service.type, methods, events };
 				var self = service.prototype;
 
@@ -253,12 +252,12 @@ export default {
 
 	set(name: string, cls: any) {
 		util.assert(util.equalsClass(Service, cls), '"{0}" is not a "Service" type', name);
-		util.assert(!(name in service_cls), 'service repeat definition, "{0}"', name);
+		util.assert(!(name in all_service_cls), 'service repeat definition, "{0}"', name);
 		cls.prototype.name = name; // 设置服务名称
-		service_cls[name] = cls;
+		all_service_cls[name] = cls;
 	},
 
 	del(name: string) {
-		delete service_cls[ name ];
+		delete all_service_cls[ name ];
 	},
 };

@@ -28,25 +28,26 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var url = require('./url');
-var DelayCall = require('./delay_call').DelayCall;
-var { haveNode, haveNgui, haveWeb } = util;
+import util from './util';
+import url from './path';
+import {DelayCall} from './delay_call';
+
+const { haveNode, haveNgui, haveWeb } = util;
 
 if (haveWeb) {
 
-	var sync_local = util.noop;
-	var commit = util.noop;
+	var sync_local = function(self: Storage) {}
+	var commit = function(self: Storage) {}
 
-	var format_key = function(self, key) {
-		return self.m_prefix + key
+	var format_key = function(self: Storage, key: string) {
+		return (<any>self).m_prefix + key
 	};
 
-	var stringify_val = function(val) {
+	var stringify_val = function(val: any): any {
 		return JSON.stringify(val);
 	};
 
-	var paese_value = function(val) {
+	var paese_value = function(val: any): any {
 		try { 
 			return JSON.parse(val);
 		} catch(e) { console.warn(e) }
@@ -55,51 +56,55 @@ if (haveWeb) {
 
 } else {
 	if (haveNgui) {
-		var fs = requireNative('_fs');
+		var fs = __requireNgui__('_fs');
 	} else if (haveNode) {
 		var fs = require('fs');
 	}
 
-	var sync_local = function(self) {
-		if (self.m_change) {
-			fs.writeFileSync(self.m_path, JSON.stringify(self.m_value, null, 2));
-			self.m_change = false;
+	var sync_local = function(self: Storage) {
+		if ((<any>self).m_change) {
+			fs.writeFileSync((<any>self).m_path, JSON.stringify((<any>self).m_value, null, 2));
+			(<any>self).m_change = false;
 		}
 	};
 
-	var commit = function(self) {
-		self.m_change = true;
-		self.m_sync.notice();
+	var commit = function(self: Storage) {
+		(<any>self).m_change = true;
+		(<any>self).m_sync.call();
 	};
 
-	var format_key = function(self, key) {
+	var format_key = function(self: Storage, key: string) {
 		return key
 	};
 
-	var stringify_val = function(val) {
+	var stringify_val = function(val: any): any {
 		return val;
 	};
 
-	var paese_value = function(val) {
+	var paese_value = function(val: any): any {
 		return val;
 	};
 }
 
-var shared = null;
+var shared: Storage | null = null;
 
 /**
  * @class Storage
  */
 class Storage {
 
+	private m_path: string;
+	private m_prefix: string = '';
+	private m_change: boolean = false;
+	private m_value: AnyObject = {};
+	private m_sync: any;
+
 	constructor(path = url.cwd() + '/' + '.storage') {
 		this.m_path = url.fallbackPath(path);
-		this.m_prefix = '';
-		this.m_change = false;
 		this.m_value = {};
 
 		if (haveWeb) {
-			this.m_sync = { notice: util.noop };
+			this.m_sync = { call: util.noop };
 			this.m_prefix = util.hash(this.m_path || 'default') + '_';
 			this.m_value = localStorage;
 		} else {
@@ -112,7 +117,7 @@ class Storage {
 		}
 	}
 
-	get(key, defaultValue) {
+	get(key: string, defaultValue?: any) {
 		key = format_key(this, key);
 		if (key in this.m_value) {
 			return paese_value(this.m_value[key]);
@@ -125,26 +130,26 @@ class Storage {
 		}
 	}
 
-	has(key) {
+	has(key: string) {
 		key = format_key(this, key);
 		return key in this.m_value;
 	}
 
-	set(key, value) {
+	set(key: string, value: any) {
 		key = format_key(this, key);
 		this.m_value[key] = stringify_val(value);
 		commit(this);
 	}
 
-	del(key) {
+	del(key: string) {
 		key = format_key(this, key);
 		delete this.m_value[key];
 		commit(this);
 	}
 
-	claer() {
+	clear() {
 		if (haveWeb) {
-			var keys = [];
+			var keys: any[] = [];
 			for (var i in this.m_value) {
 				if (i.substr(0, this.m_prefix.length) == this.m_prefix) {
 					keys.push(this.m_value);
@@ -165,43 +170,47 @@ class Storage {
 
 }
 
-module.exports = exports = {
+function _shared(): Storage {
+	if (!shared) {
+		shared = new Storage();
+	}
+	return shared;
+}
+
+export default {
 
 	Storage: Storage,
 
 	get shared() {
-		if (!shared) {
-			shared = new Storage();
-		}
-		return shared;
+		return _shared();
 	},
 
-	setShared: function(value) {
+	setShared: function(value: Storage) {
 		shared = value;
 	},
 
-	get: function(key, defaultValue) {
-		return exports.shared.get(key, defaultValue);
+	get: function(key: string, defaultValue?: any) {
+		return _shared().get(key, defaultValue);
 	},
 
-	has: function(key) {
-		return exports.shared.has(key);
+	has: function(key: string) {
+		return _shared().has(key);
 	},
 
-	set: function(key, value) {
-		return exports.shared.set(key, value);
+	set: function(key: string, value: any) {
+		return _shared().set(key, value);
 	},
 
-	del: function(key) {
-		return exports.shared.del(key);
+	del: function(key: string) {
+		return _shared().del(key);
 	},
 
 	clear: function() {
-		return exports.shared.clear();
+		return _shared().clear();
 	},
 
 	save: function() {
-		exports.shared.save();
+		_shared().save();
 	},
 
 };

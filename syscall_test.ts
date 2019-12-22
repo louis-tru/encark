@@ -28,43 +28,18 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var Hybi = require('./conv').Hybi;
-var querystring = require('querystring');
+import * as syscall from './syscall';
 
-var protocol_versions = {
-	'7': Hybi,
-	'8': Hybi,
-	'9': Hybi,
-	'10': Hybi,
-	'11': Hybi,
-	'12': Hybi,
-	'13': Hybi,
-	'14': Hybi,
-	'15': Hybi,
-	'16': Hybi,
-	'17': Hybi
-};
+syscall.exec('ls -la').then(e=>{
+	console.log(e);
+}).catch(e=>{
+	console.error(e);
+});
 
-/**
- * @func upgrade() create websocket
- * @arg  {http.ServerRequest} req
- * @arg  {Buffer}             upgradeHead
- * @ret {Conversation}
- */
-function upgrade(req, upgradeHead) {
-	var mat = decodeURI(req.url).match(/\?(.+)/);
-	var params = querystring.parse(mat ? mat[1] : '');
-	var bind_services = params.bind_services || '';
-	var version = req.headers['sec-websocket-version'];
-	
-	if (version) {
-		var klass = protocol_versions[version];
-		if (klass) {
-			return new klass(req, upgradeHead, bind_services);
-		}
-	}
-	req.socket.destroy();
-	console.warn('Unrecognized websocket protocol header');
-}
+// syscall.exec('tail -f -n 0 ' + __filename, {
+// 	onData: e=>{
+// 		console.log(e+'');
+// 	}
+// });
 
-module.exports = upgrade;
+console.log(syscall.execSync('ls -la'));

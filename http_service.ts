@@ -33,18 +33,18 @@ import {Cookie} from './cookie';
 import service from './service';
 import {StaticService} from './static_service';
 import {Session} from './session';
-// var IncomingForm = require('./incoming_form').IncomingForm;
-var zlib = require('zlib');
-var Buffer = require('buffer').Buffer;
-var errno = require('./errno');
-var {parseJSON} = require('./request');
+import * as http from 'http';
+import * as zlib from 'zlib';
+import {IncomingForm} from './incoming_form';
+import {RuleResult} from './router';
+import errno from './errno';
 
 var StaticService_action = StaticService.prototype.action;
 
 /**
  * @private
  */
-function returnJSON(self: HttpService, data) {
+function returnJSON(self: HttpService, data: any) {
 	var type = self.server.getMime(self.jsonpCallback ? 'js' : 'json');
 	try {
 		var rev = JSON.stringify(data);
@@ -56,127 +56,6 @@ function returnJSON(self: HttpService, data) {
 		data = self.jsonpCallback + '(' + rev + ')';
 	}
 	return self.returnString(rev, type);
-}
-
-async function action_multiple_calls(self, calls, index, cb) {
-	var funcs = {};
-	var result = {};
-	var count = 0, done_count = 0;
-	var done = 0;
-
-	for ( var action in calls ) {
-		count++;
-		var func = self[action];
-		if (action in HttpService.prototype) {
-			return cb(Error.new(errno.ERR_FORBIDDEN_ACCESS).toJSON(), index);
-		}
-		if ( typeof func != 'function' ) {
-			return cb(Error.new('could not find function ' + action).toJSON(), index);
-		}
-		funcs[action] = func;
-	}
-
-	function cb2(name, err, data) {
-		if ( done ) { // Already end
-			return;
-		}
-		done_count++;
-
-		if ( err ) { //
-			if (self.server.printLog) {
-				console.error(err);
-			}
-			done = true;
-			err = Error.toJSON(err);
-			err.api = name;
-			err.name = name;
-			if ( !err.code ) err.code = -1;
-			cb ( err, index );
-			result[name] = err;
-			return;
-		} else {
-			result[name] = data;
-		}
-		if ( done_count == count ) {
-			done = true;
-			cb( { data: result }, index ); // done
-		}
-	}
-
-	for ( let name in calls ) {
-		let fn = funcs[name];
-		let data = calls[name];
-		var r, e;
-		try {
-			r = await self[name](data);
-		} catch(err) {
-			e = err;
-		}
-		if (e) {
-			cb2(name, e);
-		} else {
-			cb2(name, null, r);
-		}
-	}
-}
-
-function action_multiple(self, info) {
-
-	var post_buffs = [];
-	var post_total = 0;
-
-	if ( self.request.method == 'POST' ) {
-		self.request.on('data', function(buff) {
-			post_buffs.push(buff);
-			post_total += buff.length;
-		});
-	}
-
-	self.request.on('end', async function() {
-		var auth = false;
-		try {
-			auth = await self.auth(info);
-		} catch(e) {
-			console.error(e);
-		}
-		if (!auth) {
-			self.returnJSONError(Error.new(errno.ERR_ILLEGAL_ACCESS)); return;
-		}
-
-		var data = null;
-		if ( post_buffs.length ) {
-			data = Buffer.concat(post_buffs, post_total).toString('utf-8');
-		} else {
-			data = self.params.data;
-		}
-
-		if ( data ) {
-			try {
-				data = parseJSON(data);
-				if ( !Array.isArray(data) ) {
-					self.returnJSONError(new Error('multiple call data error')); return;
-				}
-			} catch(err) {
-				self.returnJSONError(err); return;
-			}
-
-			var count = data.length;
-			var done_count = 0;
-			var result = Array(count);
-
-			for ( var i = 0; i < count; i++ ) {
-				action_multiple_calls(self, data[i], i, function(data, i) {
-					result[i] = data;
-					done_count++;
-					if ( done_count == count ) { //done
-						self.returnJSON(result);
-					}
-				});
-			}
-		} else {
-			self.returnJSONError(new Error('multiple call data error'));
-		}
-	});
 }
 
 /** 
@@ -208,30 +87,27 @@ export class HttpService extends StaticService {
 	 * ajax jsonp callback name
 	 * @tpye {String}
 	 */
-	jsonpCallback: any = '';
+	readonly jsonpCallback: string;
 
 	/**
 	 * post form
 	 * @type {IncomingForm}
 	 */
-	form: any = null;
+	form: any | null = null;
 
 	/**
 	 * post form data
 	 * @type {Object}
 	 */
-	data: any = null;
+	readonly data: AnyObject;
 
 	/**
 	 * @constructor
-	 * @arg req {http.ServerRequest}
+	 * @arg req {http.IncomingMessage}
 	 * @arg res {http.ServerResponse}
-	 * @arg info {Object}
 	 */
-	constructor(req, res, info) {
-		StaticService.call(this, req, res, info);
-		this.cookie = new Cookie(req, res);
-		this.session = new session.Session(this);
+	constructor(req: http.IncomingMessage, res: http.ServerResponse) {
+		super(req, res);
 		this.jsonpCallback = this.params.callback || '';
 		this.data = {};
 	}
@@ -239,7 +115,7 @@ export class HttpService extends StaticService {
 	/** 
 	 * @overwrite
 	 */
-	async action(info) {
+	async action(info: RuleResult) {
 
 		var self = this;
 		var action = info.action;
@@ -269,40 +145,38 @@ export class HttpService extends StaticService {
 		 * the BUG caused by the request can not respond to
 		 */
 
-		if ( action == 'multiple' ) {
-			return action_multiple(this, info);
-		}
-
 		//Filter private function
 		if (/^_/.test(action)){
-			return StaticService_action.call(this);
+			return StaticService_action.call(this, info);
 		}
 		
-		var fn = this[action];
+		var fn = (<any>this)[action];
 
 		if (action in HttpService.prototype) {
 			return self.returnError(Error.new(errno.ERR_FORBIDDEN_ACCESS));
 		}
 		if (!fn || typeof fn != 'function') {
-			return StaticService_action.call(this);
+			return StaticService_action.call(this, info);
 		}
 		
 		var ok = async function() {
+			var auth: boolean = false;
 			try {
-				var auth = await self.auth(info);
+				auth = await self.auth(info);
 			} catch(e) {
 				console.error(e);
 			}
+
 			if (!auth) {
 				self.returnError(Error.new(errno.ERR_ILLEGAL_ACCESS));
 				return;
 			}
 
 			var { service, action, ..._info } = info;
-			var data = util.assign({}, self.params, self.data, _info);
+			var data = Object.assign({}, self.params, self.data, _info);
 			var err, r;
 			try {
-				r = await self[action](data);
+				r = await (<any>self)[action](data);
 			} catch(e) {
 				err = e;
 			}
@@ -321,20 +195,21 @@ export class HttpService extends StaticService {
 		if (this.request.method == 'POST') {
 			var form = this.form = new IncomingForm(this);
 			try {
-				if (util.isAsync(this.hasAcceptFilestream)) {
+				var accept = this.hasAcceptFilestream(info);
+				if (accept instanceof Promise) {
 					this.request.pause();
-					form.isUpload = await this.hasAcceptFilestream(info);
+					form.isUpload = await accept;
 					this.request.resume();
 				} else {
-					form.isUpload = this.hasAcceptFilestream(info);
+					form.isUpload = accept;
 				}
 			} catch(err) {
 				// this._service.request.socket.destroy();
 				return self.returnError(err);
 			}
 			form.onend.on(function() {
-				util.assign(self.data, form.fields);
-				util.assign(self.data, form.files);
+				Object.assign(self.data, form.fields);
+				Object.assign(self.data, form.files);
 				ok();
 			});
 			form.parse();
@@ -346,23 +221,23 @@ export class HttpService extends StaticService {
 	/**
 	 * @func hasAcceptFilestream(info) 是否接收文件流
 	 */
-	hasAcceptFilestream(info) {
+	hasAcceptFilestream(info: RuleResult): Promise<boolean> | boolean {
 		return false;
 	}
 
 	/**
 	 * @func auth(info)
 	 */
-	auth(info) {
+	auth(info: RuleResult): Promise<boolean> | boolean {
 		return true;
 	}
-	
+
 	/**
 	 * @fun returnData() return data to browser
 	 * @arg type {String} #    MIME type
 	 * @arg data {Object} #    data
 	 */
-	returnData(type, data) {
+	returnData(type: string, data: any): void {
 		this.markResponse();
 
 		var self = this;
@@ -390,7 +265,7 @@ export class HttpService extends StaticService {
 	 * @arg type {String} #    MIME type
 	 * @arg str {String}
 	 */
-	returnString(str, type = 'text/plain') {
+	returnString(str: string, type: string = 'text/plain'): void {
 		return this.returnData(type + ';charset=utf-8', str);
 	}
 	
@@ -398,7 +273,7 @@ export class HttpService extends StaticService {
 	 * @fun returnHtml # return html to browser
 	 * @arg html {String}  
 	 */
-	returnHtml(html) {
+	returnHtml(html: string): void {
 		var type = this.server.getMime('html');
 		return this.returnString(html, type);
 	}
@@ -407,7 +282,7 @@ export class HttpService extends StaticService {
 	 * @fun rev # return data to browser
 	 * @arg data {JSON}
 	 */
-	returnJSON(data) {
+	returnJSON(data: any): void {
 		this.setNoCache();
 		return returnJSON(this, { data: data, code: 0, st: new Date().valueOf() });
 	}
@@ -416,7 +291,7 @@ export class HttpService extends StaticService {
 	 * @fun returnError() return error to browser
 	 * @arg [err] {Error} 
 	 */
-	returnError(err) {
+	returnError(err: any) {
 		this.setNoCache();
 		var accept = this.request.headers.accept || '';
 		if (/text\/html|application\/xhtml/.test(accept)) {
@@ -429,7 +304,7 @@ export class HttpService extends StaticService {
 	/**
 	 * @func returnJSONError(err)
 	 */
-	returnJSONError(err) {
+	returnJSONError(err: any) {
 		err = Error.toJSON(err);
 		err.st = new Date().valueOf();
 		if ( !err.code ) {
@@ -442,7 +317,7 @@ export class HttpService extends StaticService {
 	/**
 	 * @func returnHtmlError()
 	 */
-	returnHtmlError(err) {
+	returnHtmlError(err: any) {
 		err = Error.toJSON(err);
 		var msg = [];
 		if (err.message) msg.push(err.message);
@@ -464,13 +339,11 @@ export class HttpService extends StaticService {
 /** 
  * @class HttpService
  */
-var Descriptors = util.class('Descriptors', HttpService, {
-	
-	descriptors: async function() {
-		var descs = service.getServiceDescriptors();
-		return descs;
+class Descriptors extends HttpService {
+	descriptors() {
+		return service.getServiceDescriptors();
 	}
-});
+}
 
 service.set('descriptors', Descriptors);
 

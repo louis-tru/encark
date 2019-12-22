@@ -29,6 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import * as fs from './fs';
+export * from './fs';
 
 type PathLike = fs.PathLike;
 

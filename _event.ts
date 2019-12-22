@@ -172,7 +172,7 @@ export class List<T> {
 	* @class Event
 	*/
 export class Event<Sender = any, Data = any, Return = number> {
-	private m_data: Data;
+	private m_data: Data | null | undefined;
 	protected m_noticer: EventNoticer<Sender, Data, Return> | null = null;
 	private m_return_value: Return | null = null;
 	protected __has_event = true;
@@ -215,7 +215,7 @@ export class Event<Sender = any, Data = any, Return = number> {
 	/**
 	 * @constructor
 	 */
-	constructor(data: Data) {
+	constructor(data?: Data) {
 		this.m_data = data;
 	}
 	// @end
@@ -436,7 +436,7 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg data {Object} # 要发送的数据
 	 * @ret {Object}
 	 */
-	trigger(data: Data): Return | null {
+	trigger(data?: Data): Return | null {
 		return this.triggerWithEvent(new Event(data));
 	}
 

@@ -28,64 +28,42 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var fs = require('./fs');
-var util = require('./util');
+var Hybi = require('./conv').Hybi;
+import * as querystring from 'querystring';
+import * as http from 'http';
 
-function cut(filename, count) {
-	count = Math.max(2, Math.min(count, 100));
-	var stat = fs.statSync(filename);
-	var size = stat.size / count;
-	var rfd = fs.openSync(filename, 'r');
-	var wfd = fs.openSync(filename + '.0', 'w');
-	var index = 0;
+const protocol_versions: AnyObject = {
+	'7': Hybi,
+	'8': Hybi,
+	'9': Hybi,
+	'10': Hybi,
+	'11': Hybi,
+	'12': Hybi,
+	'13': Hybi,
+	'14': Hybi,
+	'15': Hybi,
+	'16': Hybi,
+	'17': Hybi
+};
 
-	var buff = Buffer.alloc(1024 * 100); // 100kb
-	var len = 0;
-	var total = 0;
+/**
+ * @func upgrade() create websocket
+ * @arg  {http.ServerRequest} req
+ * @arg  {Buffer}             upgradeHead
+ * @ret {Conversation}
+ */
+export default function upgrade(req: http.IncomingMessage, upgradeHead: any) {
+	var mat = decodeURI(req.url || '').match(/\?(.+)/);
+	var params = querystring.parse(mat ? mat[1] : '');
+	var bind_services = params.bind_services || '';
+	var version = <string>req.headers['sec-websocket-version'];
 	
-	do {
-		if ( total >= size ) { // reset
-			index++;
-			total = 0;
-			fs.closeSync(wfd);
-			wfd = fs.openSync(filename + '.' + index, 'w');
-		}
-		len = fs.readSync(rfd, buff, 0, buff.length, null);
-		fs.writeSync(wfd, buff, 0, len, null);
-		total += len;
-	} while (len == buff.length);
-	
-	fs.closeSync(rfd);
-	fs.closeSync(wfd);
-}
-
-function merge(filename, options) {
-	options = util.assign({
-		target: filename,
-		remove_source: false,
-	}, options);
-	
-	var wfd = fs.openSync(options.target, 'w');
-	var buff = Buffer.alloc(1024 * 100); // 100kb
-	var len = 0;
-	var i = 0;
-
-	for ( ; fs.existsSync(filename + '.' + i); i++ ) {
-		var rfd = fs.openSync(filename + '.' + i, 'r');
-		do {
-			len = fs.readSync(rfd, buff, 0, buff.length, null);
-			fs.writeSync(wfd, buff, 0, len, null);
-		} while (len == buff.length);
-		fs.closeSync(rfd);
-
-		if ( options.remove_source ) { // delete
-			fs.rm_r(filename + '.' + i);
+	if (version) {
+		var klass = protocol_versions[version];
+		if (klass) {
+			return new klass(req, upgradeHead, bind_services);
 		}
 	}
-	fs.closeSync(wfd);
-
-	return i;
+	req.socket.destroy();
+	console.warn('Unrecognized websocket protocol header');
 }
-
-exports.cut = cut;
-exports.merge = merge;

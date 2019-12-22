@@ -28,7 +28,6 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
 import {Buffer} from 'buffer';
 import * as Path from 'path';
 import * as fs from 'fs';
@@ -557,7 +556,7 @@ export type MkdirOptopns = string | number | fs.MakeDirectoryOptions | null | un
 	* @param {String}   mode  (Optional)
 	* @param {Function} cb    (Optional)
 	*/
-export function mkdirp(path: string, mode: MkdirOptopns | NoParamCallback, cb?: NoParamCallback) {
+export function mkdirp(path: string, mode?: MkdirOptopns | NoParamCallback, cb?: NoParamCallback) {
 	var mode2: any = mode;
 	if (typeof mode == 'function') {
 		cb = mode;
@@ -594,7 +593,7 @@ export function mkdirp(path: string, mode: MkdirOptopns | NoParamCallback, cb?: 
 	* @param {String}   path
 	* @param {String}   mode  (Optional)
 	*/
-export function mkdirpSync(path: string, mode: MkdirOptopns) {
+export function mkdirpSync(path: string, mode?: MkdirOptopns) {
 	path = Path.resolve(path);
 
 	if (fs.existsSync(path)) {

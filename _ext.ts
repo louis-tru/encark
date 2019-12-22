@@ -186,7 +186,7 @@ type ErrnoCode = [number/*errno*/, string/*message*/, string?/*description*/];
 type ErrorNewArg = ErrnoCode | Error | string | ErrorDescribe;
 
 interface ErrorConstructor {
-	'new'(err: ErrorNewArg, errno?: number): Error;
+	'new'(err: ErrorNewArg, errno?: number | null): Error;
 	toJSON(err: Error): any;
 }
 
@@ -483,7 +483,7 @@ const errors: Errors = {
 
 definePropertys(Error, {
 
-	new: function(arg: ErrorNewArg, errno?: number): Error {
+	new: function(arg: ErrorNewArg, errno?: number | null): Error {
 		var err: Error;
 		if (arg as Object) { // ErrnoCode | Error | ErrorDescribe;
 			if (arg as Error) {

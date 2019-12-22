@@ -28,44 +28,25 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var child_process = require('child_process');
-var stream = require('stream');
+import util from './util';
+import * as child_process from 'child_process';
+import * as stream from 'stream';
 
-function syscall(cmd) {
-	var ch = child_process.spawnSync('sh', ['-c', cmd]);
+export function syscall(cmd: string): SpawnResult {
+	var ch = child_process.spawnSync('sh', ['-c', cmd], {encoding: 'utf8'});
 	if (ch.status != 0) {
 		if (ch.stderr.length) {
-			console.error(ch.stderr.toString('utf8'));
+			console.error(ch.stderr);
 		}
 		if (ch.stdout.length) {
-			console.log(ch.stdout.toString('utf8'));
+			console.log(ch.stdout);
 		}
 		// console.log('status != 0 exit process');
 		// process.exit(ch.status);
 		throw Error.new('status != 0 exit process', ch.status);
 	} else {
-		return {
-			code: ch.status,
-			stdout: ch.stdout.length ? ch.stdout.toString().split('\n'): [],
-			stderr: ch.stderr.length ? ch.stderr.toString().split('\n'): [],
-		};
-	}
-}
-
-function execSync(cmd) {
-	return spawnSync('sh', ['-c', cmd]);
-}
-
-function spawnSync(cmd, args = []) {
-	// var ls = cmd.split(/\s+/);
-	// var ch = child_process.spawnSync(ls.shift(), ls);
-	var ch = child_process.spawnSync(cmd, args);
-	if (ch.error) {
-		throw ch.error;
-	} else {
-		var stdout = ch.stdout.length ? ch.stdout.toString().split('\n'): [];
-		var stderr = ch.stderr.length ? ch.stderr.toString().split('\n'): [];
+		var stdout = ch.stdout.length ? ch.stdout.split('\n'): [];
+		var stderr = ch.stderr.length ? ch.stderr.split('\n'): [];
 		return {
 			code: ch.status,
 			first: stdout[0],
@@ -74,7 +55,28 @@ function spawnSync(cmd, args = []) {
 	}
 }
 
-function on_data_default(data) {
+export function execSync(cmd: string): SpawnResult {
+	return spawnSync('sh', ['-c', cmd]);
+}
+
+export function spawnSync(cmd: string, args: string[] = []): SpawnResult {
+	// var ls = cmd.split(/\s+/);
+	// var ch = child_process.spawnSync(ls.shift(), ls);
+	var ch = child_process.spawnSync(cmd, args, {encoding: 'utf8'});
+	if (ch.error) {
+		throw ch.error;
+	} else {
+		var stdout = ch.stdout.length ? ch.stdout.split('\n'): [];
+		var stderr = ch.stderr.length ? ch.stderr.split('\n'): [];
+		return {
+			code: ch.status || 0,
+			first: stdout[0],
+			stdout, stderr,
+		};
+	}
+}
+
+function on_data_default(data: Buffer): string {
 	if (util.config.moreLog) {
 		process.stdout.write(data);
 		process.stdout.write('\n');
@@ -82,7 +84,7 @@ function on_data_default(data) {
 	return data.toString('utf8');
 }
 
-function on_error_default(data) {
+function on_error_default(data: Buffer): string {
 	if (util.config.moreLog) {
 		process.stderr.write(data);
 		process.stderr.write('\n');
@@ -90,44 +92,65 @@ function on_error_default(data) {
 	return data.toString('utf8');
 }
 
-function exec(cmd, ...args) {
-	return spawn('sh', ['-c', cmd], ...args);
+export interface SpawnOptions {
+	onData?: (data: Buffer)=>string;
+	onError?: (data: Buffer)=>string;
+	stdout?: stream.Writable;
+	stderr?: stream.Writable;
+	stdin?: stream.Readable;
 }
 
-function spawn(cmd, cmd_args = [], _args = {}) {
+export interface SpawnResult {
+	code: number;
+	first: string;
+	stdout: string[];
+	stderr: string[];
+}
+
+export class SpawnPromise extends Promise<SpawnResult> {
+	process: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null; 
+}
+
+export function exec(cmd: string, options: SpawnOptions = {}): SpawnPromise  {
+	return spawn('sh', ['-c', cmd], options);
+}
+
+export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = {}): SpawnPromise {
 	var {
 		onData = on_data_default,
 		onError = on_error_default,
-		stdout, stderr, stdin } = _args;
-	stdout = stdout instanceof stream.Stream ? stdout: null;
-	stderr = stderr instanceof stream.Stream ? stderr: null;
-	stdin = stdin instanceof stream.Stream ? stdin: null;
-	var ch;
+		stdout, stderr, stdin,
+	} = options;
 
-	var promise = new Promise(function(resolve, reject) {
-		var on_stdin;
-		var r_stdout = [];
-		var r_stderr = [];
+	stdout = stdout instanceof stream.Writable ? stdout: undefined;
+	stderr = stderr instanceof stream.Writable ? stderr: undefined;
+	stdin = stdin instanceof stream.Readable ? stdin: undefined;
+
+	var promise = new SpawnPromise(function(resolve, reject) {
+		var on_stdin: any;
+		var r_stdout: string[] = [];
+		var r_stderr: string[] = [];
 		var empty = Buffer.alloc(0);
+		var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null;
 
-		var data_tmp = {
+		var data_tmp: AnyObject<Buffer> = {
 			stdout: empty,
 			stderr: empty,
 		};
 
-		function on_data_before(data) {
+		function on_data_before(data: Buffer) {
 			var r = onData.call(ch, data);
 			if (r)
 				r_stdout.push(r);
 		}
 
-		function on_error_before(data) {
+		function on_error_before(data: Buffer) {
 			var r = onError.call(ch, data);
 			if (r)
 				r_stderr.push(r);
 		}
 
-		function parse_data(data, name) {
+		function parse_data(data: Buffer, name: string) {
 			var output = data_tmp[name];
 			var index, prev = 0;
 			var handle = name == 'stdout' ? on_data_before: on_error_before;
@@ -140,7 +163,7 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 			data_tmp[name] = Buffer.concat([output, data.slice(prev)]);
 		}
 
-		function on_end(err, code) {
+		function on_end(err?: Error | null, code?: number) {
 			if (ch) {
 				ch = null;
 				if (stdin) {
@@ -155,47 +178,38 @@ function spawn(cmd, cmd_args = [], _args = {}) {
 					if (data_tmp.stderr.length) {
 						on_error_before(data_tmp.stderr);
 					}
-					resolve({ code, first: r_stdout[0], stdout: r_stdout, stderr: r_stderr });
+					resolve({ code: code || 0, first: r_stdout[0], stdout: r_stdout, stderr: r_stderr });
 				}
 			}
 		}
 
-		ch = child_process.spawn(cmd, cmd_args);
+		promise.process = ch = child_process.spawn(cmd, args);
 
-		ch.stdout.on('data', function(e) {
+		ch.stdout.on('data', function(e: Buffer) {
 			if (stdout)
 				stdout.write(e);
 			parse_data(e, 'stdout');
 		});
 
-		ch.stderr.on('error', function(e) {
+		ch.stderr.on('error', function(e: Buffer) {
 			if (stderr)
 				stderr.write(e);
 			parse_data(e, 'stderr');
 		});
 
-		ch.on('error', e=>on_end(e));
-		ch.on('exit', e=>util.nextTick(on_end, null, e));
+		ch.on('error', (e: Error)=>on_end(e));
+		ch.on('exit', (e: number)=>util.nextTick(on_end, null, e));
 
 		if (stdin) {
-			stdin.addListener('data', on_stdin = function(e) {
+			stdin.addListener('data', on_stdin = function(chunk: any) {
 				if (ch) {
-					ch.stdin.write(e);
+					ch.stdin.write(chunk);
 				}
 			});
-			ch.stdin.resume();
+			// ch.stdin.resume();
 		}
 
 	});
 
-	promise.process = ch;
-
 	return promise;
 }
-
-exports.syscall = syscall;
-exports.execSync = execSync;
-exports.spawnSync = spawnSync;
-exports.exec = exec;
-exports.spawn = spawn;
-

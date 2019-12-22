@@ -28,17 +28,19 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var event = require('./event');
-var fs = require('fs');
-var Path = require('path');
-var StringDecoder = require('string_decoder').StringDecoder;
-var WriteStream = require('fs').WriteStream;
-var querystring = require('querystring');
-var Buffer = require('buffer').Buffer;
-var crypto = require('crypto');
-var {parseJSON} = require('./request');
+import util from './util';
+import {EventNoticer} from './event';
+import * as fs from 'fs';
+import * as Path from 'path';
+import {StringDecoder} from 'string_decoder';
+import {WriteStream} from 'fs';
+import * as querystring from 'querystring';
+import {Buffer} from 'buffer';
+import * as crypto from 'crypto';
+import request from './request';
 var xml = require('./xml');
+
+const {parseJSON} = request;
 
 // This is a buffering parser, not quite as nice as the multipart one.
 // If I find time I'll rewrite this to be fully streaming as well
@@ -46,25 +48,27 @@ var xml = require('./xml');
  * @class QuerystringParser
  * @private
  */
-var QuerystringParser = util.class('QuerystringParser', {
+class QuerystringParser {
+
+	private type: string;
+	private buffers: Buffer[] = [];
+	private length: number = 0;
 
 	/**
 	 * constructor function
 	 * @constructor
 	 */
-	constructor: function(type) {
+	constructor(type: string) {
 		this.type = type;
-		this.buffer = null;
-	},
+	}
 
-	write: function (buffer) {
-		this.buffer = this.buffer ? 
-			Buffer.concat([this.buffer, buffer]): buffer;
+	write(buffer: Buffer) {
+		this.length += buffer.length;
 		return buffer.length;
-	},
+	}
 
-	end: function() {
-		var buffer = this.buffer ? this.buffer.toString('utf-8'): '';
+	end() {
+		var buffer = Buffer.concat(this.buffers).toString('utf8')
 		if (this.type == 'json') {
 			var data = {};
 			buffer = buffer.trim();
@@ -87,10 +91,10 @@ var QuerystringParser = util.class('QuerystringParser', {
 			}
 			this.onEnd();
 		}
-	},
+	}
 
 	// @end
-});
+}
 
 // ----------------------- File -----------------------
 
@@ -98,62 +102,58 @@ var QuerystringParser = util.class('QuerystringParser', {
  * @File
  * @private
  */
-var File = util.class('File', {
+class File {
+	private _writeStream: fs.WriteStream | null = null;
+	private _path = '';
+	private _name = '';
+	private _type: string;
+	private _size = 0;
+	private _lastModifiedDate = null;
 
-	_writeStream: null,
-
-	path: '',
-	name: '',
-	type: null,
-	size: 0,
-	lastModifiedDate: null,
+	get size() {
+		return this._size;
+	}
 
 	// @todo Next release: Show error messages when accessing these
 	get length() {
 		return this.size;
-	},
+	}
 
 	get filename() {
-		return this.name;
-	},
+		return this._name;
+	}
 
 	get pathname() {
-		return this.path;
-	},
+		return this._path;
+	}
 	
 	get mime() {
-		return this.type;
-	},
+		return this._type;
+	}
 
-	/**
-	 * @event onprogress
-	 */
-	onprogress: null,
-
-	/**
-	 * @event onend
-	 */
-	onend: null,
+	readonly onProgress = new EventNoticer('Progress', this);
+	readonly onEnd = new EventNoticer('End', this);
 
 	/**
 	 * constructor function
 	 * @param {Object} properties
 	 * @constructor
 	 */
-	constructor: function (properties) {
-		event.initEvents(this, 'progress', 'end');
-		util.assign(this, properties);
-	},
+	constructor(path: string, name: string, type: string) {
+		this._path = path;
+		this._name = name;
+		this._type = type;
+	}
 
-	open: function () {
-		this._writeStream = new WriteStream(this.path);
-	},
+	private _open() {
+		this._writeStream = new WriteStream(this._path);
+	}
 
-	write: function (buffer, cb) {
+	write(buffer: Buffer, cb: any) {
 		var self = this;
 
 		if (!self._writeStream)
-			self.open();
+			self._open();
 
 		self._writeStream.write(buffer, function () {
 			self.lastModifiedDate = new Date();
@@ -513,7 +513,7 @@ var Part = util.class('Part', {
 
 // ----------------------- IncomingForm -----------------------
 
-var temp_dir;
+var temp_dir = '';
 var dirs = ['/tmp', process.cwd()];
 
 if (process.env.TMP) {
@@ -544,52 +544,52 @@ function canceled(self){
 	}
 }
 
-var IncomingForm = util.class('IncomingForm', {
+export class IncomingForm {
 	
-	_parser: null,
-	_flushing: 0,
-	_fields_size: 0,
-	_service: null,
+	private _parser = null;
+	private _flushing = 0;
+	private _fields_size = 0;
+	private _service = null;
 	
-	error: null,
-	ended: false,
-	hash: null,
-	
+	private error = null;
+	private ended = false;
+	private hash = null;
+
 	/**
 	 * default size 2MB
 	 * @type {Number}
 	 */
-	maxFieldsSize: 5 * 1024 * 1024,
+	readonly maxFieldsSize = 5 * 1024 * 1024;
 	
 	/**
 	 * default size 5MB
 	 * @type {Number}
 	 */
-	maxFilesSize: 5 * 1024 * 1024,
+	readonly maxFilesSize = 5 * 1024 * 1024;
 	
 	/**
 	 * verifyFileMime 'js|jpg|jpeg|png' default as '*' ...
 	 * @type {String}
 	 */
-	verifyFileMime: '*',
+	readonly verifyFileMime = '*';
 	
 	/**
 	 * is use file upload, default not upload
 	 * @type {Boolean}
 	 */
-	isUpload: false,
+	isUpload = false;
 	
-	fields: null,
-	files: null,
+	fields = null;
+	files = null;
 	
-	keepExtensions: false,
-	uploadDir: '',
-	encoding: 'utf-8',
-	headers: null,
-	type: null,
+	keepExtensions = false;
+	uploadDir = '';
+	encoding = 'utf-8';
+	headers = null;
+	type = null;
 	
-	bytesReceived: null,
-	bytesExpected: null,
+	private bytesReceived: number = 0;
+	private bytesExpected: number = 0;
 	
 	onaborted: null,
 	onprogress: null,
@@ -742,11 +742,7 @@ var IncomingForm = util.class('IncomingForm', {
 
 		this._flushing++;
 
-		var file = new File({
-			path: this._uploadPath(part.filename),
-			name: part.filename,
-			type: part.mime
-		});
+		var file = new File(this._uploadPath(part.filename), part.filename,  part.mime);
 
 		if (this.verifyFileMime != '*' && !new RegExp('\.(' + this.verifyFileMime + ')$', 'i').test(part.filename)) {
 			return this._error(new Error('File mime error'));
@@ -960,7 +956,7 @@ var IncomingForm = util.class('IncomingForm', {
 });
 
 // 
-module.exports = {
+export default {
 
 	IncomingForm: IncomingForm,
 
@@ -968,7 +964,7 @@ module.exports = {
 	
 	STATUS: S,
 
-	state_to_string: function (stateNumber) {
+	state_to_string: function (stateNumber: number) {
 		for (var state in S) {
 			var number = S[state];
 			if (number === stateNumber) return state;

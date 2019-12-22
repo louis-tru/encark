@@ -28,18 +28,65 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var syscall = require('./syscall');
+import * as fs from './fs';
 
-syscall.exec('ls -la').then(e=>{
-	console.log(e);
-}).catch(e=>{
-	console.error(e);
-});
+export function cut(filename: string, count: number) {
+	count = Math.max(2, Math.min(count, 100));
+	var stat = fs.statSync(filename);
+	var size = stat.size / count;
+	var rfd = fs.openSync(filename, 'r');
+	var wfd = fs.openSync(filename + '.0', 'w');
+	var index = 0;
 
-// syscall.exec('tail -f -n 0 ' + __filename, {
-// 	onData: e=>{
-// 		console.log(e+'');
-// 	}
-// });
+	var buff = Buffer.alloc(1024 * 100); // 100kb
+	var len = 0;
+	var total = 0;
+	
+	do {
+		if ( total >= size ) { // reset
+			index++;
+			total = 0;
+			fs.closeSync(wfd);
+			wfd = fs.openSync(filename + '.' + index, 'w');
+		}
+		len = fs.readSync(rfd, buff, 0, buff.length, null);
+		fs.writeSync(wfd, buff, 0, len, null);
+		total += len;
+	} while (len == buff.length);
+	
+	fs.closeSync(rfd);
+	fs.closeSync(wfd);
+}
 
-console.log(syscall.execSync('ls -la'));
+export interface MergeOptions {
+	target?: string
+	removeSource?: boolean
+}
+
+export function merge(filename: string, options?: MergeOptions) {
+	options = Object.assign({
+		target: filename,
+		removeSource: false,
+	}, options);
+
+	var wfd = fs.openSync(<string>options.target, 'w');
+	var buff = Buffer.alloc(1024 * 100); // 100kb
+	var len = 0;
+	var i = 0;
+
+	for ( ; fs.existsSync(filename + '.' + i); i++ ) {
+		var rfd = fs.openSync(filename + '.' + i, 'r');
+		do {
+			len = fs.readSync(rfd, buff, 0, buff.length, null);
+			fs.writeSync(wfd, buff, 0, len, null);
+		} while (len == buff.length);
+		fs.closeSync(rfd);
+
+		if ( options.removeSource ) { // delete
+			fs.removerSync(filename + '.' + i);
+		}
+	}
+	fs.closeSync(wfd);
+
+	return i;
+}

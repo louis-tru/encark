@@ -28,19 +28,20 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var path = require('./path');
-var { Notification } = require('./event');
-var { log, error, dir, warn } = console;
-var { haveNode, haveNgui, haveWeb } = utils;
+import utils from './util';
+import path from './path';
+import { Notification } from './event';
+
+const { log, error, dir, warn } = console;
+const { haveNode, haveNgui, haveWeb } = utils;
 
 if (haveNgui) {
-	var fs = requireNative('_fs');
+	var fs = __requireNgui__('_fs');
 } else if (haveNode) {
 	var fs = require('./fs');
 }
 
-function print(self, TAG, func, ...args) {
+function print(self: Console, TAG: string, func: any, ...args: any[]) {
 	args.unshift(new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
 	args.unshift(TAG);
 	args = args.map(e=>{
@@ -52,177 +53,142 @@ function print(self, TAG, func, ...args) {
 	});
 	func.call(console, ...args);
 	var data = args.join(' ');
-	if (self.m_fd) {
-		fs.write(self.m_fd, data + '\n', 'utf-8', function() {});
+	if ((<any>self).m_fd) {
+		fs.write((<any>self).m_fd, data + '\n', 'utf-8', function() {});
 	}
 	self.trigger('Log', { tag: TAG, data: data });
 	return data;
 }
 
-function formatTime(time) {
+function formatTime(time: Date) {
 	return time.toString('yyyy-MM-dd hh:mm:ss.fff');
 }
 
-function timeSpace(self) {
-	return new Array(self.m_timeStack.length).join('  ');
+function timeSpace(self: Console) {
+	return new Array((<any>self).m_timeStack.length).join('  ');
 }
 
-var default_console = null;
+export class Console extends Notification {
 
-class Console extends Notification {
+	private m_pathname: string;
+	private m_fd: number;
+	private m_timeStack: Map<string, any>;
+	
+	get fd(): number {
+		return this.m_fd;
+	}
 
-	constructor(pathname) {
+	get pathname(): string {
+		return this.m_pathname;
+	}
+
+	constructor(pathname?: string) {
 		super();
 		if (pathname) {
-			if (!haveWeb) {
+			if (haveWeb) {
+				this.m_fd = 0;
+			} else {
 				fs.mkdirpSync(path.dirname(pathname));
 				this.m_fd = fs.openSync(pathname, 'a');
-			} else {
-				this.m_fd = 0;
 			}
 			this.m_pathname = pathname;
 		} else {
 			this.m_fd = 0;
 			this.m_pathname = '';
 		}
-		this.m_timeStack = [];
+		this.m_timeStack = new Map<string, any>();
 	}
 
-	get fd() {
-		this.m_fd;
-	}
-
-	get pathname() {
-		this.m_pathname;
-	}
-	
 	makeDefault() {
 		console.log = this.log.bind(this);
 		console.error = this.error.bind(this);
 		console.dir = this.dir.bind(this);
 		console.warn = this.warn.bind(this);
-		console.dlog = this.dlog.bind(this);
-		console.print = this.print.bind(this);
 		console.time = this.time.bind(this);
+		console.timeLog = this.timeLog.bind(this);
 		console.timeline = this.timeline.bind(this);
 		console.timeEnd = this.timeEnd.bind(this);
-		console._log = this._log = log;
-		console._error = this._error = error;
-		console._dir = this._dir = dir;
-		console._warn = this._warn = warn;
-		default_console = this;
+		(<any>console)._log = (<any>this)._log = log;
+		(<any>console)._error = (<any>this)._error = error;
+		(<any>console)._dir = (<any>this)._dir = dir;
+		(<any>console)._warn = (<any>this)._warn = warn;
 		return this;
 	}
 	
-	log(...args) {
-		return print(this, 'LOG', log, ...args);
+	log(msg: string, ...args: any[]) {
+		return print(this, 'LOG', log, msg, ...args);
 	}
 
-	warn(...args) {
-		return print(this, 'WARN', warn, ...args);
+	warn(msg: string, ...args: any[]) {
+		return print(this, 'WARN', warn, msg, ...args);
 	}
 
-	error(...args) {
-		return print(this, 'ERR', error, ...args);
+	error(msg: string, ...args: any[]) {
+		return print(this, 'ERR', error, msg, ...args);
 	}
 
-	dir(...args) {
-		return print(this, 'DIR', dir, ...args);
+	dir(msg: any, ...args: any[]) {
+		return print(this, 'DIR', dir, msg, ...args);
 	}
 
-	dlog(...args) {
-		if (utils.dev || utils.config.moreLog) {
-			print(this, 'DLOG', log, ...args);
-		}
-	}
-
-	print(tag, ...args) {
+	print(tag: string, ...args: any[]) {
 		return print(this, tag, log, ...args);
 	}
 
-	time(tag = '') {
+	time(tag: string = '') {
+		if (this.m_timeStack.has(tag))
+			return warn(tag, 'already exists for console.time()');
 		var date = new Date();
 		var time = { date, tag, timelines: [{ date, tag }] };
-		this.m_timeStack.push(time);
-		this.dlog(timeSpace(this), 'Time    ', formatTime(time.date), ' ', tag);
+		this.m_timeStack.set(tag, time);
+		this.log(timeSpace(this), 'Time    ', formatTime(time.date), ' ', tag);
 	}
 
-	timeline(tag = '') {
-		this._timeline(tag, 'TimeLine');
+	timeLog(tag: string = '', ...data: any[]) {
+		this._timelog(tag, 'TimeLine', data);
 	}
 
-	_timeline(tag, prefix) {
-		if (!this.m_timeStack.length) return;
-		// utils.assert(this.m_timeStack.length);
-		var time = this.m_timeStack.last(0);
-		var privline = time.timelines.last(0);
+	/**
+	 * @deprecated Use console.timeLog() instead.
+	 */
+	timeline(tag: string = '', ...data: any[]) {
+		this._timelog(tag, 'TimeLine', data);
+	}
+
+	_timelog(tag: string, prefix: string, data: any[]) {
+		var time = this.m_timeStack.get(tag);
+		if (!time)
+			return warn(`No such label '${tag}' for console.timeLog()`);
+		var privline = time.timelines.indexReverse(0);
 		var line = { tag, date: new Date() };
 		time.timelines.push(line);
-		this.dlog(timeSpace(this), prefix, 
-			formatTime(line.date), line.date - privline.date, tag);
+		this.log(timeSpace(this), prefix, 
+			formatTime(line.date), line.date.valueOf() - privline.date, tag, ...data);
 	}
 
-	timeEnd(tag) {
-		if (!this.m_timeStack.length) return;
-		var { tag: tag1, timelines } = this.m_timeStack.last(0);
-		this._timeline(tag, 'TimeEnd ');
-		this.dlog(timeSpace(this), 'Finish  ', formatTime(timelines[0].date), tag1);
-		timelines.forEach((e, j)=>{
+	timeEnd(tag: string = '') {
+		var time = this.m_timeStack.get(tag);
+		if (!time)
+			return warn(`No such label '${tag}' for console.timeEnd()`);
+		this.m_timeStack.delete(tag);
+		var { tag: tag1, timelines } = time;
+		this._timelog(tag, 'TimeEnd ', []);
+		this.log(timeSpace(this), 'Finish  ', formatTime(timelines[0].date), tag1);
+		timelines.forEach((e: any, j: number)=>{
 			if (j) {
-				this.dlog(timeSpace(this), '---->   ', 
+				this.log(timeSpace(this), '---->   ', 
 					formatTime(e.date), e.date - timelines[j-1].date, e.tag);
 			} else {
-				// this.dlog(timeSpace(this), '---->   ', formatTime(e.date), ' ' ,e.tag);
+				// this.log(timeSpace(this), '---->   ', formatTime(e.date), ' ' ,e.tag);
 			}
 		});
-		this.dlog(timeSpace(this), 'Total   ', '--------------------', tag1, 
+		this.log(timeSpace(this), 'Total   ', '--------------------', tag1, 
 			timelines.last(0).date - timelines[0].date, '--------------------');
-		this.m_timeStack.pop();
 	}
 
 }
 
-exports = module.exports = {
-
+export default {
 	Console: Console,
-
-	log: (...args)=>{
-		exports.defaultConsole.log(...args);
-	},
-
-	warn: (...args)=>{
-		exports.defaultConsole.warn(...args);
-	},
-
-	error: (...args)=>{
-		exports.defaultConsole.error(...args);
-	},
-
-	dir: (...args)=>{
-		exports.defaultConsole.dir(...args);
-	},
-
-	dlog: (...args)=>{
-		exports.defaultConsole.dlog(...args);
-	},
-
-	time: (...args)=>{
-		exports.defaultConsole.time(...args);
-	},
-
-	timeline: (...args)=>{
-		exports.defaultConsole.timeline(...args);
-	},
-
-	timeEnd: (...args)=>{
-		exports.defaultConsole.timeEnd(...args);
-	},
-
-	get defaultConsole() {
-		if (!default_console) {
-			default_console = new Console();
-		}
-		return default_console;
-	},
-
+	...console,
 }
