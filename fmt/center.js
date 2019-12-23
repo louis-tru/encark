@@ -365,7 +365,7 @@ class FastMessageTransferCenter_IMPL {
 
 		var mark = this.m_markOffline.get(id);
 		if (mark) { // OFFLINE mark
-			utils.assert(mark > Date.now(), errno.ERR_FMT_CLIENT_OFFLINE);
+			utils.assert(mark < Date.now(), errno.ERR_FMT_CLIENT_OFFLINE);
 		}
 
 		// random query status ..
