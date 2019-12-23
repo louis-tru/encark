@@ -57,7 +57,7 @@ var shared: any = null;
 var __id = 1;
 
 export interface Options {
-	params?: any;
+	params?: AnyObject | null;
 	method?: string,
 	timeout?: number;
 	headers?: AnyObject<string>;
@@ -65,11 +65,12 @@ export interface Options {
 	signer?: Signer;
 	urlencoded?: boolean;
 	userAgent?: string;
+	cacheTime?: number;
 }
 
 const defaultOptions: Options = {
 	method: 'GET',
-	params: '',
+	params: null,
 	headers: {},
 	dataType: 'json',
 	userAgent: user_agent,
@@ -274,20 +275,16 @@ function requestNode(	options: AnyObject,
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
-		var data = null;
+		var buffers: Buffer[] = [];
 		res.on('data', (chunk: Buffer)=> {
 			// console.log(`BODY: ${chunk}`);
-			if (data) {
-				data = Buffer.concat([data, chunk]);
-			} else {
-				data = chunk;
-			}
+			buffers.push(chunk);
 		});
 		res.on('end', ()=> {
 			// console.log('No more data in response.');
 			// console.log('---requestNode', data + '');
 			resolve({
-				data: data,
+				data: Buffer.concat(buffers),
 				headers: res.headers,
 				statusCode: res.statusCode,
 				httpVersion: res.httpVersion,
@@ -297,9 +294,9 @@ function requestNode(	options: AnyObject,
 		});
 	});
 
-	req.on('abort', e=>console.log('request abort'));
-	req.on('error', (e)=>reject(e));
-	req.on('timeout', e=>{
+	req.on('abort', ()=>console.log('request abort'));
+	req.on('error', (e: any)=>reject(Error.new(e)));
+	req.on('timeout', ()=>{
 		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
 		req.abort();
 	});
@@ -559,7 +556,7 @@ export class Request {
 		return null;
 	}
 
-	parseResponseData(buf) {
+	parseResponseData(buf: Buffer) {
 		var json = buf.toString('utf8');
 		var res = parseJSON(json);
 		if (this.m_enable_strict_response_data) {
@@ -573,7 +570,7 @@ export class Request {
 		}
 	}
 
-	async request(name, method = 'GET', params = '', options = {}) {
+	async request(name: string, method: string = 'GET', params: AnyObject | null = null, options: Options = {}) {
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
 			return { data: Object.create(this.m_mock[name]) };
 		} else {
@@ -588,8 +585,8 @@ export class Request {
 				headers,
 				timeout: timeout || this.m_timeout,
 				dataType: this.m_data_type,
-				user_agent: this.m_user_agent,
-				signer: signer,
+				userAgent: this.m_user_agent,
+				signer: signer || undefined,
 			});
 			try {
 				result.data = this.parseResponseData(result.data);
@@ -607,7 +604,7 @@ export class Request {
 		}
 	}
 
-	async get(name, params, options) {
+	async get(name: string, params: AnyObject | null = null, options: Options = {}) {
 		var { cacheTime } = options || {};
 		var key = Cache.hash({ name: name, params: params });
 		var cache = this.m_cache.get(key);
