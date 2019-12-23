@@ -102,12 +102,8 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_impl.publishURL;
 	}
 
-	get kickout() {
-		return this.m_impl.m_kickout;
-	}
-
-	set kickout(value) {
-		this.m_impl.m_kickout = !!value;
+	get routeTable() {
+		return this.m_impl.routeTable;
 	}
 
 	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
@@ -177,6 +173,10 @@ class FastMessageTransferCenter_IMPL {
 
 	get delegate() {
 		return this.m_host.m_delegate;
+	}
+
+	get routeTable() {
+		return this.m_routeTable;
 	}
 
 	constructor(host, server, fnodes, publish) {
