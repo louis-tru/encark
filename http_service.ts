@@ -28,7 +28,6 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
 import {Cookie} from './cookie';
 import service from './service';
 import {StaticService} from './static_service';
@@ -207,7 +206,7 @@ export class HttpService extends StaticService {
 				// this._service.request.socket.destroy();
 				return self.returnError(err);
 			}
-			form.onend.on(function() {
+			form.onEnd.on(function() {
 				Object.assign(self.data, form.fields);
 				Object.assign(self.data, form.files);
 				ok();
@@ -242,7 +241,7 @@ export class HttpService extends StaticService {
 
 		var self = this;
 		var res = this.response;
-		var ae = this.request.headers['accept-encoding'];
+		var ae = <string>this.request.headers['accept-encoding'];
 
 		this.setDefaultHeader();
 		res.setHeader('Content-Type', type);

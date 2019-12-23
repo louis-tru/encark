@@ -8,8 +8,6 @@
  * Available under MIT license <https://lodash.com/license>
  */
 
-var lodash = {};
-
 /** Used to make template sourceURLs easier to identify. */
 var templateCounter = -1;
 
@@ -35,70 +33,94 @@ var reEsTemplate = /\$\{([^\\}]*(?:\\.[^\\}]*)*)\}/g;
 /** Used to match unescaped characters in compiled string literals. */
 var reUnescapedString = /['\n\r\u2028\u2029\\]/g;
 
+export interface Options {
+	// * @param {string} [string=''] The template string.
+	// * @param {Object} [options={}] The options object.
+	// * @param {RegExp} [options.escape=_.templateSettings.escape]
+	// *  The HTML "escape" delimiter.
+	// * @param {RegExp} [options.evaluate=_.templateSettings.evaluate]
+	// *  The "evaluate" delimiter.
+	// * @param {Object} [options.imports=_.templateSettings.imports]
+	// *  An object to import into the template as free variables.
+	// * @param {RegExp} [options.interpolate=_.templateSettings.interpolate]
+	// *  The "interpolate" delimiter.
+	// * @param {string} [options.sourceURL='lodash.templateSources[n]']
+	// *  The sourceURL of the compiled template.
+	// * @param {string} [options.variable='obj']
+	escape?: RegExp;
+	evaluate?: RegExp;
+	imports?: AnyObject;
+	interpolate?: RegExp,
+	sourceURL?: string;
+	variable?: string;
+}
 
-/**
- * By default, the template delimiters used by lodash are like those in
- * embedded Ruby (ERB) as well as ES2015 template strings. Change the
- * following template settings to use alternative delimiters.
- *
- * @static
- * @memberOf _
- * @type {Object}
- */
-lodash.templateSettings = {
-
+class Lodash {
 	/**
-	 * Used to detect `data` property values to be HTML-escaped.
+	 * By default, the template delimiters used by lodash are like those in
+	 * embedded Ruby (ERB) as well as ES2015 template strings. Change the
+	 * following template settings to use alternative delimiters.
 	 *
-	 * @memberOf _.templateSettings
-	 * @type {RegExp}
-	 */
-	'escape': reEscape,
-
-	/**
-	 * Used to detect code to be evaluated.
-	 *
-	 * @memberOf _.templateSettings
-	 * @type {RegExp}
-	 */
-	'evaluate': reEvaluate,
-
-	/**
-	 * Used to detect `data` property values to inject.
-	 *
-	 * @memberOf _.templateSettings
-	 * @type {RegExp}
-	 */
-	'interpolate': reInterpolate,
-
-	/**
-	 * Used to reference the data object in the template text.
-	 *
-	 * @memberOf _.templateSettings
-	 * @type {string}
-	 */
-	'variable': '',
-
-	/**
-	 * Used to import variables into the compiled template.
-	 *
-	 * @memberOf _.templateSettings
+	 * @static
+	 * @memberOf _
 	 * @type {Object}
 	 */
-	'imports': {
+	templateSettings: Options = {
+			
+		/**
+		 * Used to detect `data` property values to be HTML-escaped.
+		 *
+		 * @memberOf _.templateSettings
+		 * @type {RegExp}
+		 */
+		escape: reEscape,
 
 		/**
-		 * A reference to the `lodash` function.
+		 * Used to detect code to be evaluated.
 		 *
-		 * @memberOf _.templateSettings.imports
-		 * @type {Function}
+		 * @memberOf _.templateSettings
+		 * @type {RegExp}
 		 */
-		'_': lodash
+		evaluate: reEvaluate,
+
+		/**
+		 * Used to detect `data` property values to inject.
+		 *
+		 * @memberOf _.templateSettings
+		 * @type {RegExp}
+		 */
+		interpolate: reInterpolate,
+
+		/**
+		 * Used to reference the data object in the template text.
+		 *
+		 * @memberOf _.templateSettings
+		 * @type {string}
+		 */
+		variable: '',
+
+		/**
+		 * Used to import variables into the compiled template.
+		 *
+		 * @memberOf _.templateSettings
+		 * @type {Object}
+		 */
+		imports: {
+			/**
+			 * A reference to the `lodash` function.
+			 *
+			 * @memberOf _.templateSettings.imports
+			 * @type {Function}
+			 */
+			'_': lodash
+		},
 	}
 };
 
+const lodash = new Lodash();
+
 /** Used to escape characters for inclusion in compiled string literals. */
-var stringEscapes = {
+var stringEscapes: AnyObject<string> = {
 	'\\': '\\',
 	"'": "'",
 	'\n': 'n',
@@ -132,7 +154,7 @@ var stringEscapes = {
  * _.isObject(null);
  * // => false
  */
-function isObject(value) {
+function isObject(value: any) {
 	var type = typeof value;
 	return value != null && (type == 'object' || type == 'function');
 }
@@ -147,15 +169,8 @@ function isObject(value) {
  * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
  *  else `false`.
  */
-function isIterateeCall(value, index, object) {
-	if (!isObject(object)) {
-		return false;
-	}
-	var type = typeof index;
-	if (type == 'number'
-				? ( typeof object.length == 'number' && index < object.length)
-				: (type == 'string' && index in object)
-			) {
+function isIterateeCall(value: string, index: any, object: AnyObject): boolean {
+	if (isObject(object)) {
 		return object[index] === value;
 	}
 	return false;
@@ -168,7 +183,7 @@ function isIterateeCall(value, index, object) {
  * @param {string} chr The matched character to escape.
  * @returns {string} Returns the escaped character.
  */
-function escapeStringChar(chr) {
+function escapeStringChar(chr: string) {
 	return '\\' + stringEscapes[chr];
 }
 
@@ -276,19 +291,19 @@ function escapeStringChar(chr) {
  *   };\
  * ');
  */
-function template(string, options, guard) {
+export default function template(string: string, opts: Options | number | string = {}, guard?: any): string {
 	// Based on John Resig's `tmpl` implementation
 	// (http://ejohn.org/blog/javascript-micro-templating/)
 	// and Laura Doktorova's doT.js (https://github.com/olado/doT).
-	var settings = lodash.templateSettings;
+	var defaultOptions = lodash.templateSettings;
 
-	if (guard && isIterateeCall(string, options, guard)) {
-		options = undefined;
+	if (guard && isIterateeCall(string, opts, guard)) {
+		opts = {};
 	}
 	string = String(string);
-	options = { ...settings, ...options };
+	var options: Options = { ...defaultOptions, ...<Options>opts };
 
-	var imports = { ...settings.imports, ...options.imports },
+	var imports = { ...defaultOptions.imports, ...options.imports },
 			importsKeys = Object.keys(imports),
 			importsValues = Object.values(imports);
 
@@ -376,18 +391,14 @@ function template(string, options, guard) {
 	var result, err;
 
 	try {
-		result = Function(importsKeys, sourceURL + 'return ' + source).apply(undefined, importsValues)
+		result = Function(<any>importsKeys, sourceURL + 'return ' + source).apply(undefined, importsValues)
 	} catch (e) {
-		result = err = Error.new(e);
+		e = Error.new(e);
+		e.source = source;
+		throw e;
 	}
 
 	// Provide the compiled function's source by its `toString` method or
 	// the `source` property as a convenience for inlining compiled templates.
-	result.source = source;
-	if (err) {
-		throw result;
-	}
 	return result;
 }
-
-module.exports = template;

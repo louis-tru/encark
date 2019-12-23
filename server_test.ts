@@ -28,12 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var server = require('./server');
-var service = require('./service');
-var ctr = require('./ctr');
+import utils from './util';
+import server from './server';
+import service from './service';
+import {ViewController} from './ctr';
 
-class Test extends ctr.ViewController {
+class Test extends ViewController {
 
 	async timeout() {
 		this.markResponse();

@@ -42,15 +42,15 @@ const REG = new RegExp('^' + PREFIX);
 /**
  * @class Notification
  */
-export class Notification<Sender = any, Data = any, Return = number> {
+export class Notification<Data = any, Return = number, Sender = any> {
 
 	/**
 	 * @func getNoticer
 	 */
-	getNoticer(name: string): EventNoticer<Sender, Data, Return> {
+	getNoticer(name: string): EventNoticer<Data, Return, Sender> {
 		var noticer = (<any>this)[PREFIX + name];
 		if ( ! noticer ) {
-			noticer = new EventNoticer<Sender, Data, Return>(name, <any>this);
+			noticer = new EventNoticer<Data, Return, Sender>(name, <any>this);
 			(<any>this)[PREFIX + name] = noticer;
 		}
 		return noticer;
@@ -66,7 +66,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<Event<Sender, Data, Return>>) {
+	addDefaultListener(name: string, listen: Listen<Event<Data, Return, Sender>>) {
 		if ( typeof listen == 'string' ) {
 			var func = (<any>this)[listen]; // find func 
 			if ( typeof func == 'function' ) {
@@ -86,7 +86,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func addEventListener(name, listen[,scope[,id]])
 	 */
-	addEventListener<Scope>(name: string, listen: Listen<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
+	addEventListener<Scope>(name: string, listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.on(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
@@ -96,7 +96,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func addEventListenerOnce(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce<Scope>(name: string, listen: Listen<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
+	addEventListenerOnce<Scope>(name: string, listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.once(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
@@ -106,7 +106,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func addEventListener2(name, listen[,scope[,id]])
 	 */
-	addEventListener2<Scope>(name: string, listen: Listen2<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
+	addEventListener2<Scope>(name: string, listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.on2(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
@@ -116,21 +116,21 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func addEventListenerOnce2(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce2<Scope>(name: string, listen: Listen2<Event<Sender, Data, Return>, Scope>, scope?: Scope, id?: string) {
+	addEventListenerOnce2<Scope>(name: string, listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.once2(listen, scope, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
 
-	addEventForward(name: string, noticer: EventNoticer<Sender, Data, Return>, id?: string) {
+	addEventForward(name: string, noticer: EventNoticer<Data, Return, Sender>, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.forward(noticer, id);
 		this.triggerListenerChange(name, del.length, 1);
 		return r;
 	}
 
-	addEventForwardOnce(noticer: EventNoticer<Sender, Data, Return>, id?: string) {
+	addEventForwardOnce(noticer: EventNoticer<Data, Return, Sender>, id?: string) {
 		var del = this.getNoticer(name);
 		var r = del.forwardOnce(noticer, id);
 		this.triggerListenerChange(name, del.length, 1);
@@ -143,7 +143,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	* @arg data {Object}       要发送的消数据
 	*/
 	trigger(name: string, data?: Data) {
-		return this.triggerWithEvent(name, new Event<Sender, Data, Return>(data));
+		return this.triggerWithEvent(name, new Event<Data, Return, Sender>(data));
 	}
 
 	/**
@@ -151,7 +151,7 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	* @arg name {String}       事件名称
 	* @arg event {Event}       Event 
 	*/
-	triggerWithEvent(name: string, event: Event<Sender, Data, Return>) {
+	triggerWithEvent(name: string, event: Event<Data, Return, Sender>) {
 		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			return noticer.triggerWithEvent(event);
@@ -162,11 +162,11 @@ export class Notification<Sender = any, Data = any, Return = number> {
 	/**
 	 * @func $trigger(name, event, is_event)
 	 */
-	$trigger(name: string, event?: Event<Sender, Data, Return> | Data, is_event?: boolean) {
+	$trigger(name: string, event?: Event<Data, Return, Sender> | Data, is_event?: boolean) {
 		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			if ( is_event ) {
-				return this.triggerWithEvent(name, <Event<Sender, Data, Return>>event)
+				return this.triggerWithEvent(name, <Event<Data, Return, Sender>>event)
 			} else {
 				return this.trigger(name, <Data>event)
 			}

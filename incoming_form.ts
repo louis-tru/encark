@@ -28,31 +28,70 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
 import {EventNoticer} from './event';
 import * as fs from 'fs';
 import * as Path from 'path';
 import {StringDecoder} from 'string_decoder';
 import {WriteStream} from 'fs';
 import * as querystring from 'querystring';
-import {Buffer} from 'buffer';
 import * as crypto from 'crypto';
 import request from './request';
 var xml = require('./xml');
+import {StaticService} from './static_service';
+import * as http from 'http';
 
 const {parseJSON} = request;
 
+// var s = 0,
+export enum STATUS {
+	PARSER_UNINITIALIZED = 0,
+	START,
+	START_BOUNDARY,
+	HEADER_FIELD_START,
+	HEADER_FIELD,
+	HEADER_VALUE_START,
+	HEADER_VALUE,
+	HEADER_VALUE_ALMOST_DONE,
+	HEADERS_ALMOST_DONE,
+	PART_DATA_START,
+	PART_DATA,
+	PART_END,
+	END,
+};
+
+const S = STATUS;
+
+var f = 1;
+enum F {
+	PART_BOUNDARY = f,
+	LAST_BOUNDARY = f *= 2
+}
+
+const LF = 10,
+			CR = 13,
+			SPACE = 32,
+			HYPHEN = 45,
+			COLON = 58,
+			A = 97,
+			Z = 122,
+lower = function (c: number) {
+	return c | 0x20;
+};
+
+interface Parser {
+	write(buffer: Buffer): number;
+	end(): Error | undefined;
+}
+
 // This is a buffering parser, not quite as nice as the multipart one.
 // If I find time I'll rewrite this to be fully streaming as well
-/**
- * @class QuerystringParser
- * @private
- */
-class QuerystringParser {
+class QuerystringParser implements Parser {
 
 	private type: string;
 	private buffers: Buffer[] = [];
-	private length: number = 0;
+
+	onField: (field: string, value: any)=>void = ()=>{};
+	onEnd: (data: AnyObject)=>void = ()=>{};
 
 	/**
 	 * constructor function
@@ -62,13 +101,13 @@ class QuerystringParser {
 		this.type = type;
 	}
 
-	write(buffer: Buffer) {
-		this.length += buffer.length;
+	write(buffer: Buffer): number {
+		this.buffers.push(buffer);
 		return buffer.length;
 	}
 
 	end() {
-		var buffer = Buffer.concat(this.buffers).toString('utf8')
+		var buffer = Buffer.concat(this.buffers).toString('utf8');
 		if (this.type == 'json') {
 			var data = {};
 			buffer = buffer.trim();
@@ -89,26 +128,21 @@ class QuerystringParser {
 			for (var field in fields) {
 				this.onField(field, fields[field]);
 			}
-			this.onEnd();
+			this.onEnd(fields);
 		}
+		return undefined;
 	}
 
 	// @end
 }
 
-// ----------------------- File -----------------------
-
-/**
- * @File
- * @private
- */
-class File {
+export class File {
 	private _writeStream: fs.WriteStream | null = null;
 	private _path = '';
 	private _name = '';
 	private _type: string;
 	private _size = 0;
-	private _lastModifiedDate = null;
+	private _lastModifiedDate = 0;
 
 	get size() {
 		return this._size;
@@ -131,14 +165,13 @@ class File {
 		return this._type;
 	}
 
-	readonly onProgress = new EventNoticer('Progress', this);
+	get lastModifiedDate() {
+		return this._lastModifiedDate;
+	}
+
+	readonly onProgress = new EventNoticer<number>('Progress', this);
 	readonly onEnd = new EventNoticer('End', this);
 
-	/**
-	 * constructor function
-	 * @param {Object} properties
-	 * @constructor
-	 */
 	constructor(path: string, name: string, type: string) {
 		this._path = path;
 		this._name = name;
@@ -146,98 +179,52 @@ class File {
 	}
 
 	private _open() {
-		this._writeStream = new WriteStream(this._path);
+		this._writeStream = new WriteStream();
 	}
 
 	write(buffer: Buffer, cb: any) {
 		var self = this;
-
-		if (!self._writeStream)
+		if (!self._writeStream) 
 			self._open();
-
-		self._writeStream.write(buffer, function () {
-			self.lastModifiedDate = new Date();
-			self.size += buffer.length;
-			self.onprogress.trigger(self.size);
+		(<WriteStream>self._writeStream).write(buffer, function() {
+			self._lastModifiedDate = Date.now();
+			self._size += buffer.length;
+			self.onProgress.trigger(self.size);
 			cb();
 		});
-	},
+	}
 
-	end: function (cb) {
-		var self = this;
-
-		if (self._writeStream) {
-			self._writeStream.end(function () {
-				self.onend.trigger();
+	end(cb: any) {
+		if (this._writeStream) {
+			this._writeStream.end(()=>{
+				this.onEnd.trigger();
 				cb();
 			});
-		}
-		else {
-			self.path = '';
-			self.onend.trigger();
+		} else {
+			this._path = '';
+			this.onEnd.trigger();
 			cb();
 		}
-	},
+	}
 	// @end
-});
+}
 
-// ----------------------- MultipartParser -----------------------
+class MultipartParser implements Parser {
 
-var s = 0,
-S =
-{ PARSER_UNINITIALIZED: s++,
-	START: s++,
-	START_BOUNDARY: s++,
-	HEADER_FIELD_START: s++,
-	HEADER_FIELD: s++,
-	HEADER_VALUE_START: s++,
-	HEADER_VALUE: s++,
-	HEADER_VALUE_ALMOST_DONE: s++,
-	HEADERS_ALMOST_DONE: s++,
-	PART_DATA_START: s++,
-	PART_DATA: s++,
-	PART_END: s++,
-	END: s++
-},
+	private boundary: Buffer;
+	private lookbehind: Buffer;
+	private boundaryChars: AnyObject = {};
+	private state: number = S.PARSER_UNINITIALIZED;
+	private flags: number = 0;
+	private index = 0;
+	private _mark: AnyObject<number> = {};
 
-f = 1,
-F =
-{
-	PART_BOUNDARY: f,
-	LAST_BOUNDARY: f *= 2
-},
-
-LF = 10,
-CR = 13,
-SPACE = 32,
-HYPHEN = 45,
-COLON = 58,
-A = 97,
-Z = 122,
-
-lower = function (c) {
-	return c | 0x20;
-};
-
-var MultipartParser = util.class('MultipartParser', {
-
-	/**
-	 * constructor function
-	 * @constructor
-	 */
-	constructor: function () {
-		this.boundary = null;
-		this.boundaryChars = null;
-		this.lookbehind = null;
+	constructor(boundary: string) {
 		this.state = S.PARSER_UNINITIALIZED;
-		this.index = null;
-		this.flags = 0;
-	},
 
-	init_with_boundary: function (str) {
-		this.boundary = Buffer.alloc(str.length + 4);
+		this.boundary = Buffer.alloc(boundary.length + 4);
 		this.boundary.write('\r\n--', 0, 'ascii');
-		this.boundary.write(str, 4, 'ascii');
+		this.boundary.write(boundary, 4, 'ascii');
 		this.lookbehind = Buffer.alloc(this.boundary.length + 8);
 		this.state = S.START;
 
@@ -245,9 +232,9 @@ var MultipartParser = util.class('MultipartParser', {
 		for (var i = 0; i < this.boundary.length; i++) {
 			this.boundaryChars[this.boundary[i]] = true;
 		}
-	},
+	}
 	
-	write: function (buffer) {
+	write(buffer: Buffer) {
 		var self = this,
 			i = 0,
 			len = buffer.length,
@@ -262,36 +249,34 @@ var MultipartParser = util.class('MultipartParser', {
 			boundaryEnd = boundaryLength - 1,
 			bufferLength = buffer.length,
 			c,
-			cl,
+			cl, _mark = this._mark,
 
-			mark = function (name) {
-				self[name + 'Mark'] = i;
+			mark = function (name: string) {
+				_mark[name + 'Mark'] = i;
 			},
-			clear = function (name) {
-				delete self[name + 'Mark'];
+			clear = function (name: string) {
+				delete _mark[name + 'Mark'];
 			},
-			callback = function (name, buffer, start, end) {
+			callback = function(name: string, buffer?: Buffer, start?: number, end?: number) {
 				if (start !== undefined && start === end) {
 					return;
 				}
-
 				var callbackSymbol = 'on' + name.substr(0, 1).toUpperCase() + name.substr(1);
 				if (callbackSymbol in self) {
-					self[callbackSymbol](buffer, start, end);
+					(<any>self)[callbackSymbol](buffer, start, end);
 				}
 			},
-			dataCallback = function (name, clear) {
+			dataCallback = function (name: string, clear?: boolean) {
 				var markSymbol = name + 'Mark';
-				if (!(markSymbol in self)) {
+				if (!(markSymbol in _mark)) {
 					return;
 				}
-
-				if (!clear) {
-					callback(name, buffer, self[markSymbol], buffer.length);
-					self[markSymbol] = 0;
+				if (clear) {
+					callback(name, buffer, _mark[markSymbol], i);
+					delete _mark[markSymbol];
 				} else {
-					callback(name, buffer, self[markSymbol], i);
-					delete self[markSymbol];
+					callback(name, buffer, _mark[markSymbol], buffer.length);
+					_mark[markSymbol] = 0;
 				}
 			};
 
@@ -477,39 +462,30 @@ var MultipartParser = util.class('MultipartParser', {
 		this.flags = flags;
 
 		return len;
-	},
+	}
 
-	end: function () {
+	end() {
 		if (this.state != S.END) {
 			return new Error('MultipartParser.end(): stream ended unexpectedly: ' + this.explain());
 		}
-	},
-
-	explain: function () {
-		return 'state = ' + module.exports.state_to_string(this.state);
-	},
-
-});
-
-// ----------------------- Part -----------------------
-
-var Part = util.class('Part', {
-
-	headers: null,
-	name: '',
-	filename: '',
-	mime: '',
-	headerField: '',
-	headerValue: '',
-	
-	ondata: null,
-	onend: null,
-	
-	constructor: function () {
-		event.initEvents(this, 'data', 'end');
-		this.headers = {};
 	}
-});
+
+	explain() {
+		return 'state = ' + stateToString(this.state);
+	}
+
+}
+
+class Part {
+	headers: AnyObject<string> = {}
+	name = ''
+	filename = ''
+	mime = ''
+	headerField = ''
+	headerValue = ''
+	readonly onData = new EventNoticer<Buffer>('Data', this);
+	readonly onEnd = new EventNoticer('End', this);
+}
 
 // ----------------------- IncomingForm -----------------------
 
@@ -520,40 +496,46 @@ if (process.env.TMP) {
 	dirs.unshift(process.env.TMP);
 }
 
-for (var i = 0; i < dirs.length; i++) {
-	var dir = dirs[i];
+for (var dir of dirs) {
 	var isDirectory = false;
-
 	try {
 		isDirectory = fs.statSync(dir).isDirectory();
-	} catch (e) { }
-
+	} catch (e) {}
 	if (isDirectory) {
 		temp_dir = dir;
 		break;
 	}
 }
 
-function canceled(self){
-	//
-	for(var i in self.files){
-		var files = self.files[i];
-		for(var j = 0, len = files.length; i < len; i++){
-			fs.unlink(files[j].path);
-		}
-	}
+export interface ProgressData {
+	bytesReceived: number;
+	bytesExpected: number;
+}
+
+export interface FieldData {
+	name: string;
+	value: string;
+}
+
+export interface FileData {
+	name: string;
+	file: File;
 }
 
 export class IncomingForm {
 	
-	private _parser = null;
+	private _parser: Parser | null = null;
 	private _flushing = 0;
 	private _fields_size = 0;
-	private _service = null;
-	
-	private error = null;
-	private ended = false;
-	private hash = null;
+	private _service: StaticService;
+
+	private _error: Error | null = null;
+	private _ended = false;
+	readonly hash: crypto.Hash;
+
+	get ended() {
+		return this._ended;
+	}
 
 	/**
 	 * default size 2MB
@@ -572,102 +554,103 @@ export class IncomingForm {
 	 * @type {String}
 	 */
 	readonly verifyFileMime = '*';
-	
+
 	/**
 	 * is use file upload, default not upload
 	 * @type {Boolean}
 	 */
 	isUpload = false;
-	
-	fields = null;
-	files = null;
+
+	readonly fields: AnyObject = {};
+	readonly files: AnyObject<File[]> = {};
 	
 	keepExtensions = false;
 	uploadDir = '';
 	encoding = 'utf-8';
-	headers = null;
-	type = null;
-	
+	headers: http.IncomingHttpHeaders = {};
+	type: string = '';
+
 	private bytesReceived: number = 0;
 	private bytesExpected: number = 0;
-	
-	onaborted: null,
-	onprogress: null,
-	onfield: null,
-	onfileBegin: null,
-	onfile: null,
-	onerror: null,
-	onend: null,
-	
+
+	readonly onAborted = new EventNoticer('Aborted', this);
+	readonly onProgress = new EventNoticer<ProgressData>('Progress', this);
+	readonly onField = new EventNoticer<FieldData>('Field', this);
+	readonly onFileBegin = new EventNoticer<FileData>('FileBegin', this);
+	readonly onFile = new EventNoticer<FileData>('File', this);
+	readonly onError = new EventNoticer<Error>('Error', this);
+	readonly onEnd = new EventNoticer('End', this);
+
 	/**
 	 * constructor function
 	 * @param {HttpService}
 	 * @constructor
 	 */
-	constructor: function (service) {
-		// 
-		event.initEvents(this,
-			'aborted', 'progress', 'field', 'fileBegin', 'file', 'error', 'end');
-
+	constructor(service: StaticService) {
 		this.hash = crypto.createHash(service.server.formHash || 'md5');
 		this.uploadDir = service.server.temp;
 		this._service = service;
-		this.fields = { };
-		this.files = { };
 		this.maxFieldsSize = this._service.server.maxFormDataSize;
 		this.maxFilesSize = this._service.server.maxUploadFileSize;
-	},
-	
+	}
+
+	_canceled() {
+		for (var files of Object.values(this.files)) {
+			for (var file of files) {
+				fs.unlink(file.pathname, e=>{});
+			}
+		}
+	}
+
 	/**
 	 * parse
 	 */
-	parse: function () {
+	parse() {
 
 		var self = this;
 		var req = this._service.request;
 
 		req.on('error', function (err) {
-			self._error(err);
+			self._throwError(err);
 		});
 		req.on('aborted', function () {
-			canceled(self);
-			self.onaborted.trigger();
+			self._canceled();
+			self.onAborted.trigger();
 		});
 		req.on('data', function (buffer) {
 			self.write(buffer);
 		});
 		req.on('end', function () {
-			if (self.error) {
+			if (self._error)
 				return;
-			}
-			var err = self._parser.end();
+			var err = (<Parser>self._parser).end();
 			if (err) {
-				self._error(err);
+				self._throwError(err);
 			}
 		});
 
 		this.headers = req.headers;
 		this._parseContentLength();
 		this._parseContentType();
-	},
+	}
 
-	write: function (buffer) {
+	write(buffer: Buffer) {
 		if (!this._parser) {
-			this._error(new Error('unintialized parser'));
+			this._throwError(new Error('unintialized parser'));
 			return;
 		}
 
 		this.hash.update(buffer);
 		
 		this.bytesReceived += buffer.length;
-		this.onprogress.trigger({
+		this.onProgress.trigger({
 			bytesReceived: this.bytesReceived,
 			bytesExpected: this.bytesExpected,
 		});
 
 		var bytesParsed = this._parser.write(buffer);
 		if (bytesParsed !== buffer.length) {
-			this._error(
+			this._throwError(
 				new Error('parser error, ' + 
 				bytesParsed + ' of ' + 
 				buffer.length + ' bytes parsed')
@@ -675,69 +658,69 @@ export class IncomingForm {
 		}
 
 		return bytesParsed;
-	},
+	}
 
-	pause: function () {
+	pause() {
 		try {
 			this._service.request.pause();
 		} catch (err) {
 			// the stream was destroyed
-			if (!this.ended) {
+			if (!this._ended) {
 				// before it was completed, crash & burn
-				this._error(err);
+				this._throwError(err);
 			}
 			return false;
 		}
 		return true;
-	},
+	}
 
-	resume: function () {
+	resume() {
 		try {
 			this._service.request.resume();
 		} catch (err) {
 			// the stream was destroyed
-			if (!this.ended) {
+			if (!this._ended) {
 				// before it was completed, crash & burn
-				this._error(err);
+				this._throwError(err);
 			}
 			return false;
 		}
 
 		return true;
-	},
+	}
 
-	onpart: function (part) {
+	onpart(part: Part) {
 		// this method can be overwritten by the user
 		this.handle_part(part);
-	},
+	}
 
-	handle_part: function (part) {
+	handle_part(part: Part) {
 		var self = this;
 
 		if (part.filename === undefined) {
 			var value = '';
 			var decoder = new StringDecoder(this.encoding);
 
-			part.ondata.on(function (e) {
-				var buffer = e.data;
+			part.onData.on(function (e) {
+				var buffer = <Buffer>e.data;
 				self._fields_size += buffer.length;
 				if (self._fields_size > self.maxFieldsSize) {
-					self._error(new Error('maxFieldsSize exceeded, received ' + self._fields_size + ' bytes of field data'));
+					self._throwError(new Error('maxFieldsSize exceeded, received ' + self._fields_size + ' bytes of field data'));
 					return;
 				}
 				value += decoder.write(buffer);
 			});
 
-			part.onend.on(function () {
+			part.onEnd.on(function () {
 				self._fields_size = 0;
 				self.fields[part.name] = value;
-				self.onfield.trigger({ name: part.name, value: value });
+				self.onField.trigger({ name: part.name, value: value });
 			});
 			return;
 		}
 
-		if(!this.isUpload){
-			return this._error(new Error('Does not allow file uploads'));
+		if (!this.isUpload) {
+			return this._throwError(new Error('Does not allow file uploads'));
 		}
 
 		this._flushing++;
@@ -745,20 +728,19 @@ export class IncomingForm {
 		var file = new File(this._uploadPath(part.filename), part.filename,  part.mime);
 
 		if (this.verifyFileMime != '*' && !new RegExp('\.(' + this.verifyFileMime + ')$', 'i').test(part.filename)) {
-			return this._error(new Error('File mime error'));
+			return this._throwError(new Error('File mime error'));
 		}
 
-		this.onfileBegin.trigger({ name: part.name, file: file });
+		this.onFileBegin.trigger({ name: part.name, file: file });
 
-		part.ondata.on(function (e) {
-			var buffer = e.data;
+		part.onData.on(function(e) {
+			var buffer = <Buffer>e.data;
 			self.pause();
 
 			self._fields_size += buffer.length;
-			if (self._fields_size > self.maxFilesSize) {
-
+			if (self._fields_size > self.maxFilesSize) { // limit
 				file.end(function () {
-					self._error(new Error('maxFilesSize exceeded, received ' + self._fields_size + ' bytes of field data'));
+					self._throwError(new Error('maxFilesSize exceeded, received ' + self._fields_size + ' bytes of field data'));
 				});
 				return;
 			}
@@ -768,7 +750,7 @@ export class IncomingForm {
 			});
 		});
 
-		part.onend.on(function () {
+		part.onEnd.on(function () {
 			self._fields_size = 0;
 			file.end(function () {
 				self._flushing--;
@@ -778,49 +760,47 @@ export class IncomingForm {
 					self.files[part.name] = files = [];
 				files.push(file);
 
-				self.onfile.trigger({ name: part.name, file: file });
+				self.onFile.trigger({ name: part.name, file: file });
 				self._maybeEnd();
 			});
 		});
-	},
+	}
 
-	_parseContentType: function () {
+	_parseContentType() {
 
-		var type = this.headers['content-type'];
+		var type = <string>this.headers['content-type'];
 
 		if (type && type.match(/multipart/i)) {
 			var m;
-			if (m = this.headers['content-type'].match(/boundary=(?:"([^"]+)"|([^;]+))/i)) {
+			if (m = type.match(/boundary=(?:"([^"]+)"|([^;]+))/i)) {
 				this._initMultipart(m[1] || m[2]);
 			} else {
-				this._error(new Error('bad content-type header, no multipart boundary'));
+				this._throwError(new Error('bad content-type header, no multipart boundary'));
 			}
 		} else {
 			this._initUrlencodedOrJsonOrXml(type);
 		}
-	},
+	}
 
-	_error: function (err) {
-
-		if (this.error) {
+	_throwError(err: Error) {
+		if (this._error) {
 			return;
 		}
+		this._canceled();
 
-		canceled(this);
-
-		this.error = err;
+		this._error = err;
 		this._service.request.socket.end(); //close socket connect
-		this.onerror.trigger(err);
-	},
+		this.onError.trigger(err);
+	}
 
-	_parseContentLength: function () {
+	_parseContentLength() {
 		if (this.headers['content-length']) {
 			this.bytesReceived = 0;
 			this.bytesExpected = parseInt(this.headers['content-length'], 10);
 		}
-	},
+	}
 
-	_fileName: function (headerValue) {
+	_fileName(headerValue: string) {
 		var m = headerValue.match(/filename="(.*?)"($|; )/i)
 		if (!m) return;
 
@@ -830,32 +810,30 @@ export class IncomingForm {
 			return String.fromCharCode(code);
 		});
 		return filename;
-	},
+	}
 
-	_initMultipart: function (boundary) {
+	_initMultipart(boundary: string) {
 		this.type = 'multipart';
 
-		var parser = new MultipartParser();
+		var parser = new MultipartParser(boundary);
 		var self = this;
 		var headerField = '';
 		var headerValue = '';
-		var part;
+		var part: Part;
 
-		parser.init_with_boundary(boundary);
-
-		parser.onPartBegin = function () {
+		(<any>parser).onPartBegin = function() {
 			part = new Part();
 		};
 
-		parser.onHeaderField = function (b, start, end) {
+		(<any>parser).onHeaderField = function (b: Buffer, start: number, end: number) {
 			headerField += b.toString(self.encoding, start, end);
 		};
 
-		parser.onHeaderValue = function (b, start, end) {
+		(<any>parser).onHeaderValue = function (b: Buffer, start: number, end: number) {
 			headerValue += b.toString(self.encoding, start, end);
 		};
 
-		parser.onHeaderEnd = function () {
+		(<any>parser).onHeaderEnd = function () {
 
 			headerField = headerField.toLowerCase();
 			part.headers[headerField] = headerValue;
@@ -866,7 +844,7 @@ export class IncomingForm {
 					part.name = m[1];
 				}
 
-				part.filename = self._fileName(headerValue);
+				part.filename = self._fileName(headerValue) || '';
 			} else if (headerField == 'content-type') {
 				part.mime = headerValue;
 			}
@@ -875,27 +853,27 @@ export class IncomingForm {
 			headerValue = '';
 		};
 
-		parser.onHeadersEnd = function () {
+		(<any>parser).onHeadersEnd = function () {
 			self.onpart(part);
 		};
 
-		parser.onPartData = function (b, start, end) {
-			part.ondata.trigger(b.slice(start, end));
+		(<any>parser).onPartData = function (b: Buffer, start: number, end: number) {
+			part.onData.trigger(b.slice(start, end));
 		};
 
-		parser.onPartEnd = function () {
-			part.onend.trigger();
+		(<any>parser).onPartEnd = function () {
+			part.onEnd.trigger();
 		};
 
-		parser.onEnd = function () {
-			self.ended = true;
+		(<any>parser).onEnd = function () {
+			self._ended = true;
 			self._maybeEnd();
 		};
 
 		this._parser = parser;
-	},
+	}
 
-	_initUrlencodedOrJsonOrXml: function(type) {
+	private _initUrlencodedOrJsonOrXml(type: string) {
 
 		if (type && type.indexOf('json') >= 0) {
 			type = 'json';
@@ -908,29 +886,29 @@ export class IncomingForm {
 		this.type = type;
 		var parser = new QuerystringParser(type)
 		var self = this;
-		
+
 		if (type == 'json' || type == 'xml') {
-			parser.onField = function() {};
+			// parser.onField = function() {};
 			parser.onEnd = function(data) {
-				self.ended = true;
+				self._ended = true;
 				Object.assign(self.fields, data);
 				self._maybeEnd();
 			};
 		} else {
 			parser.onField = function (name, value) {
 				self.fields[name] = value;
-				self.onfield.trigger({ name: name, value: value });
+				self.onField.trigger({ name: name, value: value });
 			};
 			parser.onEnd = function() {
-				self.ended = true;
+				self._ended = true;
 				self._maybeEnd();
 			};
 		}
 		
 		this._parser = parser;
-	},
+	}
 
-	_uploadPath: function (filename) {
+	private _uploadPath(filename: string) {
 		var name = '';
 		for (var i = 0; i < 32; i++) {
 			name += Math.floor(Math.random() * 16).toString(16);
@@ -944,31 +922,30 @@ export class IncomingForm {
 		}
 
 		return Path.join(this.uploadDir, 'temp_upload_' + name);
-	},
+	}
 
-	_maybeEnd: function () {
-		if (!this.ended || this._flushing) {
+	private _maybeEnd() {
+		if (!this._ended || this._flushing)
 			return;
-		}
-		this.onend.trigger();
-	},
+		this.onEnd.trigger();
+	}
 
-});
+}
+
+function stateToString(stateNumber: number): string {
+	for (var state in S) {
+		var number: number = (<any>S)[state];
+		if (number === stateNumber)
+			return state;
+	}
+	return '';
+}
 
 // 
 export default {
-
 	IncomingForm: IncomingForm,
-
 	temp_dir: temp_dir,
-	
-	STATUS: S,
-
-	state_to_string: function (stateNumber: number) {
-		for (var state in S) {
-			var number = S[state];
-			if (number === stateNumber) return state;
-		}
-	},
+	STATUS: STATUS,
+	stateToString: stateToString,
 };
 

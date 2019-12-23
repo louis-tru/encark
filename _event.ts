@@ -30,7 +30,7 @@
 
 var _id = 0;
 
-class LiteItem<T> {
+export class LiteItem<T> {
 	private _host: List<T> | null;
 	private _prev: LiteItem<T> | null; 
 	private _next: LiteItem<T> | null;
@@ -171,15 +171,15 @@ export class List<T> {
 /**
 	* @class Event
 	*/
-export class Event<Sender = any, Data = any, Return = number> {
-	private m_data: Data | null | undefined;
-	protected m_noticer: EventNoticer<Sender, Data, Return> | null = null;
+export class Event<Data = any, Return = number, Sender = any> {
+	private m_data?: Data;
+	protected m_noticer: EventNoticer<Data, Return, Sender> | null = null;
 	private m_return_value: Return | null = null;
 	protected __has_event = true;
 	private m_origin = null;
 
 	get name() {
-		return (<EventNoticer<Sender, Data, Return>>this.m_noticer).name;
+		return (<EventNoticer<Data, Return, Sender>>this.m_noticer).name;
 	}
 
 	get data () {
@@ -187,7 +187,7 @@ export class Event<Sender = any, Data = any, Return = number> {
 	}
 
 	get sender() {
-		return (<EventNoticer<Sender, Data, Return>>this.m_noticer).sender;
+		return (<EventNoticer<Data, Return, Sender>>this.m_noticer).sender;
 	}
 
 	get origin () {
@@ -249,9 +249,9 @@ function check_fun(origin: any) {
 	}
 }
 
-function forwardNoticeNoticer<Sender, Data, Return>(
-	forward_noticer: EventNoticer<Sender, Data, Return>, 
-	evt: Event<Sender, Data, Return>
+function forwardNoticeNoticer<Data, Return, Sender>(
+	forward_noticer: EventNoticer<Data, Return, Sender>, 
+	evt: Event<Data, Return, Sender>
 ) {
 	var noticer = (<any>evt).m_noticer;
 	forward_noticer.triggerWithEvent(evt);
@@ -261,7 +261,7 @@ function forwardNoticeNoticer<Sender, Data, Return>(
 /**
  * @class EventNoticer
  */
-export class EventNoticer<Sender = any, Data = any, Return = number> {
+export class EventNoticer<Data = any, Return = number, Sender = any> {
 
 	private m_name: string;
 	private m_sender: any;
@@ -360,7 +360,7 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [scope] {Object}   # 重新指定侦听函数this
 	 * @arg [id]  {String}     # 侦听器别名,可通过id删除
 	 */
-	on<Scope>(listen: Listen<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+	on<Scope>(listen: Listen<Event<Data, Return, Sender>, Scope>, scope: Scope = this.m_sender, id?: string): string {
 		check_fun(listen);
 		return this._add(listen, listen, scope, id);
 	}
@@ -371,11 +371,11 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [scope] {Object}  #         重新指定侦听函数this
 	 * @arg [id] {String}     #         侦听器别名,可通过id删除
 	 */
-	once<Scope>(listen: Listen<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+	once<Scope>(listen: Listen<Event<Data, Return, Sender>, Scope>, scope: Scope = this.m_sender, id?: string): string {
 		check_fun(listen);
 		var self = this;
 		var _id = this._add(listen, {
-			call: function (scope: Scope, evt: Event<Sender, Data, Return>) {
+			call: function (scope: Scope, evt: Event<Data, Return, Sender>) {
 				self.off(_id);
 				listen.call(scope, evt);
 			}
@@ -391,7 +391,7 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [scope] {Object}   #      重新指定侦听函数this
 	 * @arg [id] {String}     #     侦听器别名,可通过id删除
 	 */
-	on2<Scope>(listen: Listen2<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+	on2<Scope>(listen: Listen2<Event<Data, Return, Sender>, Scope>, scope: Scope = this.m_sender, id?: string): string {
 		check_fun(listen);
 		return this._add(listen, { call: listen }, scope, id);
 	}
@@ -404,11 +404,11 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg [scope] {Object}      # 重新指定侦听函数this
 	 * @arg [id] {String}         # 侦听器id,可通过id删除
 	 */
-	once2<Scope>(listen: Listen2<Event<Sender, Data, Return>, Scope>, scope: Scope = this.m_sender, id?: string): string {
+	once2<Scope>(listen: Listen2<Event<Data, Return, Sender>, Scope>, scope: Scope = this.m_sender, id?: string): string {
 		check_fun(listen);
 		var self = this;
 		var _id = this._add(listen, {
-			call: function (scope: Scope, evt: Event<Sender, Data, Return>) {
+			call: function (scope: Scope, evt: Event<Data, Return, Sender>) {
 				self.off(_id);
 				listen(scope, evt);
 			}
@@ -416,15 +416,15 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 		return _id;
 	}
 	
-	forward(noticer: EventNoticer<Sender, Data, Return>, id?: string): string {
+	forward(noticer: EventNoticer<Data, Return, Sender>, id?: string): string {
 		check_noticer(noticer);
 		return this._add(noticer, { call: forwardNoticeNoticer }, noticer, id);
 	}
 
-	forwardOnce(noticer: EventNoticer<Sender, Data, Return>, id?: string): string {
+	forwardOnce(noticer: EventNoticer<Data, Return, Sender>, id?: string): string {
 		check_noticer(noticer);
 		var self = this;
-		var _id = this._add(noticer, function(evt: Event<Sender, Data, Return>) {
+		var _id = this._add(noticer, function(evt: Event<Data, Return, Sender>) {
 			self.off(_id);
 			forwardNoticeNoticer(noticer, evt);
 		}, noticer, id);
@@ -445,7 +445,7 @@ export class EventNoticer<Sender = any, Data = any, Return = number> {
 	 * @arg data {Object} 要发送的event
 	 * @ret {Object}
 	 */
-	triggerWithEvent(evt: Event<Sender, Data, Return>): Return | null {
+	triggerWithEvent(evt: Event<Data, Return, Sender>): Return | null {
 		if ( this.m_enable && this.m_length ) {
 			(<any>evt).m_noticer = this;
 			var listens = <List<ListenItem>>this.m_listens;

@@ -28,44 +28,55 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('./util');
-var { haveNgui, haveNode, haveWeb } = utils;
-var url = require('./url');
-var errno = require('./errno');
-var default_user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
+import utils from './util';
+import Buffer from './buffer';
+import url from './path';
+import errno from './errno';
+
+const { haveNgui, haveNode, haveWeb } = utils;
+const _user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
-var Buffer = require('./buffer').Buffer;
 
 if (haveNgui) {
-	var user_agent = default_user_agent;
-	var http = requireNative('_http');
+	var user_agent = _user_agent;
+	var httpNgui = __requireNgui__('_http');
 }
 else if (haveWeb) {
 	var user_agent = navigator.userAgent;
-	var XMLHttpRequest = global.XMLHttpRequest;
+	var XMLHttpRequest = globalThis.XMLHttpRequest;
 }
 else if (haveNode) {
-	var user_agent = default_user_agent;
+	var user_agent = _user_agent;
 	var http = require('http');
 	var https = require('https');
-}
-if (!haveNgui && !haveNode && !haveWeb) {
+} else {
 	throw Error.new('Unimplementation');
 }
 
-var shared = null;
+var shared: any = null;
 var __id = 1;
 
-var defaultOptions = {
+export interface Options {
+	params?: any;
+	method?: string,
+	timeout?: number;
+	headers?: AnyObject<string>;
+	dataType?: string,
+	signer?: Signer;
+	urlencoded?: boolean;
+	userAgent?: string;
+}
+
+const defaultOptions: Options = {
 	method: 'GET',
 	params: '',
-	headers : {},
-	dataType : 'json',
-	user_agent : user_agent,
+	headers: {},
+	dataType: 'json',
+	userAgent: user_agent,
 	timeout: 18e4,
 };
 
-function stringifyPrimitive(v) {
+function stringifyPrimitive(v: any) {
 	if (typeof v === 'string')
 		return v;
 	if (typeof v === 'number' && isFinite(v))
@@ -75,9 +86,7 @@ function stringifyPrimitive(v) {
 	return '';
 }
 
-function querystring_stringify(obj, sep, eq) {
-	sep = sep || '&';
-	eq = eq || '=';
+function querystringStringify(obj: any, sep: string = '&', eq: string = '=') {
 	var encode = encodeURIComponent;
 
 	if (obj !== null && typeof obj === 'object') {
@@ -111,16 +120,16 @@ function querystring_stringify(obj, sep, eq) {
 	return '';
 }
 
-function stringify_xml(obj) {
+function stringify_xml(obj: any) {
 
 	var result = ['<xml>'];
 
-	for (var [k,v] of Object.entries(obj)) {
+	for (var [k, v] of Object.entries(obj)) {
 		result.push(`<${k}>`);
 		if (v && typeof v == 'object') {
 			result.push(`![CDATA[${v}]]`);
 		} else {
-			result.push(v);
+			result.push(String(v));
 		}
 		result.push(`</${k}>`);
 	}
@@ -130,14 +139,33 @@ function stringify_xml(obj) {
 	return result.join('');
 }
 
+export interface Result {
+	data: any,
+	headers: AnyObject<string>,
+	statusCode: number,
+	httpVersion: string,
+	requestHeaders: AnyObject<string>,
+	requestData: AnyObject,
+}
+
+class PromiseResult extends Promise<Result> {}
+
 // Ngui implementation
-function requestNgui(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestNgui(
+	options: AnyObject,
+	soptions: AnyObject, 
+	resolve: (e: Result)=>void,
+	reject: (e: any)=>void,
+	is_https?: boolean, 
+	method?: string,
+	post_data?: any
+) {
 	var url = is_https ? 'https://': 'http://';
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
 	url += soptions.path;
 
-	http.request({
+	httpNgui.request({
 		url: url,
 		method: method == 'POST'? http.HTTP_METHOD_POST: http.HTTP_METHOD_GET,
 		headers: soptions.headers,
@@ -145,7 +173,7 @@ function requestNgui(options, soptions, resolve, reject, is_https, method, post_
 		timeout: soptions.timeout,
 		disableCache: true,
 		disableSslVerify: true,
-	}, function(res) {
+	}).then((res: any)=>{
 		resolve({
 			data: res.data,
 			headers: res.responseHeaders,
@@ -154,12 +182,20 @@ function requestNgui(options, soptions, resolve, reject, is_https, method, post_
 			requestHeaders: soptions.headers,
 			requestData: options.params,
 		});
-	}.catch(err=>{
+	}).catch((err:any)=>{
 		reject(err);
-	}));
+	});
 }
 
-function requestWeb(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestWeb(
+	options: AnyObject,
+	soptions: AnyObject, 
+	resolve: (e: Result)=>void,
+	reject: (e: any)=>void,
+	is_https?: boolean, 
+	method?: string,
+	post_data?: any
+) {
 	var url = is_https ? 'https://': 'http://';
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
@@ -167,7 +203,7 @@ function requestWeb(options, soptions, resolve, reject, is_https, method, post_d
 	url += `${soptions.path.indexOf('?')==-1?'?':'&'}_=${__id++}`;
 
 	var xhr = new XMLHttpRequest();
-	xhr.open(method, url, true);
+	xhr.open(method|| 'POST', url, true);
 	xhr.responseType = 'arraybuffer';
 	// xhr.responseType = 'text';
 	xhr.timeout = soptions.timeout;
@@ -177,10 +213,20 @@ function requestWeb(options, soptions, resolve, reject, is_https, method, post_d
 	for (var key in soptions.headers) {
 		xhr.setRequestHeader(key, soptions.headers[key]);
 	}
+
+	function parseResponseHeaders(str: string): AnyObject<string> {
+		var r: AnyObject<string> = {};
+		// TODO ...
+		return r;
+	}
+
+	xhr.getAllResponseHeaders()
+
 	xhr.onload = async ()=>{
 		var data = xhr.response;
-		var r = {
-			headers: xhr.getAllResponseHeaders(),
+		var r: Result = {
+			data: null,
+			headers: parseResponseHeaders(xhr.getAllResponseHeaders()),
 			statusCode: xhr.status,
 			httpVersion: '1.1',
 			requestHeaders: soptions.headers,
@@ -188,13 +234,13 @@ function requestWeb(options, soptions, resolve, reject, is_https, method, post_d
 		};
 		if (data instanceof ArrayBuffer) {
 			resolve(Object.assign(r, { data: Buffer.from(data) }));
-		} else if (data instanceof Blob && data.arrayBuffer) {
-			data.arrayBuffer().then(e=>resolve(Object.assign(r, { data: Buffer.from(e) })));
+		} else if (data instanceof Blob && (<any>data).arrayBuffer) {
+			(<any>data).arrayBuffer().then((e:any)=>resolve(Object.assign(r, { data: Buffer.from(e) })));
 		} else {
 			resolve(Object.assign(r, { data }))
 		}
 	};
-	xhr.onerror = (e)=>{
+	xhr.onerror = (e: any)=>{
 		var err = Error.new(e.message);
 		reject(err);
 	};
@@ -205,7 +251,14 @@ function requestWeb(options, soptions, resolve, reject, is_https, method, post_d
 }
 
 // Node implementation
-function requestNode(options, soptions, resolve, reject, is_https, method, post_data) {
+function requestNode(	options: AnyObject,
+	soptions: AnyObject, 
+	resolve: (e: Result)=>void,
+	reject: (e: any)=>void,
+	is_https?: boolean, 
+	method?: string,
+	post_data?: any
+) {
 
 	var lib = is_https ? https: http;
 
@@ -217,12 +270,12 @@ function requestNode(options, soptions, resolve, reject, is_https, method, post_
 		soptions.headers['Content-Length'] = post_data ? Buffer.byteLength(post_data) : 0;
 	}
 
-	var req = lib.request(soptions, (res)=> {
+	var req = lib.request(soptions, (res: any)=> {
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
 		var data = null;
-		res.on('data', (chunk)=> {
+		res.on('data', (chunk: Buffer)=> {
 			// console.log(`BODY: ${chunk}`);
 			if (data) {
 				data = Buffer.concat([data, chunk]);
@@ -271,27 +324,28 @@ var _request_platform =
  * @class Signer
  */
 class Signer {
+	private m_options: any;
 	get options() {
 		return this.m_options;
 	}
-	constructor(options) {
+	constructor(options: any) {
 		this.m_options = options || {};
 	}
-	sign(path, data = null) { /* subclass rewrite */ }
+	sign(path: string, data?: any) { /* subclass rewrite */ }
 }
 
 /**
  * @func request
  */
-function request(pathname, options) {
-	options = Object.assign({}, defaultOptions, options);
-	var { params, method, timeout, headers = {}, signer } = options;
+function request(pathname: string, opts: Options): PromiseResult {
+	var options = Object.assign({}, defaultOptions, opts);
+	var { params, method, headers = {}, signer } = options;
 
 	if (utils.config.moreLog) {
-		var data = [];
+		var data: string[] = [];
 		if (params) {
 			if (method == 'GET') {
-				pathname += '?' + querystring_stringify(params);
+				pathname += '?' + querystringStringify(params);
 			} else {
 				data = [`-d '${JSON.stringify(params)}'`];
 			}
@@ -306,7 +360,7 @@ function request(pathname, options) {
 		console.log('curl', logs.join(' \\\n'));
 	}
 
-	return new Promise((resolve, reject)=> {
+	return new PromiseResult((resolve, reject)=> {
 		var uri = new url.URL(pathname);
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
@@ -314,8 +368,8 @@ function request(pathname, options) {
 		var raw_path = uri.path;
 		var path = raw_path;
 
-		var headers = {
-			'User-Agent': options.user_agent,
+		var headers: AnyObject<string> = {
+			'User-Agent': <string>options.userAgent,
 			'Accept': 'application/json',
 		};
 		Object.assign(headers, options.headers);
@@ -326,10 +380,10 @@ function request(pathname, options) {
 			// set proxy
 			var proxy = process.env.HTTP_PROXY || process.env.http_proxy;
 			if (proxy && /^https?:\/\//.test(proxy)) {
-				proxy = new url.URL(proxy);
-				is_https = proxy.protocol == 'https:';
-				hostname = proxy.hostname;
-				port = Number(proxy.port) || (is_https ? 443: 80);
+				var proxyUrl = new url.URL(proxy);
+				is_https = proxyUrl.protocol == 'https:';
+				hostname = proxyUrl.hostname;
+				port = Number(proxyUrl.port) || (is_https ? 443: 80);
 				path = pathname;
 				// set headers
 				headers.host = uri.hostname;
@@ -343,7 +397,7 @@ function request(pathname, options) {
 			if (options.urlencoded || options.dataType == 'urlencoded') {
 				headers['Content-Type'] = 'application/x-www-form-urlencoded';
 				if (params) {
-					post_data = querystring_stringify(params);
+					post_data = querystringStringify(params);
 				}
 			} else if (options.dataType == 'xml') {
 				headers['Content-Type'] = 'application/xml';
@@ -362,7 +416,7 @@ function request(pathname, options) {
 			}
 		} else {
 			if (params) {
-				path += (uri.search ? '&' : '?') + querystring_stringify(params);
+				path += (uri.search ? '&' : '?') + querystringStringify(params);
 			}
 		}
 
@@ -370,7 +424,7 @@ function request(pathname, options) {
 			Object.assign(headers, signer.sign(raw_path, post_data));
 		}
 
-		timeout = parseInt(timeout);
+		var timeout = Number( options.timeout || '' );
 
 		var send_options = {
 			hostname,
@@ -386,25 +440,27 @@ function request(pathname, options) {
 	});
 }
 
+interface CacheValue {
+	data: any;
+	time: number;
+	timeoutid: any;
+}
+
 /**
  * @class Cache
  */
 class Cache {
+	private m_getscache: AnyObject<CacheValue> = {};
 
-	constructor() {
-		this.m_getscache = {};
-	}
-
-	has(key) {
+	has(key: string) {
 		return name in this.m_getscache;
 	}
 
-	get(key) {
-		var i = this.m_getscache[key];
-		return i ? i : null;
+	get(key: string) {
+		return this.m_getscache[key];
 	}
 
-	set(key, data, cacheTiem) {
+	set(key: string, data: any, cacheTiem: number) {
 		var i = this.m_getscache[key];
 		if (i) {
 			var id = i.timeoutid;
@@ -421,7 +477,7 @@ class Cache {
 		}
 	}
 
-	static hash(object) {
+	static hash(object: any) {
 		return utils.hash(JSON.stringify(object));
 	}
 
@@ -443,17 +499,21 @@ function parseJSON(json: string): any {
  * @class Request
  */
 export class Request {
+	private m_user_agent: string;
+	private m_server_url: string;
+	private m_mock: AnyObject;
+	private m_mock_switch: AnyObject | null;
+	private m_data_type: string = 'urlencoded';
+	private m_enable_strict_response_data: boolean = true;
+	private m_cache = new Cache();
+	private m_timeout = defaultOptions.timeout;
+	private m_signer: Signer | null = null;
 
-	constructor(serverURL, mock, mockSwitch) {
+	constructor(serverURL: string, mock?: AnyObject, mockSwitch?: AnyObject) {
 		this.m_user_agent = user_agent;
 		this.m_server_url = serverURL || utils.config.web_service;
 		this.m_mock = mock || {};
-		this.m_mock_switch = mockSwitch;
-		this.m_data_type = 'urlencoded';
-		this.m_enable_strict_response_data = true;
-		this.m_cache = new Cache();
-		this.m_timeout = defaultOptions.timeout;
-		this.m_signer = null;
+		this.m_mock_switch = mockSwitch || null;
 
 		if (!this.m_server_url) {
 			if (haveWeb) {
@@ -591,7 +651,7 @@ export default {
 	/**
 	 * @func querystringStringify()
 	 */
-	querystringStringify: querystring_stringify,
+	querystringStringify: querystringStringify,
 
 	/**
 	 * @get userAgent

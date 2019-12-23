@@ -28,16 +28,39 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var {List} = require('./event');
-var http = require('http');
-var https = require('https');
-var url = require('url');
-var fs = require('fs');
-var errno = require('./errno');
-var { userAgent } = require('./request');
+import util from './util';
+import {List,LiteItem} from './event';
+import * as http from 'http';
+import * as https from 'https';
+import * as url from 'url';
+import * as fs from 'fs';
+import errno from './errno';
+import {userAgent} from './request';
 
-function wget(www, save, options) { // 206
+export interface Options {
+	renewal?: boolean;
+	limit?: number;
+	onProgress?(opts: { total: number, size: number, speed: number }): void;
+	timeout?: number;
+}
+
+export interface Result {
+	total: number;
+	size: number; 
+}
+
+class PromiseResult extends Promise<Result> {
+	private m_abort: ()=>void;
+	abort() {
+		this.m_abort();
+	}
+	constructor(abort: ()=>void, cb: (resolve: (e: Result)=>void, reject: any)=>void) {
+		super(cb);
+		this.m_abort = abort;
+	}
+}
+
+export default function wget(www: string, save: string, options?: Options): PromiseResult { // 206
 	var { renewal = false,
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
@@ -45,10 +68,10 @@ function wget(www, save, options) { // 206
 				timeout = 12e4, } = options || {};
 
 	limit = Number(limit) || 0;
-	renewal = renewal || options.broken_point || false;
-	onProgress = onProgress || options.progress || util.noop;
+	renewal = renewal || false;
+	var progress = onProgress || util.noop;
 
-	var _reject, _req;
+	var _reject: (err: Error)=>void, _req: http.ClientRequest;
 	var ok = false;
 
 	function abort() {
@@ -63,7 +86,7 @@ function wget(www, save, options) { // 206
 		}
 	}
 
-	var promise = new Promise((resolve, reject)=> {
+	var promise = new PromiseResult(abort, (resolve, reject)=> {
 		_reject = reject;
 		if (ok) // abort
 			return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
@@ -72,17 +95,19 @@ function wget(www, save, options) { // 206
 		var isSSL = uri.protocol == 'https:';
 		var lib =	isSSL ? https: http;
 
-		var options = {
+		var options: http.RequestOptions & https.AgentOptions = {
 			hostname: uri.hostname,
 			port: Number(uri.port) || (isSSL ? 443: 80),
-			path: uri.path,
+			path: <string>uri.path,
 			method: 'GET',
 			headers: {
 				'User-Agent': userAgent,
 			},
-			rejectUnauthorized: false,
 			timeout: timeout || 12e4,
+			rejectUnauthorized: false,
 		};
+
+		(<any>options).rejectUnauthorized = false;
 
 		if (isSSL) {
 			options.agent = new https.Agent(options);
@@ -104,22 +129,23 @@ function wget(www, save, options) { // 206
 					}
 				}
 				if (start_range) {
-					options.headers.range = 'bytes=' + start_range + '-';
+					(<http.OutgoingHttpHeaders>options.headers).range = 'bytes=' + start_range + '-';
 				}
 			}
 
 			var fd = 0;
 			var res_end = false;
-			var buffers = new List();
+			var buffers = new List<Buffer>();
 
-			function error(err) {
+			function error(err: any) {
 				if (!ok) {
 					ok = true;
+					var e = Error.new(err);
 					if (fd) {
 						var _fd = fd; fd = 0;
-						fs.close(_fd, e=>reject(err));
+						fs.close(_fd, e=>reject(e));
 					} else {
-						reject(err);
+						reject(e);
 					}
 				}
 			}
@@ -127,7 +153,7 @@ function wget(www, save, options) { // 206
 			function write() {
 				if (fd) {
 					if (buffers.length) {
-						fs.write(fd, buffers.first.value, function(err) {
+						fs.write(fd, (<LiteItem<Buffer>>buffers.first).value, function(err) {
 							if (err) {
 								error(err);
 								req.abort();
@@ -145,16 +171,16 @@ function wget(www, save, options) { // 206
 			}
 
 			// new request 
-			var req = lib.request(options, (res)=> {
+			var req = lib.request(options, (res: http.IncomingMessage)=> {
 				if (ok) // abort
 					return;
 				_req = req;
 
 				if (res.statusCode == 200 || res.statusCode == 206) {
 					res.pause();
-					res.client.setNoDelay(true);
-					res.client.setKeepAlive(true, 3e4); // 30s
-					res.client.on('error', e=>error(e));
+					res.socket.setNoDelay(true);
+					res.socket.setKeepAlive(true, 3e4); // 30s
+					res.socket.on('error', e=>error(e));
 					res.on('error', e=>error(e));
 
 					var speed = 0; // speed / 3 second
@@ -188,7 +214,7 @@ function wget(www, save, options) { // 206
 						}
 
 						try {
-							onProgress({ total: download_total, size: download_size, speed });
+							progress({ total: download_total, size: download_size, speed });
 						} catch(e) {
 							console.error(e);
 						}
@@ -212,7 +238,7 @@ function wget(www, save, options) { // 206
 							res.statusCode == 206 && 
 							res.headers['accept-ranges'] == 'bytes') 
 					{
-						var content_range = res.headers['content-range'];
+						var content_range = <string>res.headers['content-range'];
 						var m = content_range.match(/^bytes\s(\d+)-/);
 						if (m && Number(m[1]) == start_range) {
 							flag = 'a';
@@ -248,10 +274,10 @@ function wget(www, save, options) { // 206
 				}
 			});
 
-			req.on('abort', e=>error(errno.ERR_REQUEST_ABORT));
+			req.on('abort', ()=>error(errno.ERR_REQUEST_ABORT));
 			req.on('error', e=>error(e));
-			req.on('timeout', e=>{
-				error(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
+			req.on('timeout', ()=>{
+				error(errno.ERR_HTTP_REQUEST_TIMEOUT);
 				req.abort();
 			});
 			req.end(); // send

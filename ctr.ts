@@ -28,36 +28,36 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var path = require('path');
-var fs = require('./fs');
-var HttpService = require('./http_service').HttpService;
-var Module = require('module').Module;
-var vm = require('vm');
-var template = require('./template');
+import util from './util';
+import * as path from 'path';
+import * as fs from './fs';
+import {HttpService} from './http_service';
+import * as Module from 'module';
+import * as vm from 'vm';
+import template, {Options} from './template';
 
 var FILE_CACHE_TIMEOUT = util.dev ? 0 : 1000 * 60 * 10; // 10分钟
-var FILE_CACHES = {};
+var FILE_CACHES: AnyObject = {};
 var _require = require;
 
-function makeRequireFunction(mod) {
-	function require(path) {
+function makeRequireFunction(mod: Module) {
+	function require(path: string) {
 		return mod.require(path);
 	}
-	function resolve(request, options) {
+	function resolve(request: string, options: any) {
 		if (typeof request !== 'string') {
 			var actual = request;
 			var str = `The "request" argument must be of type string`;
 			str += `. Received type ${actual !== null ? typeof actual : 'null'}`;
 			throw new Error(str);
 		}
-		return Module._resolveFilename(request, mod, false, options);
+		return (<any>Module)._resolveFilename(request, mod, false, options);
 	}
 	require.resolve = resolve;
 	return require;
 }
 
-function require_ejs(filename, options, __mainfilename) {
+function requireEjs(filename: string, options: Options, __mainfilename: string) {
 
 	var ext = path.extname(filename);
 
@@ -83,16 +83,16 @@ function require_ejs(filename, options, __mainfilename) {
 
 	var dirname = path.dirname(filename);
 	var mod = { 
-		exports: {}, 
+		exports: {},
+		require: (path: string)=>requireEjs(require.resolve(path), options, __mainfilename),
 		id: filename, 
-		dirname: dirname,
-		require: function(path) {
-			return require_ejs(require.resolve(path), options, __mainfilename);
-		},
-		paths: Module._nodeModulePaths(dirname),
 		filename: filename,
+		dirname: dirname,
+		children: [],
+		paths: (<any>Module)._nodeModulePaths(dirname),
+		parent: null,
 	};
-	
+
 	var result = `const __mainFilename = '${__mainfilename}';
 								module.exports = ${template(ejs.source, options)}`;
 	var wrapper = Module.wrap(result);
@@ -103,9 +103,9 @@ function require_ejs(filename, options, __mainfilename) {
 		displayErrors: true
 	});
 
-	var require = makeRequireFunction(mod);
-
-	compiledWrapper.call(mod.exports, mod.exports, require, mod, filename, dirname);
+	compiledWrapper.call(mod.exports, mod.exports, 
+		makeRequireFunction(<any>mod), mod, filename, dirname
+	);
 
 	return mod.exports;
 }
@@ -113,9 +113,9 @@ function require_ejs(filename, options, __mainfilename) {
 /**
  * @class ViewController
  */
-class ViewController extends HttpService {
+export class ViewController extends HttpService {
 
-	view(name, data) {
+	view(name: string, data?: AnyObject) {
 		var dirname = util.config.viewDirname;
 		if (!dirname) {
 			var mainModule = process.mainModule;
@@ -130,7 +130,7 @@ class ViewController extends HttpService {
 
 		data = data || {};
 		try {
-			var func = require_ejs(filename, data, filename);
+			var func = requireEjs(filename, data, filename);
 			// fs.writeFileSync(__dirname + '/test.js', func + '');
 			var str = func(data);
 			this.returnHtml(str);

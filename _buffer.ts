@@ -80,9 +80,16 @@ function ERR_OUT_OF_RANGE(str: string, range: string, input: number) {
 	return new RangeError(`ERR_OUT_OF_RANGE ${str}, ${range}, ${input}`);
 }
 
+function invalidArgType(value: any, types: string | string[], arg: string = ''): TypeError {
+	if (!Array.isArray(types))
+		types = [types];
+	return new TypeError(`ERR_INVALID_ARG_TYPE ${arg} [${types.join('|')}] ${value}`);
+}
+
 function validateNumber(value: any, name?: string) {
 	if (typeof value !== 'number')
-		throw new TypeError(`ERR_INVALID_ARG_TYPE ${name} number ${value}`);
+		throw invalidArgType(value, 'number', name);
+		// throw new TypeError(`ERR_INVALID_ARG_TYPE ${name} number ${value}`);
 }
 
 function checkBounds(buf: Uint8Array, offset: number, byteLength: number) {
@@ -664,4 +671,6 @@ export default {
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
 	writeBigIntLE,
+	//
+	invalidArgType,
 };

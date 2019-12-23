@@ -79,6 +79,36 @@ function encodeUTF8Word(unicode: number): number[] {
 	return bytes;
 }
 
+function encodeUTF8WordLength(unicode: number): number {
+	if (unicode < 0x7F + 1) {             // 单字节编码
+		return 1;
+	} else {
+		if (unicode < 0x7FF + 1) {            // 两字节编码
+			return 2;
+		} else if (unicode < 0xFFFF + 1) {      // 三字节编码
+			return 3;
+		} else if (unicode < 0x10FFFF + 1) {    // 四字节编码
+			return 4;
+		} else if (unicode < 0x3FFFFFF + 1) {   // 五字节编码
+			if (unicode > 0x200000 - 1) {
+				return 5;
+			} else { // 这个区间没有编码
+				return 1;
+			}
+		} else {                               //六字节编码
+			return 6;
+		}
+	}
+}
+
+function encodeUTF8Length(str: string): number {
+	var r = 0;
+	for (var i = 0, l = str.length; i < l; i++) {
+		r += encodeUTF8WordLength(str.charCodeAt(i));
+	}
+	return r;
+}
+
 // string => bytes
 // Convert str to utf8 to a bytes
 function encodeUTF8(str: string): number[] {
@@ -328,4 +358,7 @@ export default {
 	// ext
 	convertHexString,
 	convertBase64String,
+	// length
+	encodeUTF8WordLength,
+	encodeUTF8Length,
 };
