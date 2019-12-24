@@ -28,17 +28,20 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
+import utils from '../util';
+import * as doc from './document';
+import * as el from './element';
+import * as nnm from './named_node_map';
 
-var html_tag = /^(br|hr|input|frame|img|area|link|col|meta|area|base|basefont|param)$/i;
-var html = /^html$/i;
+const html_tag = /^(br|hr|input|frame|img|area|link|col|meta|area|base|basefont|param)$/i;
+const html = /^html$/i;
 
-function xmlEncoder(c) {
+function xmlEncoder(c: string) {
 	return c == '<' && '&lt;' || c == '&' && '&amp;' || 
-				 c == '"' && '&quot;' || '&#' + c.charCodeAt() + ';';
+				 c == '"' && '&quot;' || '&#' + c.charCodeAt(0) + ';';
 }
 
-function findNSMap(self) {
+function findNSMap(self: Node) {
 	var el = self;
 
 	while (el.nodeType !== exports.ELEMENT_NODE) {
@@ -51,7 +54,7 @@ function findNSMap(self) {
 	return el._namespaceMap;
 }
 
-function serializeToString(node, buf) {
+function serializeToString(node: Node, buf: string[]) {
 	switch (node.nodeType) {
 		case exports.ELEMENT_NODE:
 			var attrs = node.attributes;
@@ -141,7 +144,7 @@ function serializeToString(node, buf) {
 * nodeValue,Attr:value,CharacterData:data
 * prefix
 */
-function update(self, el, attr) {
+function update(self: Node, el: Node, attr) {
 
 	var doc = self.ownerDocument || self;
 	doc._inc++;
@@ -163,7 +166,7 @@ function update(self, el, attr) {
 	}
 }
 
-function cloneNode(doc, node, deep) {
+function cloneNode(doc: Node, node: Node, deep: boolean) {
 	var node2 = new node.constructor();
 	for (var n in node) {
 		var v = node[n];
@@ -200,37 +203,59 @@ function cloneNode(doc, node, deep) {
 	return node2;
 }
 
-var Node = exports.Node = util.class('Node', {
-	
-	firstChild: null,
-	lastChild: null,
-	previousSibling: null,
-	nextSibling: null,
-	attributes: null,
-	parentNode: null,
-	childNodes: null,
-	ownerDocument: null,
-	nodeValue: null,
-	namespaceURI: null,
-	prefix: null,
-	localName: null,
+export enum NODE_TYPE {
+	NODE_NODE = 1,
+	ELEMENT_NODE = 1,
+	ATTRIBUTE_NODE = 2,
+	TEXT_NODE = 3,
+	CDATA_SECTION_NODE = 4,
+	ENTITY_REFERENCE_NODE = 5,
+	ENTITY_NODE = 6,
+	PROCESSING_INSTRUCTION_NODE = 7,
+	COMMENT_NODE = 8,
+	DOCUMENT_NODE = 9,
+	DOCUMENT_TYPE_NODE = 10,
+	DOCUMENT_FRAGMENT_NODE = 11,
+	NOTATION_NODE = 12,
+};
+
+export class Node {
+	readonly ownerDocument: doc.Document;
+	readonly nodeType?: NODE_TYPE;
+	readonly childNodes?: NodeList;
+	readonly attributes?: nnm.NamedNodeMap;
+	firstChild?: Node;
+	lastChild?: Node;
+	previousSibling?: Node;
+	nextSibling?: Node;
+	parentNode?: Node;
+	nodeValue?: string;
+	namespaceURI?: string;
+	prefix?: string;
+	localName?: string;
+
+	constructor(ownerDocument: doc.Document) {
+		this.ownerDocument = ownerDocument;
+	}
 
 	// Modified in DOM Level 2:
-	insertBefore: function (newChild, refChild) {//raises
+	insertBefore(newChild: Node, refChild: Node | null) {//raises
+		utils.assert(newChild.ownerDocument == this.ownerDocument);
+
 		var parentNode = this;
 
 		var cp = newChild.parentNode;
 		if (cp) {
 			cp.removeChild(newChild); //remove and update
 		}
-		if (newChild.nodeType === exports.DOCUMENT_FRAGMENT_NODE) {
+		if (newChild.nodeType === NODE_TYPE.DOCUMENT_FRAGMENT_NODE) {
 			var newFirst = newChild.firstChild;
 			var newLast = newChild.lastChild;
 		}
 		else
 			newFirst = newLast = newChild;
 
-		if (refChild == null) {
+		if (!refChild) {
 			var pre = parentNode.lastChild;
 			parentNode.lastChild = newLast;
 		} else {
@@ -249,16 +274,16 @@ var Node = exports.Node = util.class('Node', {
 		while (newFirst !== newLast && (newFirst = newFirst.nextSibling))
 
 		update(this, parentNode);
-	},
+	}
 
-	replaceChild: function (newChild, oldChild) {//raises
+	replaceChild(newChild: Node, oldChild: Node) {//raises
 		this.insertBefore(newChild, oldChild);
 		if (oldChild) {
 			this.removeChild(oldChild);
 		}
-	},
+	}
 
-	removeAllChild: function () {
+	removeAllChild() {
 		var ns = this.childNodes;
 		for (var i = 0, l = ns.length; i < l; i++) {
 			ns[i].parentNode = null;
@@ -268,9 +293,9 @@ var Node = exports.Node = util.class('Node', {
 		this.lastChild = null;
 
 		update(this, this);
-	},
+	}
 
-	removeChild: function (oldChild) {
+	removeChild(oldChild: Node) {
 		var parentNode = this;
 		var previous = null;
 		var child = this.firstChild;
@@ -294,19 +319,19 @@ var Node = exports.Node = util.class('Node', {
 			previous = child;
 			child = next;
 		}
-	},
+	}
 
-	appendChild: function (newChild) {
+	appendChild(newChild: Node) {
 		return this.insertBefore(newChild, null);
-	},
-	hasChildNodes: function () {
+	}
+	hasChildNodes() {
 		return this.firstChild != null;
-	},
-	cloneNode: function (deep) {
+	}
+	cloneNode(deep: boolean) {
 		return cloneNode(this.ownerDocument || this, this, deep);
-	},
+	}
 	// Modified in DOM Level 2:
-	normalize: function () {
+	normalize() {
 		var child = this.firstChild;
 		while (child) {
 			var next = child.nextSibling;
@@ -318,29 +343,29 @@ var Node = exports.Node = util.class('Node', {
 				child = next;
 			}
 		}
-	},
+	}
 	// Introduced in DOM Level 2:
-	isSupported: function (feature, version) {
+	isSupported(feature, version) {
 		return this.ownerDocument.implementation.hasFeature(feature, version);
-	},
+	}
 	// Introduced in DOM Level 2:
-	hasAttributes: function () {
+	hasAttributes() {
 		return this.attributes.length > 0;
-	},
-	lookupPrefix: function (namespaceURI) {
+	}
+	lookupPrefix(namespaceURI) {
 		var map = findNSMap(this)
 		if (namespaceURI in map) {
 			return map[namespaceURI]
 		}
 		return null;
-	},
+	}
 	// Introduced in DOM Level 3:
-	isDefaultNamespace: function (namespaceURI) {
+	isDefaultNamespace(namespaceURI) {
 		var prefix = this.lookupPrefix(namespaceURI);
 		return prefix == null;
-	},
+	}
 	// Introduced in DOM Level 3:
-	lookupNamespaceURI: function (prefix) {
+	lookupNamespaceURI(prefix) {
 		var map = findNSMap(this)
 		for (var n in map) {
 			if (map[n] == prefix) {
@@ -348,33 +373,18 @@ var Node = exports.Node = util.class('Node', {
 			}
 		}
 		return null;
-	},
+	}
 
-	toString: function () {
+	toString() {
 		var buf = [];
 		serializeToString(this, buf);
 		return buf.join('');
 	}
 
-});
+}
 
-var NODE_TYPE = {
-	ELEMENT_NODE: 1,
-	ATTRIBUTE_NODE: 2,
-	TEXT_NODE: 3,
-	CDATA_SECTION_NODE: 4,
-	ENTITY_REFERENCE_NODE: 5,
-	ENTITY_NODE: 6,
-	PROCESSING_INSTRUCTION_NODE: 7,
-	COMMENT_NODE: 8,
-	DOCUMENT_NODE: 9,
-	DOCUMENT_TYPE_NODE: 10,
-	DOCUMENT_FRAGMENT_NODE: 11,
-	NOTATION_NODE: 12
-};
-
-util.assign(Node.prototype, NODE_TYPE);
-util.assign(exports, NODE_TYPE);
+// util.assign(Node.prototype, NODE_TYPE);
+// util.assign(exports, NODE_TYPE);
 
 /**
 	* @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-536297177
@@ -382,12 +392,18 @@ util.assign(exports, NODE_TYPE);
 	* The items in the NodeList are accessible via an integral index, starting from 0.
 	*/
 
-var NodeList = exports.NodeList = util.class('NodeList', {
+export class NodeList {
+
 	/**
 		* The number of nodes in the list. The range of valid child node indices is 0 to length-1 inclusive.
 		* @standard level1
 		*/
-	length: 0,
+	protected _length = 0
+
+	get length() {
+		return this._length;
+	}
+
 	/**
 		* Returns the indexth item in the collection. If index is greater than or equal to the number of nodes in the list, this returns null.
 		* @standard level1
@@ -396,95 +412,123 @@ var NodeList = exports.NodeList = util.class('NodeList', {
 		* @return Node
 		* 	The node at the indexth position in the NodeList, or null if that is not a valid index.
 		*/
-	item: function (index) {
-		return this[index] || null;
-	}
-});
-
-function update_live_node_list(self) {
-	var inc = self._node.ownerDocument._inc;
-	if (self._inc != inc) {
-		var ls = self._refresh(self._node);
-		var l = ls.length;
-
-		self._length = l;
-		for(var i = 0; i < l; i++)
-			self[i] = ls[i];
-
-		self._inc = inc;
+	item(index: number): Node | null {
+		return (<any>this)[index] || null;
 	}
 }
 
-exports.LiveNodeList = util.class('LiveNodeList', NodeList, {
+const Zero_childNodes = new NodeList();
 
-	_length: 0,
+export class LiveNodeList extends NodeList {
+
+	private _node: Node;
+	private _refresh: (n: Node)=>Node[];
+	private _inc: any;
+
+	private _update_live_node_list() {
+		var self = this;
+		var inc = (<any>self)._node.ownerDocument._inc;
+		if (self._inc != inc) {
+			var ls = self._refresh(self._node);
+			var l = ls.length;
+	
+			self._length = l;
+
+			for(var i = 0; i < l; i++)
+				(<any>self)[i] = ls[i];
+			self._inc = inc;
+		}
+	}
 
 	get length() {
-		update_live_node_list(this);
+		this._update_live_node_list();
 		return this._length;
-	},
+	}
 	
-	constructor: function (node, refresh) {
+	constructor(node: Node, refresh: (n: Node)=>Node[]) {
+		super();
 		this._node = node;
 		this._refresh = refresh;
-	},
-
-	item: function (index) {
-		update_live_node_list(this);
-		return this[index] || null;
 	}
-});
 
-var CharacterData = exports.CharacterData = util.class('CharacterData', Node, {
-	
-	data: '',
-	
-	substringData: function (offset, count) {
+	item(index: number): Node | null {
+		this._update_live_node_list();
+		return (<any>this)[index] || null;
+	}
+}
+
+class CharacterData extends Node {
+	data = '';
+	length = 0;
+
+	substringData(offset: number, count: number) {
 		return this.data.substring(offset, offset + count);
-	},
-	
-	appendData: function (text) {
+	}
+
+	appendData(text: string) {
 		text = this.data + text;
 		this.nodeValue = this.data = text;
 		this.length = text.length;
-	},
+	}
 	
-	insertData: function (offset, text) {
+	insertData(offset: number, text: string) {
 		this.replaceData(offset, 0, text);
-	},
+	}
 	
-	deleteData: function (offset, count) {
-		this.replaceData(offset, count, "");
-	},
+	deleteData(offset: number, count: number) {
+		this.replaceData(offset, count, '');
+	}
 	
-	replaceData: function (offset, count, text) {
+	replaceData(offset: number, count: number, text: string) {
 		var start = this.data.substring(0, offset);
 		var end = this.data.substring(offset + count);
 		text = start + text + end;
 		this.nodeValue = this.data = text;
 		this.length = text.length;
-	},
-});
+	}
+}
 
-exports.Attr = util.class('Attr', CharacterData, {
-	nodeType: NODE_TYPE.ATTRIBUTE_NODE
-});
+export class Attribute extends CharacterData {
+	readonly nodeType = NODE_TYPE.ATTRIBUTE_NODE;
+	ownerElement: el.Element | null = null;
+	readonly name: string;
+	readonly specified: boolean;
+	value: string;
 
-exports.CDATASection = util.class('CDATASection', CharacterData, {
-	nodeName: "#cdata-section",
-	nodeType: NODE_TYPE.CDATA_SECTION_NODE
-});
+	get nodeName() {
+		return this.name;
+	}
 
-exports.Comment = util.class('Comment', CharacterData, {
-	nodeName: "#comment",
-	nodeType: NODE_TYPE.COMMENT_NODE
-});
+	constructor(doc: doc.Document, name: string, value: string, specified: boolean = false) {
+		super(doc);
+		// this.ownerElement = ownerElement;
+		this.name = name;
+		this.value = value;
+		this.specified = specified;
+	}
+}
 
-exports.DocumentFragment = util.class('DocumentFragment', Node, {
-	nodeName: '#document-fragment'
-});
+export class CDATASection extends CharacterData {
+	readonly nodeType = NODE_TYPE.CDATA_SECTION_NODE;
+	readonly nodeName = "#cdata-section";
+}
 
-exports.DocumentType = util.class('DocumentType', Node, {
+export class Comment extends CharacterData {
+	readonly nodeType = NODE_TYPE.COMMENT_NODE;
+	readonly nodeName = "#comment";
+}
+
+export class DocumentFragment extends Node {
+	readonly nodeName = '#document-fragment';
+	readonly childNodes = new NodeList();
+}
+
+export class DocumentType extends Node {
+	readonly nodeName: string;
+	readonly nodeType = NODE_TYPE.DOCUMENT_TYPE_NODE;
+	readonly name: string;
+	readonly publicId: string;
+	readonly systemId: string;
 
 	// Introduced in DOM Level 2:
 	/**
@@ -494,44 +538,50 @@ exports.DocumentType = util.class('DocumentType', Node, {
 		* @param {String}              publicId
 		* @param {String}              systemId
 		*/
-	constructor: function (qualifiedName, publicId, systemId) {// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
-
+	constructor(doc: doc.Document, qualifiedName: string, publicId: string, systemId: string) {
+		// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
+		super(doc);
 		this.name = qualifiedName;
 		this.nodeName = qualifiedName;
 		this.publicId = publicId;
 		this.systemId = systemId;
 		// Introduced in DOM Level 2:
 		//readonly attribute DOMString        internalSubset;
-
 		//TODO:..
 		//  readonly attribute NamedNodeMap     entities;
 		//  readonly attribute NamedNodeMap     notations;
-	},
+	}
+}
 
-	nodeType: NODE_TYPE.DOCUMENT_TYPE_NODE
+export class Entity extends Node {
+	readonly nodeType = NODE_TYPE.ENTITY_NODE;
+}
 
-});
+export class EntityReference extends Node {
+	readonly nodeType = NODE_TYPE.ENTITY_REFERENCE_NODE;
+	nodeName = '';
+}
 
-exports.Entity = util.class('Entity', Node, {
-	nodeType: NODE_TYPE.ENTITY_NODE
-});
+export class Notation extends Node {
+	readonly nodeType = NODE_TYPE.NOTATION_NODE;
+}
 
-exports.EntityReference = util.class('EntityReference', Node, {
-	nodeType: NODE_TYPE.ENTITY_REFERENCE_NODE
-});
+export class ProcessingInstruction extends Node {
+	readonly nodeType = NODE_TYPE.PROCESSING_INSTRUCTION_NODE;
+	readonly target: string;
+	readonly data: string;
+	constructor(doc: doc.Document, target: string, data: string) {
+		super(doc);
+		this.target = target;
+		this.data = data;
+	}
+}
 
-exports.Notation = util.class('Notation', Node, {
-	nodeType: NODE_TYPE.NOTATION_NODE
-});
+export class Text extends CharacterData {
+	readonly nodeName = "#text";
+	readonly nodeType = NODE_TYPE.TEXT_NODE;
 
-exports.ProcessingInstruction = util.class('ProcessingInstruction', Node, {
-	nodeType: NODE_TYPE.PROCESSING_INSTRUCTION_NODE
-});
-
-exports.Text = util.class('Text', CharacterData, {
-	nodeName: "#text",
-	nodeType: NODE_TYPE.TEXT_NODE,
-	splitText: function (offset) {
+	splitText(offset: number) {
 		var text = this.data;
 		var newText = text.substring(offset);
 		text = text.substring(0, offset);
@@ -543,5 +593,4 @@ exports.Text = util.class('Text', CharacterData, {
 		}
 		return newNode;
 	}
-});
-
+}

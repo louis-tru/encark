@@ -42,105 +42,108 @@
 	*
 	*/
 
-var util = require('../util');
-var exception = require('./exception');
-var NodeList = require('./node').NodeList;
+import exception, { Exception } from './exception';
+import {NodeList, Attribute} from './node';
+import * as el from './element';
 
-function findNodeIndex(self, node) {
-	var i = self.length;
-	while (i--) {
-		if (self[i] == node) { return i }
+export class NamedNodeMap extends NodeList {
+	readonly ownerElement: el.Element;
+
+	constructor(owner: el.Element) {
+		super();
+		this.ownerElement = owner;
 	}
-}
 
-function add(self, node, old) {
-	if (old) {
-		self[findNodeIndex(self, old)] = node;
-	} else {
-		self[self.length++] = node;
-	}
-	var el = self._ownerElement;
-	var doc = el && el.ownerDocument;
-	if (doc)
-		node.ownerElement = el;
-
-	return old || null;
-}
-
-
-var NamedNodeMap = util.class('NamedNodeMap', NodeList, {
-
-	getNamedItem: function (key) {
-
+	getNamedItem(key: string) {
 		var i = this.length;
 		while (i--) {
-			var node = this[i];
+			var node = <Attribute>((<any>this)[i]);
 			if (node.nodeName == key)
 				return node;
 		}
-	},
+	}
 	
-	setNamedItem: function (node) {
+	setNamedItem(node: Attribute) {
 		var old = this.getNamedItem(node.nodeName);
-		return add(this, node, old);
-	},
+		return this._add(node, old);
+	}
 
 	/* returns Node */
-	setNamedItemNS: function (node) {
-		// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
-		var old = this.getNamedItemNS(node.namespaceURI, node.localName);
-		return add(self, node, old);
-	},
+	// private _setNamedItemNS(node: Attribute) {
+	// 	// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
+	// 	var old = this.getNamedItemNS(node.namespaceURI, node.localName);
+	// 	return this._add(node, old);
+	// }
 
-	_removeItem: function (node) {
+	private _findNodeIndex(node: Attribute): number {
+		var i = this.length;
+		while (i--) {
+			if ((<any>this)[i] === node) return i;
+		}
+		return -1;
+	}
+	
+	private _add(node: Attribute, old?: Attribute) {
+		var self = this;
+		if (old) {
+			(<any>self)[this._findNodeIndex(old)] = node;
+		} else {
+			(<any>self)[(<any>self)._length++] = node;
+		}
+		var el = self.ownerElement;
+		var doc = el && el.ownerDocument;
+		if (doc)
+			node.ownerElement = el;
+	
+		return old || null;
+	}
+	
+	private _removeItem(node: Attribute) {
 		var i = this.length;
 		var lastIndex = i - 1;
 		while (i--) {
-			var c = this[i];
+			var c = (<any>this)[i];
 			if (node === c) {
 				var old = c;
 				while (i < lastIndex) {
-					this[i] = this[++i];
+					(<any>this)[i] = (<any>this)[++i];
 				}
-				this.length = lastIndex;
+				this._length = lastIndex;
 				node.ownerElement = null;
-				var el = this._ownerElement;
-				var doc = el && el.ownerDocument;
+				// var el = this.ownerElement;
 				return old;
 			}
 		}
-	},
+	}
 
 	/* returns Node */
-	removeNamedItem: function (key) {
+	removeNamedItem(key: string) {
 		var node = this.getNamedItem(key);
 		if (node) {
 			this._removeItem(node);
 		} else {
-			throw exception.Exception(exception.NOT_FOUND_ERR, new Error());
+			throw new Exception(exception.NOT_FOUND_ERR);
 		}
-	}, // raises: NOT_FOUND_ERR,NO_MODIFICATION_ALLOWED_ERR
+	} // raises: NOT_FOUND_ERR,NO_MODIFICATION_ALLOWED_ERR
 
 	//for level2
-	getNamedItemNS: function (namespaceURI, localName) {
+	getNamedItemNS(namespaceURI: string, localName: string) {
 		var i = this.length;
 		while (i--) {
-			var node = this[i];
+			var node: Attribute = (<any>this)[i];
 			if (node.localName == localName && node.namespaceURI == namespaceURI) {
 				return node;
 			}
 		}
 		return null;
-	},
+	}
 
-	removeNamedItemNS: function (namespaceURI, localName) {
+	removeNamedItemNS(namespaceURI: string, localName: string) {
 		var node = this.getNamedItemNS(namespaceURI, localName);
 		if (node) {
 			this._removeItem(node);
 		} else {
-			throw exception.Exception(exception.NOT_FOUND_ERR, new Error());
+			throw new Exception(exception.NOT_FOUND_ERR);
 		}
-	},
-});
-
-exports.NamedNodeMap = NamedNodeMap;
+	}
+}

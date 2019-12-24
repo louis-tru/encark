@@ -28,17 +28,34 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var document = require('./document');
-var element = require('./element');
-var exception = require('./exception');
-var named_node_map = require('./named_node_map');
-var node = require('./node');
-var parser = require('./parser');
+const ExceptionMessage: string[] = [];
 
-util.assign(exports, node);
-util.assign(exports, exception);
-exports.Document = document.Document;
-exports.Element = element.Element;
-exports.NamedNodeMap = named_node_map.NamedNodeMap;
-exports.Parser = parser.Parser;
+export class Exception extends Error {
+	constructor(errno: number) {
+		super(ExceptionMessage[errno] || 'Unknown error');
+		// if (Error.captureStackTrace)
+		// 	Error.captureStackTrace(this, Exception);
+		this.errno = errno;
+	}
+}
+
+export enum ErrnoList {
+	INDEX_SIZE_ERR = (ExceptionMessage[1] = 'Index size error', 1),
+	DOMSTRING_SIZE_ERR = (ExceptionMessage[2] = 'DOMString size error', 2),
+	HIERARCHY_REQUEST_ERR = (ExceptionMessage[3] = 'Hierarchy request error', 3),
+	WRONG_DOCUMENT_ERR = (ExceptionMessage[4] = 'Wrong document', 4),
+	INVALID_CHARACTER_ERR = (ExceptionMessage[5] = 'Invalid character', 5),
+	NO_DATA_ALLOWED_ERR = (ExceptionMessage[6] = 'No data allowed', 6),
+	NO_MODIFICATION_ALLOWED_ERR = (ExceptionMessage[7] = 'No modification allowed', 7),
+	NOT_FOUND_ERR = (ExceptionMessage[8] = 'Not found', 8),
+	NOT_SUPPORTED_ERR = (ExceptionMessage[9] = 'Not supported', 9),
+	INUSE_ATTRIBUTE_ERR = (ExceptionMessage[10] = 'Attribute in use', 10),
+	//level2
+	INVALID_STATE_ERR = (ExceptionMessage[11] = 'Invalid state', 11),
+	SYNTAX_ERR = (ExceptionMessage[12] = 'Syntax error', 12),
+	INVALID_MODIFICATION_ERR = (ExceptionMessage[13] = 'Invalid modification', 13),
+	NAMESPACE_ERR = (ExceptionMessage[14] = 'Invalid namespace', 14),
+	INVALID_ACCESS_ERR = (ExceptionMessage[15] = 'Invalid access', 15)
+}
+
+export default ErrnoList;

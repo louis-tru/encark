@@ -28,21 +28,22 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var node = require('./node');
-var element = require('./element');
-var NamedNodeMap = require('./named_node_map').NamedNodeMap;
-var parser = require('./parser');
+import {
+	Node, NODE_TYPE, NodeList, 
+	DocumentFragment, Text, Comment,
+	Attribute, CDATASection, ProcessingInstruction,
+	EntityReference,
+} from './node';
+import {Element, visitNode} from './element';
+import parser from './parser';
 
-var visitNode = element.visitNode;
-var Element = element.Element;
-var Node_insertBefore = node.Node.prototype.insertBefore;
-var Node_removeChild = node.Node.prototype.removeChild;
+var Node_insertBefore = Node.prototype.insertBefore;
+var Node_removeChild = Node.prototype.removeChild;
 
-function importNode(doc, node, deep) {
+function importNode(doc: Document, node: Node, deep?: boolean) {
 	var node2;
 	switch (node.nodeType) {
-		case node.ELEMENT_NODE:
+		case NODE_TYPE.ELEMENT_NODE:
 			node2 = node.cloneNode(false);
 			node2.ownerDocument = doc;
 			var attrs = node2.attributes;
@@ -50,9 +51,9 @@ function importNode(doc, node, deep) {
 			for (var i = 0; i < len; i++) {
 				node2.setAttributeNodeNS(importNode(doc, attrs.item(i), deep));
 			}
-		case node.DOCUMENT_FRAGMENT_NODE:
+		case NODE_TYPE.DOCUMENT_FRAGMENT_NODE:
 			break;
-		case node.ATTRIBUTE_NODE:
+		case NODE_TYPE.ATTRIBUTE_NODE:
 			deep = true;
 			break;
 	}
@@ -71,13 +72,19 @@ function importNode(doc, node, deep) {
 	return node2;
 }
 
-var Document = util.class('Document', node.Node, {
+export class Document extends Node {
 
-	nodeName: '#document',
-	nodeType: node.DOCUMENT_NODE,
-	doctype: null,
-	documentElement: null,
-	_inc: 1,
+	readonly nodeName = '#document';
+	readonly nodeType = NODE_TYPE.DOCUMENT_NODE;
+	readonly doctype: Node | null;
+	readonly childNodes = new NodeList();
+	readonly ownerDocument: Document;
+	_documentElement: Element | null = null;
+	_inc = 1;
+
+	get documentElement() {
+		return this._documentElement;
+	}
 
 	// Introduced in DOM Level 2:
 	/**
@@ -87,25 +94,26 @@ var Document = util.class('Document', node.Node, {
 		* @param {String}              qualifiedName
 		* @param {tesla.xml.DocumentType} doctype
 		*/
-	constructor: function (namespaceURI, qualifiedName, doctype) {
+	constructor(namespaceURI?: string, qualifiedName?: string, doctype?: Node) {
+		super(<any>null);
+		this.ownerDocument = this;
 		// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR,WRONG_DOCUMENT_ERR
-		this.childNodes = new node.NodeList();
-		this.doctype = doctype;
-		if (doctype) {
-			this.appendChild(doctype);
+		this.doctype = doctype || null;
+		if (this.doctype) {
+			this.appendChild(this.doctype);
 		}
 		if (qualifiedName) {
-			var root = this.createElementNS(namespaceURI, qualifiedName);
+			var root = this.createElementNS(namespaceURI || '', qualifiedName);
 			this.appendChild(root);
 		}
-	},
-	
-	load: function (text) {
+	}
+
+	load(text: string) {
 		new parser.Parser().fragment(this, null, text);
-	},
-	
-	insertBefore: function (newChild, refChild) {//raises
-		if (newChild.nodeType == node.DOCUMENT_FRAGMENT_NODE) {
+	}
+
+	insertBefore(newChild: Node, refChild: Node) { //raises
+		if (newChild.nodeType == NODE_TYPE.DOCUMENT_FRAGMENT_NODE) {
 			var child = newChild.firstChild;
 			while (child) {
 				this.insertBefore(newChild, refChild);
@@ -113,145 +121,113 @@ var Document = util.class('Document', node.Node, {
 			}
 			return newChild;
 		}
-		if (this.documentElement === null && newChild.nodeType == 1)
-			this.documentElement = newChild;
+		if (this._documentElement === null && newChild.nodeType == NODE_TYPE.ELEMENT_NODE)
+			this._documentElement = <Element>newChild;
 		
 		Node_insertBefore.call(this, newChild, refChild);
-		newChild.ownerDocument = this;
 		return newChild;
-	},
+	}
 	
-	removeChild: function (oldChild) {
+	removeChild(oldChild: Node) {
 		if (this.documentElement == oldChild) {
-			this.documentElement = null;
+			this._documentElement = null;
 		}
-		return Node_removeChild.call(this, newChild, refChild);
-	},
+		return Node_removeChild.call(this, oldChild);
+	}
 	
 	// Introduced in DOM Level 2:
-	importNode: function (importedNode, deep) {
+	importNode(importedNode: Node, deep?: boolean) {
 		return importNode(this, importedNode, deep);
-	},
+	}
 	
 	// Introduced in DOM Level 2:
-	getElementById: function (id) {
+	getElementById(id: string) {
 		var rtv = null;
-		visitNode(this.documentElement, function (node) {
-			if (node.nodeType == 1) {
-				if (node.getAttribute('id') == id) {
+		visitNode(<Node>this.documentElement, function (node: Node) {
+			if (node.nodeType == NODE_TYPE.ELEMENT_NODE) {
+				if ((<Element>node).getAttribute('id') == id) {
 					rtv = node;
 					return false;
 				}
 				return true;
 			}
+			return false;
 		});
 		return rtv;
-	},
+	}
 	
-	getElementsByTagName: function (name) {
+	getElementsByTagName(name: string) {
 		var el = this.documentElement;
 		return el ? el.getElementsByTagName(name) : [];
-	},
+	}
 	
-	getElementsByTagNameNS: function (namespaceURI, localName) {
-		var el = this.documentElement;
+	getElementsByTagNameNS(namespaceURI: string, localName: string) {
+		var el = <Element>this.documentElement;
 		return el ? el.getElementsByTagNameNS(namespaceURI, localName) : [];
-	},
+	}
 	
 	//document factory method:
-	createElement: function (tagName) {
-		var r = new Element();
-		r.ownerDocument = this;
-		r.nodeName = tagName;
-		r.tagName = tagName;
-		r.childNodes = new node.NodeList();
-		var attrs = r.attributes = new NamedNodeMap();
-		attrs._ownerElement = r;
-		return r;
-	},
+	createElement(tagName: string) {
+		return new Element(this, tagName);
+	}
 	
-	createDocumentFragment: function () {
-		var r = new node.DocumentFragment();
-		r.ownerDocument = this;
-		r.childNodes = new node.NodeList();
-		return r;
-	},
+	createDocumentFragment() {
+		return new DocumentFragment(this);
+	}
 	
-	createTextNode: function (data) {
-		var r = new node.Text();
-		r.ownerDocument = this;
+	createTextNode(data: string) {
+		var r = new Text(this);
 		r.appendData(data);
 		return r;
-	},
+	}
 	
-	createComment: function (data) {
-		var r = new node.Comment();
-		r.ownerDocument = this;
+	createComment(data: string) {
+		var r = new Comment(this);
 		r.appendData(data);
 		return r;
-	},
+	}
 	
-	createCDATASection: function (data) {
-		var r = new node.CDATASection();
-		r.ownerDocument = this;
+	createCDATASection(data: string) {
+		var r = new CDATASection(this);
 		r.appendData(data);
 		return r;
-	},
+	}
 	
-	createProcessingInstruction: function (target, data) {
-		var r = new node.ProcessingInstruction();
-		r.ownerDocument = this;
-		r.target = target;
-		r.data = data;
-		return r;
-	},
+	createProcessingInstruction(target: string, data: string) {
+		return new ProcessingInstruction(this, target, data);
+	}
 	
-	createAttribute: function (name) {
-		var r = new node.Attr();
-		r.ownerDocument = this;
-		r.name = name;
-		r.nodeName = name;
-		r.specified = true;
-		return r;
-	},
+	createAttribute(name: string) {
+		return new Attribute(this, name, '', true);
+	}
 
-	createEntityReference: function (name) {
-		var r = new node.EntityReference();
-		r.ownerDocument = this;
+	createEntityReference(name: string) {
+		var r = new EntityReference(this);
 		r.nodeName = name;
 		return r;
-	},
+	}
 
 	// Introduced in DOM Level 2:
-	createElementNS: function (namespaceURI, qualifiedName) {
-		var r = new Element();
+	createElementNS(namespaceURI: string, qualifiedName: string) {
+		var el = new Element(this, qualifiedName);
 		var pl = qualifiedName.split(':');
-		var attrs = r.attributes = new NamedNodeMap();
-		r.childNodes = new node.NodeList();
-		r.ownerDocument = this;
-		r.nodeName = qualifiedName;
-		r.tagName = qualifiedName;
-		r.namespaceURI = namespaceURI;
-		if (r.length == 2) {
-			r.prefix = pl[0];
-			r.localName = pl[1];
+		el.namespaceURI = namespaceURI;
+		if (pl.length == 2) {
+			el.prefix = pl[0];
+			el.localName = pl[1];
 		} else {
-			//el.prefix = null;
-			r.localName = qualifiedName;
+			el.localName = qualifiedName;
 		}
-		attrs._ownerElement = r;
-		return r;
-	},
+		return el;
+	}
 
 	// Introduced in DOM Level 2:
-	createAttributeNS: function (namespaceURI, qualifiedName) {
-		var r = new node.Attr();
+	createAttributeNS(namespaceURI: string, qualifiedName: string) {
+		// var r = new node.Attribute(this);
+		var r = new Attribute(this, qualifiedName, '', true);
 		var pl = qualifiedName.split(':');
-		r.ownerDocument = this;
-		r.nodeName = qualifiedName;
-		r.name = qualifiedName;
 		r.namespaceURI = namespaceURI;
-		r.specified = true;
+
 		if (pl.length == 2) {
 			r.prefix = pl[0];
 			r.localName = pl[1];
@@ -260,36 +236,31 @@ var Document = util.class('Document', node.Node, {
 			r.localName = qualifiedName;
 		}
 		return r;
-	},
+	}
 
-	toJSON: function() {
-		var result = {};
-
-		var doc = this;
-		var first = doc.firstChild;
-
-		if (!first) return null;
-	
-		var ns = first.childNodes;
-	
+	toJSON() {
+		var first = this.firstChild;
+		if (!first)
+			return null;
+		var result: AnyObject<string> = {};
+		var ns = <NodeList>first.childNodes;
+		if (!ns)
+			return null
 		for (var i = 0; i < ns.length; i++) {
-			var node = ns.item(i);
-			if (node.nodeType === node.ELEMENT_NODE) {
+			var node = <Node>ns.item(i);
+			if (node.nodeType === NODE_TYPE.ELEMENT_NODE) {
+				var el = <Element>node;
 				if (node.lastChild) {
-					if (node.lastChild.nodeType == 4) { // cdata
-						result[node.tagName] = node.lastChild.data;
+					if (node.lastChild.nodeType == NODE_TYPE.CDATA_SECTION_NODE) { // cdata
+						result[el.tagName] = (<CDATASection>node.lastChild).data;
 					} else {
-						result[node.tagName] = node.innerXml;
+						result[el.tagName] = el.innerXml;
 					}
 				} else {
-					result[node.tagName] = '';
+					result[el.tagName] = '';
 				}
-				
 			}
 		}
-	
 		return result;
 	}
-});
-
-exports.Document = Document;
+}

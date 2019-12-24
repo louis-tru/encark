@@ -28,15 +28,17 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var node = require('./node');
-var LiveNodeList = require('./node').LiveNodeList;
-var parser = require('./parser');
+import {Node, NodeList, NODE_TYPE, LiveNodeList, Attribute} from './node';
+import * as doc from './document';
+import * as parser from './parser';
+import {NamedNodeMap} from './named_node_map';
 
-function visitNode(node, callback) {
+// NamedNodeMap
+
+export function visitNode(node: Node, callback: (node: Node)=>boolean): boolean {
 	if (!callback(node))
 		return false;
-	
+
 	var next = node.firstChild;
 	if (next) {
 		if (!visitNode(next, callback))
@@ -47,109 +49,118 @@ function visitNode(node, callback) {
 	return true;
 }
 
-var Element = util.class('Element', node.Node, {
+export class Element extends Node {
 
-	nodeType: node.ELEMENT_NODE,
-	
-	hasAttribute: function (name) {
+	readonly nodeType = NODE_TYPE.ELEMENT_NODE;
+	readonly childNodes = new NodeList();
+	readonly tagName: string;
+	readonly attributes: NamedNodeMap;
+
+	get nodeName() {
+		return this.tagName;
+	}
+
+	constructor(doc: doc.Document, tagName: string) {
+		super(doc);
+		this.attributes = new NamedNodeMap(this);
+		this.tagName = tagName;
+	}
+
+	hasAttribute(name: string) {
 		return this.getAttributeNode(name) != null;
-	},
+	}
 	
-	getAttribute: function (name) {
+	getAttribute(name: string) {
 		var attr = this.getAttributeNode(name);
 		return attr && attr.value || '';
-	},
+	}
 
-	setAttribute: function (name, value) {
+	setAttribute(name: string, value: string) {
 		var attr = this.ownerDocument.createAttribute(name);
 		attr.value = attr.nodeValue = value + '';
 		this.setAttributeNode(attr);
-	},
+	}
 
-	getAttributeNode: function (name) {
+	getAttributeNode(name: string) {
 		return this.attributes.getNamedItem(name);
-	},
+	}
 
-	setAttributeNode: function (newAttr) {
+	setAttributeNode(newAttr: Attribute) {
 		this.attributes.setNamedItem(newAttr);
-	},
+	}
 
-	removeAttributeNode: function (oldAttr) {
+	removeAttributeNode(oldAttr: string) {
 		this.attributes._removeItem(oldAttr);
-	},
+	}
 
-	removeAttribute: function (name) {
+	removeAttribute(name: string) {
 		var attr = this.getAttributeNode(name);
 		attr && this.removeAttributeNode(attr);
-	},
+	}
 
-	hasAttributeNS: function (namespaceURI, localName) {
+	hasAttributeNS(namespaceURI: string, localName: string) {
 		return this.getAttributeNodeNS(namespaceURI, localName) != null;
-	},
+	}
 
-	getAttributeNS: function (namespaceURI, localName) {
+	getAttributeNS(namespaceURI: string, localName: string) {
 		var attr = this.getAttributeNodeNS(namespaceURI, localName);
 		return attr && attr.value || '';
-	},
+	}
 
-	setAttributeNS: function (namespaceURI, qualifiedName, value) {
+	setAttributeNS(namespaceURI: string, qualifiedName: string, value: string) {
 		var attr = this.ownerDocument.createAttributeNS(namespaceURI, qualifiedName);
 		attr.value = attr.nodeValue = value + '';
 		this.setAttributeNode(attr);
-	},
+	}
 
-	getAttributeNodeNS: function (namespaceURI, localName) {
+	getAttributeNodeNS(namespaceURI: string, localName: string) {
 		return this.attributes.getNamedItemNS(namespaceURI, localName);
-	},
+	}
 
-	setAttributeNodeNS: function (newAttr) {
+	setAttributeNodeNS(newAttr: string) {
 		this.attributes.setNamedItemNS(newAttr);
-	},
+	}
 
-	removeAttributeNS: function (namespaceURI, localName) {
+	removeAttributeNS(namespaceURI: string, localName: string) {
 		var attr = this.getAttributeNodeNS(namespaceURI, localName);
 		attr && this.removeAttributeNode(attr);
-	},
+	}
 
-	getElementsByTagName: function (name) {
-		return new LiveNodeList(this, function (node) {
-			var ls = [];
+	getElementsByTagName(name: string) {
+		return new LiveNodeList(this, function (node: Node) {
+			var ls: Element[] = [];
 			visitNode(node, function (node) {
-				if (node.nodeType == node.ELEMENT_NODE && node.tagName == name)
-					ls.push(node);
+				if (node.nodeType == NODE_TYPE.ELEMENT_NODE && (<Element>node).tagName == name)
+					ls.push(<Element>node);
 				return true;
 			});
 			return ls;
 		});
-	},
+	}
 
-	getElementsByTagNameNS: function (namespaceURI, localName) {
-		return new LiveNodeList(this, function (node) {
-			var ls = [];
+	getElementsByTagNameNS(namespaceURI: string, localName: string) {
+		return new LiveNodeList(this, function (node: Node) {
+			var ls: Element[] = [];
 			visitNode(node, function (node) {
-				if (node.nodeType == node.ELEMENT_NODE && 
+				if (node.nodeType == NODE_TYPE.ELEMENT_NODE && 
 				node.namespaceURI == namespaceURI && 
 				node.localName == localName)
-					ls.push(node);
+					ls.push(<Element>node);
 				return true;
 			});
 			return ls;
 		});
-	},
+	}
 
 	get innerXml () {
 		return Array.toArray(this.childNodes).join('');
-	},
+	}
 
 	set innerXml (xml) {
-
 		this.removeAllChild();
 		if(xml){
 			new parser.Parser().fragment(this.ownerDocument, this, xml);
 		}
 	}
 
-});
-
-exports.Element = Element;
-exports.visitNode = visitNode;
+}
