@@ -87,7 +87,7 @@ function stringifyPrimitive(v: any) {
 	return '';
 }
 
-function querystringStringify(obj: any, sep: string = '&', eq: string = '=') {
+export function querystringStringify(obj: any, sep: string = '&', eq: string = '=') {
 	var encode = encodeURIComponent;
 
 	if (obj !== null && typeof obj === 'object') {
@@ -121,8 +121,7 @@ function querystringStringify(obj: any, sep: string = '&', eq: string = '=') {
 	return '';
 }
 
-function stringify_xml(obj: any) {
-
+export function stringifyXml(obj: any) {
 	var result = ['<xml>'];
 
 	for (var [k, v] of Object.entries(obj)) {
@@ -217,11 +216,13 @@ function requestWeb(
 
 	function parseResponseHeaders(str: string): AnyObject<string> {
 		var r: AnyObject<string> = {};
-		// TODO ...
+		for (var s of str.split(/\r?\n/)) {
+			var index = s.indexOf(':');
+			if (index != -1)
+				r[s.substr(0, index)] = s.substr( index + 1);
+		}
 		return r;
 	}
-
-	xhr.getAllResponseHeaders()
 
 	xhr.onload = async ()=>{
 		var data = xhr.response;
@@ -320,7 +321,7 @@ var _request_platform =
 /**
  * @class Signer
  */
-class Signer {
+export class Signer {
 	private m_options: any;
 	get options() {
 		return this.m_options;
@@ -334,7 +335,7 @@ class Signer {
 /**
  * @func request
  */
-function request(pathname: string, opts: Options): PromiseResult {
+export function request(pathname: string, opts: Options): PromiseResult {
 	var options = Object.assign({}, defaultOptions, opts);
 	var { params, method, headers = {}, signer } = options;
 
@@ -402,7 +403,7 @@ function request(pathname: string, opts: Options): PromiseResult {
 					if (typeof params == 'string') {
 						post_data = params;
 					} else {
-						post_data = stringify_xml(params);
+						post_data = stringifyXml(params);
 					}
 				}
 			} else {
@@ -422,7 +423,6 @@ function request(pathname: string, opts: Options): PromiseResult {
 		}
 
 		var timeout = Number( options.timeout || '' );
-
 		var send_options = {
 			hostname,
 			port,
@@ -450,7 +450,7 @@ class Cache {
 	private m_getscache: AnyObject<CacheValue> = {};
 
 	has(key: string) {
-		return name in this.m_getscache;
+		return key in this.m_getscache;
 	}
 
 	get(key: string) {
@@ -480,7 +480,7 @@ class Cache {
 
 }
 
-function parseJSON(json: string): any {
+export function parseJSON(json: string): any {
 	var res = JSON.parse(json, function(key, value) {
 		// 2019-05-09T00:00:00.000Z
 		if (typeof value == 'string' && value[10] == 'T' && value[23] == 'Z') {
@@ -490,7 +490,6 @@ function parseJSON(json: string): any {
 	});
 	return res;
 }
-
 
 /**
  * @class Request
@@ -624,11 +623,11 @@ export class Request {
 		}
 	}
 
-	post(name, params, options) {
+	post(name: string, params: AnyObject | null = null, options: Options = {}) {
 		return this.request(name, 'POST', params, options);
 	}
-	
-	call(name, params, options) {
+
+	call(name: string, params: AnyObject | null = null, options: Options = {}) {
 		if (params) {
 			return this.post(name, params, options);
 		} else {
@@ -640,15 +639,7 @@ export class Request {
 export default {
 
 	Signer: Signer,
-
 	Request: Request,
-
-	parseJSON: parseJSON,
-
-	/**
-	 * @func querystringStringify()
-	 */
-	querystringStringify: querystringStringify,
 
 	/**
 	 * @get userAgent
@@ -658,7 +649,7 @@ export default {
 	/**
 	 * @func setShared()
 	 */
-	setShared: function(req) {
+	setShared(req: Request) {
 		shared = req;
 	},
 
@@ -675,14 +666,14 @@ export default {
 	/**
 	 * @func get()
 	 */
-	get: function(url, options) {
+	get(url: string, options: Options = {}) {
 		return request(url, Object.assign({}, options, { method: 'GET' }));
 	},
 
 	/**
 	 * @func post()
 	 */
-	post: function(url, options) {
+	post(url: string, options: Options = {}) {
 		return request(url, Object.assign({}, options, { method: 'POST' }));
 	},
 
