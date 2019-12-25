@@ -282,3 +282,5 @@ exports.Mysql = util.class('Mysql', Database, {
 	},
 	
 });
+
+export default {}

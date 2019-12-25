@@ -322,3 +322,5 @@ exports.MAX_PACKET_SIZE = 0x01000000;
 	*/
 exports.CHAREST_NUMBER = constants.UTF8_UNICODE_CI;
 
+
+export default {}

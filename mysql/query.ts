@@ -229,3 +229,5 @@ exports = module.exports = {
 	FIELD_TYPE_STRING: 0xfe,
 	FIELD_TYPE_GEOMETRY: 0xff
 };
+
+export default {}

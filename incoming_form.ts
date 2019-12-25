@@ -35,12 +35,10 @@ import {StringDecoder} from 'string_decoder';
 import {WriteStream} from 'fs';
 import * as querystring from 'querystring';
 import * as crypto from 'crypto';
-import request from './request';
+import {parseJSON} from './request';
 var xml = require('./xml');
 import {StaticService} from './static_service';
 import * as http from 'http';
-
-const {parseJSON} = request;
 
 // var s = 0,
 export enum STATUS {

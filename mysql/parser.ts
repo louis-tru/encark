@@ -770,3 +770,5 @@ var Parser = util.class('Parser', {
 util.assign(exports, CONSTANTS);
 
 exports.Parser = Parser
+
+export default {}

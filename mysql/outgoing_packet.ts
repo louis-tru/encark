@@ -123,3 +123,5 @@ exports.OutgoingPacket = util.class('OutgoingPacket', {
 
 });
 
+
+export default {}

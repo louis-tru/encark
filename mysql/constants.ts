@@ -91,3 +91,5 @@ exports.COM_SET_OPTION = 0x1b;
 exports.COM_STMT_FETCH = 0x1c;
 
 Object.assign(exports, charsets, errors);
+
+export default {}

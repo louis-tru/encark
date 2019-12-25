@@ -47,7 +47,7 @@ function xor(a, b) {
 	return result;
 }
 
-module.exports = {
+export default {
 
 	sha1: sha1,
 

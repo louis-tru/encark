@@ -2436,3 +2436,5 @@ exports[3200] = 'ER_UDF_ERROR';
 exports[3201] = 'ER_KEYRING_MIGRATION_FAILURE';
 exports[3202] = 'ER_KEYRING_ACCESS_DENIED_ERROR';
 exports[3203] = 'ER_KEYRING_MIGRATION_STATUS';
+
+export default {}
