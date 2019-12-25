@@ -28,19 +28,17 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
+import utils from './util';
 import * as path from 'path';
 import Document, {
 	NODE_TYPE, Element, Node, Attribute, CDATASection
 } from './xml';
 import db, {Database} from './db';
 import * as fs from './fs';
-// import { type } from 'os';
+import {Model,Collection, FetchOptions, ModelBasic, ID} from './model';
 var {Mysql} = require('./mysql');
 // var memcached = require('./memcached');
 var memcached: any = {};
-
-const {Model,Collection} = require('./model');
 
 const local_cache: Any = {};
 const original_handles: Any<_MethodInfo> = {};
@@ -77,55 +75,56 @@ export const DEFAULT_CONFIG: Config = {
 
 export interface Options {
 	where?: string;
+	cacheTime?: number;
 }
 
-interface _Params {
+export interface QueryParams {
 	limit?: number | number[];
 	group?: string | string[] | Any<string>;
 	order?: string | string[] | Any<string>;
 	[prop: string]: any;
 };
 
-interface INLParams extends _Params {
+export type FetchParams = [
+	string, // table name
+	QueryParams?, // params
+	FetchOptions?, // options
+];
+
+export type FetchParamsMix = FetchOptions | string;
+
+interface INLParams extends QueryParams {
 	group_str?: string;
 	order_str?: string;
 }
 
-export interface AfterFetchOptions extends Options {
-	key?: string,
-	table?: string,
-	method?:'select',
-}
-
-export type AfterFetchParams = [
-	string, // table name
-	_Params?, // params
-	AfterFetchOptions?, // options
-];
-export type AfterFetchParamsMix = AfterFetchParams | string;
-
-export interface Params extends _Params {
-	afterFetch?: AfterFetchParamsMix[];
+export interface Params extends QueryParams {
+	afterFetch?: FetchParamsMix[];
 	fetchTotal?: boolean;
 	onlyFetchTotal?: boolean;
 }
 
-export type Result = Promise<any>;
+export interface Result {
+	rows?: Any[];
+	fields?: Any;
+	affectedRows: number;
+	insertId: ID;
+}
 
-export interface DataAccess {
+export interface DataSource {
 	map: SqlMap;
 	readonly dao: DataAccessObject;
 	primaryKey(table: string): string;
-	get(name: string, param?: Params, opts?: Options): Result;
-	gets(name: string, param?: Params, opts?: Options): Result;
-	post(name: string, param?: Params, opts?: Options): Result;
-	query(name: string, param?: Params, opts?: Options): Result;
+	get(name: string, param?: Params, opts?: Options): Promise<Model | null>;
+	gets(name: string, param?: Params, opts?: Options): Promise<Collection>;
+	post(name: string, param?: Params, opts?: Options): Promise<Result>;
+	exec(name: string, param?: Params, opts?: Options): Promise<Result[]>;
 }
 
 export interface DataAccessMethod {
-	(param?: Params, options?: Options): Result;
-	query(param?: Params, options?: Options): Result;
-	get(param?: Params, options?: Options): Result;
+	<T = Collection | Result>(param?: Params, options?: Options): Promise<T>;
+	exec(param?: Params, options?: Options): Promise<Result[]>;
+	get(param?: Params, options?: Options): Promise<Model | null>;
 }
 
 type MethodType = string;
@@ -138,20 +137,20 @@ interface TablesInfo {
 	[table: string]: MethodsInfo;
 }
 
-class DataAccessShortcuts extends Proxy<Any<DataAccessMethod>> {
-	constructor(access: DataAccess, table: string, info: MethodsInfo) { // handles
+export class DataAccessShortcuts extends Proxy<Any<DataAccessMethod>> {
+	constructor(ds: DataSource, table: string, info: MethodsInfo) { // handles
 		var target: Any<DataAccessMethod> = {};
 		super(target, {
 			get(target: Any<DataAccessMethod>, methodName: string, receiver: any): any {
 				var method: DataAccessMethod = target[methodName];
 				if (!method) {
 					var type = info[methodName];
-					util.assert(type, `Dao table method not defined, ${table}.${methodName}`);
+					utils.assert(type, `Dao table method not defined, ${table}.${methodName}`);
 					var fullname = table + '/' + methodName;
-					method = <any>((param?: Params, options?: Options)=>(<any>access)[type](fullname, param, options));
-					method.query = (param?: Params, options?: Options)=>access.query(fullname, param, options);
+					method = <any>((param?: Params, options?: Options)=>(<any>ds)[type](fullname, param, options));
+					method.exec = (param?: Params, options?: Options)=>ds.exec(fullname, param, options);
 					if (type == 'gets') {
-						method.get = (param?: Params, options?: Options)=>access.get(fullname, param, options);
+						method.get = (param?: Params, options?: Options)=>ds.get(fullname, param, options);
 					}
 					target[methodName] = method;
 				}
@@ -162,16 +161,16 @@ class DataAccessShortcuts extends Proxy<Any<DataAccessMethod>> {
 	[method: string]: DataAccessMethod;
 }
 
-class DataAccessObject extends Proxy<Any<DataAccessShortcuts>> {
-	constructor(access: DataAccess, info: TablesInfo) {
+export class DataAccessObject extends Proxy<Any<DataAccessShortcuts>> {
+	constructor(ds: DataSource, info: TablesInfo) {
 		var target: Any<DataAccessShortcuts> = {};
 		super(target, {
 			get(target: Any<DataAccessShortcuts>, tableName: string, receiver: any): any {
 				var shortcuts = target[tableName];
 				if (!shortcuts) {
 					var methodsInfo = info[tableName];
-					util.assert(methodsInfo, `Dao table not defined, ${tableName}`);
-					target[tableName] = new DataAccessShortcuts(access, name, methodsInfo);
+					utils.assert(methodsInfo, `Dao table not defined, ${tableName}`);
+					target[tableName] = new DataAccessShortcuts(ds, name, methodsInfo);
 				}
 				return shortcuts;
 			}
@@ -184,7 +183,7 @@ class DataAccessObject extends Proxy<Any<DataAccessShortcuts>> {
  * @createTime 2012-01-18
  * @author xuewen.chu <louis.tru@gmail.com>
  */
-class Transaction implements DataAccess {
+class Transaction implements DataSource {
 	private m_on: boolean;
 	readonly map: SqlMap;
 	readonly db: Database;
@@ -224,10 +223,10 @@ class Transaction implements DataAccess {
 	}
 
 	/**
-	 * @func query(name, param, cb)
+	 * @func exec(name, param, cb)
 	 */
-	query(name: string, param?: Params, opts?: Options) {
-		return funcs.query(this.map, this.db, this.m_on, name, param, opts);
+	exec(name: string, param?: Params, opts?: Options) {
+		return funcs.exec(this.map, this.db, this.m_on, name, param, opts);
 	}
 
 	/**
@@ -269,6 +268,7 @@ interface _MethodInfo extends _El {
 	is_select: boolean;
 	table: string;
 	sql: string;
+	cacheTime: number;
 }
 
 interface AbstractSql {
@@ -352,7 +352,7 @@ function read_original_mapinfo(self: SqlMap, original_path: string, table: strin
 
 function get_original_mapinfo(self: SqlMap, name: string) {
 	var info = <_MethodInfo>(<any>self).m_original_mapinfo[name];
-	if (info && !util.dev) {
+	if (info && !utils.dev) {
 		return info;
 	}
 
@@ -361,7 +361,7 @@ function get_original_mapinfo(self: SqlMap, name: string) {
 	var original_path = path.resolve(self.original, table_name);
 
 	if (original_path in original_files) {
-		if (util.dev) {
+		if (utils.dev) {
 			if (fs.statSync(original_path + '.xml').mtime != original_files[original_path]) {
 				read_original_mapinfo(self, original_path, table_name);
 			}
@@ -389,19 +389,19 @@ function get_db(self: SqlMap): Database {
 		default:
 			break;
 	}
-	util.assert(db_class, 'Not supporting database, {0}', self.type);
+	utils.assert(db_class, 'Not supporting database, {0}', self.type);
 	return new db_class(self.config);
 }
 
 // exec script
-function exec(self: SqlMap, exp: string, param: INLParams) {
-	return util._eval(`(function (ctx){with(ctx){return(${exp})}})`)(param);
+function execExp(self: SqlMap, exp: string, param: INLParams) {
+	return utils._eval(`(function (g, ctx){with(ctx){return(${exp})}})`)(globalThis, param);
 }
 
 //format sql
 function format_sql(self: SqlMap, sql: string, param: INLParams) {
 	return sql.replace(REG, function (all, exp) {
-		return db.escape(exec(self, exp, param));
+		return db.escape(execExp(self, exp, param));
 	});
 }
 
@@ -437,7 +437,7 @@ function parse_if_sql(self: SqlMap, el: _El, param: INLParams,
 	}
 
 	if (exp) {
-		if (!exec(self, exp, param)) {
+		if (!execExp(self, exp, param)) {
 			return null;
 		}
 	} else if (name) {
@@ -454,7 +454,7 @@ function parse_if_sql(self: SqlMap, el: _El, param: INLParams,
 	if (el.child.length) {
 		parse_sql_ls(self, el.child, param, options, asql, is_select, is_total);
 	} else { // name 
-		util.assert(name, 'name prop cannot be empty')
+		utils.assert(name, 'name prop cannot be empty')
 		var val = param[<string>name];
 		if (Array.isArray(val)) {
 			asql.sql.push(` ${name} in (${val.map(e=>db.escape(e)).join(',')}) `);
@@ -562,7 +562,7 @@ function parse_sql_ls(self: SqlMap, ls: _Child[], param: INLParams,
 }
 
 // parse sql str
-function parseSql(self: SqlMap, name: string, param: _Params, options: Options, is_total?: boolean) {
+function parseSql(self: SqlMap, name: string, param: QueryParams, options: Options, is_total?: boolean) {
 	var map = get_original_mapinfo(self, name);
 	var asql: AbstractSql = { sql: [], out: [], group: [], order: [], limit: [] };
 
@@ -656,6 +656,7 @@ function parseSql(self: SqlMap, name: string, param: _Params, options: Options, 
 
 	var sql = asql.sql.join('');
 	map.sql = r ? String.format('{0} {1}', r.prepend || '', sql) : '';
+	map.cacheTime = Number(options.cacheTime || map.props.cacheTime);
 
 	return map;
 }
@@ -688,19 +689,19 @@ function setCache(self: SqlMap, key: string, data: any, timeout: number) {
 	}
 }
 
-interface QueryCallback {
-	(err: Error, data: any, table: string): any;
+interface ExecCallback {
+	(err: Error | null, data: Result[], table?: string): any;
 }
 
-//query
-function query(
+// exec query
+function exec(
 	self: SqlMap, 
 	db: Database, 
 	is_transaction: boolean, 
 	type: string, 
 	name: string, 
-	cb: QueryCallback, 
-	param: _Params, 
+	cb: ExecCallback, 
+	param: QueryParams, 
 	options?: Options, is_total?: boolean
 ) {
 
@@ -713,34 +714,33 @@ function query(
 		param = { ...param };
 	}
 
-	param = Object.assign(Object.create(global), param);
-	param = new Proxy(param, {
-		get:(target, name)=>target[name],
-		has:()=>true,
-	});
+	// param = new Proxy(param, {
+	// 	get: (target: QueryParams, name: string)=>target[name],
+	// 	has:()=>true,
+	// });
 
 	try {
-		var map = Object.assign(parseSql(self, name, param, options || {}, is_total), options);
-		var cacheTime = parseInt(map.cacheTime) || 0;
-		var sql = map.sql, key;
+		var map = parseSql(self, name, param, options || {}, is_total);
+		var cacheTime = map.cacheTime;
+		var sql = map.sql, key: string;
 		var table = map.table
 
-		if (util.dev) {
+		if (utils.dev) {
 			console.log(sql);
 		}
 
-		function handle(err, data) {
+		function handle(err: Error, data: any[]) {
 			if (!is_transaction) {
 				db.close(); // Non transaction, shut down immediately after the query
 			}
 			if (err) {
-				cb(err);
+				cb(err, []);
 			} else {
-				data = data.map(e=>{
+				var result: Result[] = data.map(e=>{
 					if (e.rows) {
-						return { rows: e.rows, fields: Object.keys(e.fields) };
+						return  { affectedRows: 0, insertId: 0, rows: e.rows, fields: Object.keys(e.fields) };
 					} else {
-						return e;
+						return { affectedRows: 0, insertId: 0, ...e };
 					}
 				});
 				if (type == 'get') {
@@ -758,16 +758,14 @@ function query(
 
 		if (type == 'get') { // use cache
 			if (cacheTime > 0) {
-				key = util.hash('get:' + sql);
+				key = utils.hash('get:' + sql);
 				if (self.memcached) {
-					memcached.shared.get(key, function(err, data) {
+					memcached.shared.get(key, function(err?: Error, data?: any[]) {
 						if (err) {
-							console.err(err);
-						}
-						if (data) {
-							cb(err, data, table);
-						} else {
+							console.error(err);
 							db.query(sql, handle);
+						} else {
+							cb(err || null, data || [], table);
 						}
 					});
 				} else {
@@ -790,58 +788,57 @@ function query(
 				db.close();
 			}
 		}
-		cb(err);
+		cb(err, []);
 	}
 }
 
-async function execAfterFetch(self: SqlMap, model: any, afterFetch?: AfterFetchParamsMix[]) {
+async function execAfterFetch(self: SqlMap, model: ModelBasic, afterFetch?: FetchParamsMix[]) {
 	if (afterFetch) {
 		for (var i of afterFetch) {
-			var args: AfterFetchParams = <AfterFetchParams>i;
+			var args: FetchParams = <FetchParams>i;
 			if (!Array.isArray(i)) {
-				args = [i];
+				args = [<string>i];
 			}
 			var [table, ..._args] = args;
 			if (table[0] == '@') {
 				await model.fetchChild(table.substr(1), ..._args);
 			} else {
-				await model.fetch(table, ...args);
+				await model.fetch(table, ..._args);
 			}
 		}
 	}
-	return model;
 }
 
 const funcs = {
 
-	get: async function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options) {
+	get: async function<T = Any>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Model<T> | null> {
 		var { afterFetch, fetchTotal, onlyFetchTotal, ..._param } = <Params>(param || {});
 
-		var model = await new Promise((resolve, reject)=> {
-			query(self, db, is_t, 'get', name, function(err, data, table) {
+		var model = await new Promise((resolve: (r: Model<T> | null)=>void, reject)=>{
+			exec(self, db, is_t, 'get', name, function(err, data, table) {
 				if (err) {
 					reject(err);
 				} else {
 					var [{rows}] = data;
 					var value = rows ? (rows[0]||null) : null;
-					resolve( value ? new Model(value, {dao: self.dao,table}): null );
+					resolve( value ? new Model<T>(value, {dataSource: self, table }): null );
 				}
 			}, _param, opts);
 		});
 
 		if (model) {
-			return await execAfterFetch(self, model, afterFetch);
-		} else {
-			return model;
+			await execAfterFetch(self, model, afterFetch);
 		}
+		return model;
 	},
 
-	gets: async function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options) {
+	gets: async function<T = Any>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Collection<T>> {
 		var {afterFetch, fetchTotal, onlyFetchTotal, ..._param} = param || {};
+		var total, table;
 
 		if (fetchTotal || onlyFetchTotal) {
-			var table, total = await new Promise((resolve, reject)=> {
-				query(self, db, is_t, 'get', name, function(err, data, t) {
+			total = await new Promise((resolve: (r: number)=>void, reject)=> {
+				exec(self, db, is_t, 'get', name, function(err, data, t) {
 					if (err) {
 						reject(err);
 					} else {
@@ -854,57 +851,55 @@ const funcs = {
 			});
 
 			if (!total || onlyFetchTotal) {
-				return Object.assign(new Collection([], {dao: self.dao, table}), { total });
+				return Object.assign(new Collection<T>([], {dataSource: self, table}), { total });
 			}
 		}
 
-		var model = await new Promise((resolve, reject)=> {
-			query(self, db, is_t, 'gets', name, function(err, data, table) {
+		var col = await new Promise((resolve: (r: Collection<T>)=>void, reject)=> {
+			exec(self, db, is_t, 'gets', name, function(err, data, table) {
 				if (err) {
 					reject(err);
 				} else {
 					var [{rows=[]}] = data;
-					var dao = self.dao;
-					var value = rows.map((e)=>new Model(e,{dao,table}));
-					resolve( new Collection(value, {dao,table}) );
+					var value = rows.map((e)=>new Model<T>(<T>e, { dataSource: self, table }));
+					resolve( new Collection<T>(value, {dataSource: self, table }) );
 				}
 			}, _param, opts);
 		});
 
 		if (Array.isArray(_param.limit) && _param.limit.length > 1) {
-			model.index = Number(_param.limit[0]) || 0;
+			col.index = Number(_param.limit[0]) || 0;
 		}
 
 		if (total) {
-			model.total = total;
+			col.total = total;
 		}
 
-		if (model.length) {
-			return await execAfterFetch(self, model, afterFetch);
-		} else {
-			return model;
+		if (col.length) {
+			await execAfterFetch(self, col, afterFetch);
 		}
+		return col;
 	},
 
-	post: function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options) {
+	post: function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Result> {
 		var {afterFetch, fetchTotal, onlyFetchTotal, ..._param} = param || {};
 
-		return new Promise((resolve, reject)=> {
-			query(self, db, is_t, 'post', name, function(err, data) {
+		return new Promise((resolve: (r: Result)=>void, reject)=> {
+			exec(self, db, is_t, 'post', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
-					resolve(data[0]);
+					resolve((<Result[]>data)[0]);
 				}
 			}, _param, opts);
 		});
 	},
 
-	query: function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options) {
+	exec: function(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Result[]> {
 		var {afterFetch, fetchTotal, onlyFetchTotal, ..._param} = param || {};
 
-		return new Promise((resolve, reject)=> {
-			query(self, db, is_t, 'query', name, function(err, data) {
+		return new Promise((resolve: (r: Result[])=>void, reject)=> {
+			exec(self, db, is_t, 'query', name, function(err, data) {
 				if (err) {
 					reject(err);
 				} else {
@@ -916,7 +911,7 @@ const funcs = {
 
 };
 
-export class SqlMap implements DataAccess {
+export class SqlMap implements DataSource {
 
 	private m_original_mapinfo: Any<_MethodInfo> = {};
 	private m_tables: Any = {};
@@ -951,7 +946,7 @@ export class SqlMap implements DataAccess {
 	 */ 
 	constructor(conf?: Config) {
 		this.config = Object.assign({}, DEFAULT_CONFIG, conf);
-		this.config.db = Object.assign({}, this.config.db, conf?.db);
+		this.config.db = Object.assign({}, DEFAULT_CONFIG.db, conf?.db);
 		this.tablesInfo = {};
 
 		fs.readdirSync(this.original).forEach(e=>{
@@ -961,7 +956,7 @@ export class SqlMap implements DataAccess {
 				var {attrs,infos} = read_original_mapinfo(this, this.original + '/' + table, table);
 				var methods: MethodsInfo = {};
 
-				for (let [method,{type}] of Object.entries(infos)) {
+				for (let [method,{props: {type}}] of Object.entries(infos)) {
 					type = type || method.indexOf('select') >= 0 ? 'get': 'post';
 					type = type == 'get' ? 'gets': 'post';
 					methods[method] = type;
@@ -1002,16 +997,16 @@ export class SqlMap implements DataAccess {
 	/**
 	 * @func query(name, param, cb)
 	 */
-	query(name: string, param?: Params, opts?: Options) {
-		return funcs.query(this, get_db(this), false, name, param, opts);
+	exec(name: string, param?: Params, opts?: Options) {
+		return funcs.exec(this, get_db(this), false, name, param, opts);
 	}
 
 	/**
 		* start transaction
 		* @return {Transaction}
 		*/
-	transaction<R>(cb: (da: DataAccess, dao: DataAccessObject)=>Promise<R>): Promise<R> {
-		util.assert(cb);
+	transaction<R>(cb: (ds: DataSource, dao: DataAccessObject)=>Promise<R>): Promise<R> {
+		utils.assert(cb);
 		var tr = new Transaction(this);
 		return cb(tr, tr.dao).then((e: R)=>{
 			tr.commit();

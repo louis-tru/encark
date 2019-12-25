@@ -33,7 +33,7 @@ import {ReadCookie, Cookie} from './cookie';
 import {Service} from './service';
 
 var   HttpService: any;
-const SESSIONS: AnyObject = {};
+const SESSIONS: Any = {};
 const SESSION_TOKEN_NAME = '__SESSION_TOKEN';
 
 function deleteSession(token: number) {

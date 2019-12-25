@@ -31,7 +31,7 @@
 import _keys from './_keys' ;
 import _util from './_util' ;
 
-export type Optopns = AnyObject;
+export type Optopns = Any;
 
 const {haveNode, haveNgui, haveWeb} = _util;
 const PREFIX = 'file:///';

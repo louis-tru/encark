@@ -37,7 +37,7 @@ import * as vm from 'vm';
 import template, {Options} from './template';
 
 var FILE_CACHE_TIMEOUT = util.dev ? 0 : 1000 * 60 * 10; // 10分钟
-var FILE_CACHES: AnyObject = {};
+var FILE_CACHES: Any = {};
 var _require = require;
 
 function makeRequireFunction(mod: Module) {
@@ -115,7 +115,7 @@ function requireEjs(filename: string, options: Options, __mainfilename: string) 
  */
 export class ViewController extends HttpService {
 
-	view(name: string, data?: AnyObject) {
+	view(name: string, data?: Any) {
 		var dirname = util.config.viewDirname;
 		if (!dirname) {
 			var mainModule = process.mainModule;

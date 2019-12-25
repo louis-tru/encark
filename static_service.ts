@@ -34,9 +34,9 @@ import service, {Service} from './service';
 import * as http from 'http';
 import * as zlib from 'zlib';
 
-var g_static_cache: AnyObject = {};
+var g_static_cache: Any = {};
 
-type RouterInfo = AnyObject;
+type RouterInfo = Any;
 
 //set util
 function setHeader(self: StaticService, expires?: number) {

@@ -32,7 +32,7 @@ var Hybi = require('./conv').Hybi;
 import * as querystring from 'querystring';
 import * as http from 'http';
 
-const protocol_versions: AnyObject = {
+const protocol_versions: Any = {
 	'7': Hybi,
 	'8': Hybi,
 	'9': Hybi,

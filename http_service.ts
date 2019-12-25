@@ -98,7 +98,7 @@ export class HttpService extends StaticService {
 	 * post form data
 	 * @type {Object}
 	 */
-	readonly data: AnyObject;
+	readonly data: Any;
 
 	/**
 	 * @constructor

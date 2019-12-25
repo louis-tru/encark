@@ -57,10 +57,10 @@ var shared: any = null;
 var __id = 1;
 
 export interface Options {
-	params?: AnyObject | null;
+	params?: Any | null;
 	method?: string,
 	timeout?: number;
-	headers?: AnyObject<string>;
+	headers?: Any<string>;
 	dataType?: string,
 	signer?: Signer;
 	urlencoded?: boolean;
@@ -141,19 +141,19 @@ export function stringifyXml(obj: any) {
 
 export interface Result {
 	data: any,
-	headers: AnyObject<string>,
+	headers: Any<string>,
 	statusCode: number,
 	httpVersion: string,
-	requestHeaders: AnyObject<string>,
-	requestData: AnyObject,
+	requestHeaders: Any<string>,
+	requestData: Any,
 }
 
 class PromiseResult extends Promise<Result> {}
 
 // Ngui implementation
 function requestNgui(
-	options: AnyObject,
-	soptions: AnyObject, 
+	options: Any,
+	soptions: Any, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -188,8 +188,8 @@ function requestNgui(
 }
 
 function requestWeb(
-	options: AnyObject,
-	soptions: AnyObject, 
+	options: Any,
+	soptions: Any, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -214,8 +214,8 @@ function requestWeb(
 		xhr.setRequestHeader(key, soptions.headers[key]);
 	}
 
-	function parseResponseHeaders(str: string): AnyObject<string> {
-		var r: AnyObject<string> = {};
+	function parseResponseHeaders(str: string): Any<string> {
+		var r: Any<string> = {};
 		for (var s of str.split(/\r?\n/)) {
 			var index = s.indexOf(':');
 			if (index != -1)
@@ -253,8 +253,8 @@ function requestWeb(
 }
 
 // Node implementation
-function requestNode(	options: AnyObject,
-	soptions: AnyObject, 
+function requestNode(	options: Any,
+	soptions: Any, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -366,7 +366,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		var raw_path = uri.path;
 		var path = raw_path;
 
-		var headers: AnyObject<string> = {
+		var headers: Any<string> = {
 			'User-Agent': <string>options.userAgent,
 			'Accept': 'application/json',
 		};
@@ -447,7 +447,7 @@ interface CacheValue {
  * @class Cache
  */
 class Cache {
-	private m_getscache: AnyObject<CacheValue> = {};
+	private m_getscache: Any<CacheValue> = {};
 
 	has(key: string) {
 		return key in this.m_getscache;
@@ -497,15 +497,15 @@ export function parseJSON(json: string): any {
 export class Request {
 	private m_user_agent: string;
 	private m_server_url: string;
-	private m_mock: AnyObject;
-	private m_mock_switch: AnyObject | null;
+	private m_mock: Any;
+	private m_mock_switch: Any | null;
 	private m_data_type: string = 'urlencoded';
 	private m_enable_strict_response_data: boolean = true;
 	private m_cache = new Cache();
 	private m_timeout = defaultOptions.timeout;
 	private m_signer: Signer | null = null;
 
-	constructor(serverURL: string, mock?: AnyObject, mockSwitch?: AnyObject) {
+	constructor(serverURL: string, mock?: Any, mockSwitch?: Any) {
 		this.m_user_agent = user_agent;
 		this.m_server_url = serverURL || utils.config.web_service;
 		this.m_mock = mock || {};
@@ -569,7 +569,7 @@ export class Request {
 		}
 	}
 
-	async request(name: string, method: string = 'GET', params: AnyObject | null = null, options: Options = {}) {
+	async request(name: string, method: string = 'GET', params: Any | null = null, options: Options = {}) {
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
 			return { data: Object.create(this.m_mock[name]) };
 		} else {
@@ -603,7 +603,7 @@ export class Request {
 		}
 	}
 
-	async get(name: string, params: AnyObject | null = null, options: Options = {}) {
+	async get(name: string, params: Any | null = null, options: Options = {}) {
 		var { cacheTime } = options || {};
 		var key = Cache.hash({ name: name, params: params });
 		var cache = this.m_cache.get(key);
@@ -623,11 +623,11 @@ export class Request {
 		}
 	}
 
-	post(name: string, params: AnyObject | null = null, options: Options = {}) {
+	post(name: string, params: Any | null = null, options: Options = {}) {
 		return this.request(name, 'POST', params, options);
 	}
 
-	call(name: string, params: AnyObject | null = null, options: Options = {}) {
+	call(name: string, params: Any | null = null, options: Options = {}) {
 		if (params) {
 			return this.post(name, params, options);
 		} else {

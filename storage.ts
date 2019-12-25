@@ -96,7 +96,7 @@ class Storage {
 	private m_path: string;
 	private m_prefix: string = '';
 	private m_change: boolean = false;
-	private m_value: AnyObject = {};
+	private m_value: Any = {};
 	private m_sync: any;
 
 	constructor(path = url.cwd() + '/' + '.storage') {

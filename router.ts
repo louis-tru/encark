@@ -31,7 +31,7 @@
 interface InlRule {
 	match: RegExp;
 	keys: string[];
-	defaultValue: AnyObject<string>;
+	defaultValue: Any<string>;
 }
 
 export interface Rule {
@@ -79,7 +79,7 @@ export class Router  {
 
 		for (var define of defines) {
 			var keys: string[] = [];
-			var defaultValue: AnyObject<string> = {};
+			var defaultValue: Any<string> = {};
 
 			// 创建表达式字符串
 			// 替换{name}关键字表达式并且转义表达式中的特殊字符

@@ -47,7 +47,7 @@ interface ClientCookie {
 	 * @return {Object} 返回cookie值
 	 * @static
 	 */
-	getAll(): AnyObject;
+	getAll(): Any;
 
 	/**
 	 * 设置cookie值
@@ -92,12 +92,12 @@ if (haveWeb)
 ImplCookie = class implements ClientCookie {
 
 	get(name: string) {
-		var i = document.cookie.match(new RegExp('(?:^|;\\s*){0}=([^;]+)(;|$)'.format(name)));
+		var i = document.cookie.match(new RegExp(String.format('(?:^|;\\s*){0}=([^;]+)(;|$)', name)));
 		return i && decodeURIComponent(i[1]);
 	}
 
 	getAll() {
-		var cookie: AnyObject = {};
+		var cookie: Any = {};
 		for (var item of document.cookie.split(';')) {
 			if (item) {
 				var sp = item.split('=');

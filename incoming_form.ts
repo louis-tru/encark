@@ -91,7 +91,7 @@ class QuerystringParser implements Parser {
 	private buffers: Buffer[] = [];
 
 	onField: (field: string, value: any)=>void = ()=>{};
-	onEnd: (data: AnyObject)=>void = ()=>{};
+	onEnd: (data: Any)=>void = ()=>{};
 
 	/**
 	 * constructor function
@@ -213,11 +213,11 @@ class MultipartParser implements Parser {
 
 	private boundary: Buffer;
 	private lookbehind: Buffer;
-	private boundaryChars: AnyObject = {};
+	private boundaryChars: Any = {};
 	private state: number = S.PARSER_UNINITIALIZED;
 	private flags: number = 0;
 	private index = 0;
-	private _mark: AnyObject<number> = {};
+	private _mark: Any<number> = {};
 
 	constructor(boundary: string) {
 		this.state = S.PARSER_UNINITIALIZED;
@@ -477,7 +477,7 @@ class MultipartParser implements Parser {
 }
 
 class Part {
-	headers: AnyObject<string> = {}
+	headers: Any<string> = {}
 	name = ''
 	filename = ''
 	mime = ''
@@ -561,8 +561,8 @@ export class IncomingForm {
 	 */
 	isUpload = false;
 
-	readonly fields: AnyObject = {};
-	readonly files: AnyObject<File[]> = {};
+	readonly fields: Any = {};
+	readonly files: Any<File[]> = {};
 	
 	keepExtensions = false;
 	uploadDir = '';

@@ -49,7 +49,7 @@ export interface Options {
 	// * @param {string} [options.variable='obj']
 	escape?: RegExp;
 	evaluate?: RegExp;
-	imports?: AnyObject;
+	imports?: Any;
 	interpolate?: RegExp,
 	sourceURL?: string;
 	variable?: string;
@@ -120,7 +120,7 @@ class Lodash {
 const lodash = new Lodash();
 
 /** Used to escape characters for inclusion in compiled string literals. */
-var stringEscapes: AnyObject<string> = {
+var stringEscapes: Any<string> = {
 	'\\': '\\',
 	"'": "'",
 	'\n': 'n',
@@ -169,7 +169,7 @@ function isObject(value: any) {
  * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
  *  else `false`.
  */
-function isIterateeCall(value: string, index: any, object: AnyObject): boolean {
+function isIterateeCall(value: string, index: any, object: Any): boolean {
 	if (isObject(object)) {
 		return object[index] === value;
 	}

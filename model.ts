@@ -28,14 +28,51 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
+import utils from './util';
+import * as sql from './sql_map';
+
+function pkeyValue(self: ModelBasic, keyPath: string[]): string {
+	var m: any = self;
+	for (var key of keyPath) {
+		// TODO private visit
+		m = m.m_value[key];
+		if (!m)
+			return m;
+	}
+	return m;
+}
+
+function primaryKey(mkey: string) {
+	var [key,key2] = mkey.split('=');
+	var fetchKeyPath = (key2 || key).split('.');
+	return {
+		pkeyName: key2 ? key: fetchKeyPath.indexReverse(0),
+		fetchKeyPath,
+	};
+}
+
+export interface Options {
+	dataSource?: sql.DataSource;
+	table?: string;
+}
+
+export interface FetchOptions extends sql.Options {
+	key?: string,
+	table?: string,
+	method?: string,
+}
 
 /**
  * @class ModelBasic
  */
-class ModelBasic {
+export abstract class ModelBasic {
 
-	get value() {
+	protected m_value: any;
+	protected m_ds: sql.DataSource | null;
+	protected m_table: string;
+	protected m_parent: ModelBasic | null = null;
+
+	get baseValue() {
 		return this.m_value;
 	}
 
@@ -47,93 +84,90 @@ class ModelBasic {
 		return this.m_parent;
 	}
 
-	constructor(value = null, {dao,table,parent} = {}) {
+	constructor(value: any = null, opts: Options = {}) {
 		this.m_value = value;
-		this.m_dao = dao;
-		this.m_table = table;
-		this.m_parent = parent||null;
+		this.m_ds = opts.dataSource || null;
+		this.m_table = opts.table || '';
 	}
 
 	toJSON() {
 		return this.m_value;
 	}
 
-	fetch() {}
-	child() {}
+	abstract fetch(name: string, param?: sql.QueryParams, options?: FetchOptions): Promise<this>;
+	abstract fetchChild(name: string, param?: sql.QueryParams, options?: FetchOptions): Promise<this>;
 
-}
-
-function value(self: Model, keys) {
-	var r = self;
-	for (var key of keys) {
-		r = r.m_value[key];
-		if (!r) return r;
-	}
-	return r;
-}
-
-function parseKeys(mkey) {
-	var [key,key2] = mkey.split(',');
-	var keys = key.split('.');
-	return [
-		key2||keys.last(0), keys,
-	];
 }
 
 /**
  * @class Model
  */
-export class Model extends ModelBasic {
+export class Model<T = Any> extends ModelBasic {
 
-	async fetch(name, param, { key, table, method='select', ...opts } = {}) {
-		table = table || name;
-		var dao = this.m_dao;
-		var [k,keys] = parseKeys(key || dao.$.primaryKey(table));
-		var model = await dao[table][method].get({ [k]: value(this,keys), ...param}, opts);
+	get value(): T {
+		return <T>this.m_value;
+	}
+
+	async fetch(name: string, param?: sql.QueryParams, { key, table, method='select', ...opts }: FetchOptions = {}) {
+		var _table = table || name;
+		var ds = <sql.DataSource>this.m_ds;
+		utils.assert(ds);
+		var {pkeyName,fetchKeyPath} = primaryKey(key || ds.primaryKey(_table));
+		var model = await ds.dao[_table][method].get({ [pkeyName]: pkeyValue(this,fetchKeyPath), ...param}, opts);
 		this.m_value[name] = model;
 		return this;
 	}
 
-	async fetchChild(name, param, { key, table, method='select', ...opts } = {}) {
-		table = table || name;
-		var dao = this.m_dao;
-		var [k,keys] = parseKeys(key || dao.$.primaryKey(this.m_table));
-		var collection = await dao[table][method]({ [k]: value(this,keys), limit: 0, ...param}, opts);
-		collection.m_parent = this;
+	async fetchChild(name: string, param?: sql.QueryParams, { key, table, method='select', ...opts }: FetchOptions = {}) {
+		var _table = table || name;
+		var ds = <sql.DataSource>this.m_ds;
+		utils.assert(ds);
+		var {pkeyName,fetchKeyPath} = primaryKey(key || ds.primaryKey(this.m_table));
+		var collection = <Collection<Any>>await ds.dao[_table][method]({ [pkeyName]: pkeyValue(this,fetchKeyPath), limit: 0, ...param}, opts);
+		// TODO private visit
+		(<any>collection).m_parent = this;
 		this.m_value[name] = collection;
 		return this;
 	}
 
 }
 
+export type ID = string | number;
+
 /**
  * @class Collection
  */
-export class Collection extends ModelBasic {
+export class Collection<T = Any> extends ModelBasic {
 
-	constructor(value = [], opts = {}) {
+	private m_map: Map<ID, Model<T>> = new Map();
+	private m_ids: ID[] = [];
+	private m_index: number = 0;
+	private m_total: number = 0;
+
+	constructor(value: Model<T>[] = [], opts: Options = {}) {
 		super(value, opts);
-		this.m_map = {};
-		this.m_ids = [];
-		this.m_total = 0;
-		this.m_index = 0;
-		var pk = this.m_dao.$.primaryKey(this.m_table);
-
+		var ds = <sql.DataSource>this.m_ds;
+		utils.assert(ds);
+		var pk = ds.primaryKey(this.m_table);
 		for (var m of this.m_value) {
-			var id = m.value[pk];
+			var id = <ID>m.value[pk];
 			if (id) {
 				this.m_ids.push(id);
-				this.m_map[id] = m;
+				this.m_map.set(id, m);
 			}
 		}
 	}
 
-	get(id) {
-		return this.m_map[id];
+	get value(): Model<T>[] {
+		return <Model<T>[]>this.m_value;
+	}
+
+	get(id: ID) {
+		return this.m_map.get(id);
 	}
 
 	get total() {
-		return this.m_total || this.m_value.length;
+		return this.m_total || this.length;
 	}
 
 	set total(value) {
@@ -148,68 +182,94 @@ export class Collection extends ModelBasic {
 		this.m_index = Number(value) || 0;
 	}
 
-	get length() {
-		return this.m_value.length;
+	get length(): number {
+		return (<T[]>this.m_value).length;
 	}
 
-	get ids() {
+	get IDs() {
 		return this.m_ids;
 	}
 
-	async fetch(name, param, { key, table, select='select', ...opts } = {}) {
-		table = table || name;
-		var dao = this.m_dao;
-		var pk0 = dao.$.primaryKey(table);
-		var [k,keys] = parseKeys(key || pk0);
-		var ids_set = {};
-		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>(!e||ids_set[e]?0:(ids_set[e]=1,e)));
-
-		if (ids.length) {
-			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
-			var map = collection.m_map;
-			if (k != pk0) {
-				map = {};
-				for (var m of collection.m_value) {
-					var id = m.m_value[k];
-					if (id) {
-						map[id] = m;
+	async fetch(name: string, param?: sql.QueryParams, { key, table, method='select', ...opts }: FetchOptions = {}) {
+		var _table = table || name;
+		var ds = <sql.DataSource>this.m_ds;
+		utils.assert(ds);
+		var pk0 = ds.primaryKey(_table);
+		var {pkeyName,fetchKeyPath} = primaryKey(key || pk0);
+		var ids_set: Set<string> = new Set;
+		var ids = this.value
+			.map( (m)=>pkeyValue(m,fetchKeyPath) )
+			.filter( (e: string)=>{
+				if (e) {
+					if (!ids_set.has(e)) {
+						ids_set.add(e);
+						return true;
 					}
 				}
+				return false;
+			});
+
+		if (ids.length) {
+			var collection = <Collection<any>>await ds.dao[_table][method]({ [pkeyName]:ids, limit: 0, ...param}, opts);
+			var map = collection.m_map;
+			if (pkeyName != pk0) {
+				map = new Map();
+				for (var m of collection.value) {
+					var id = m.value[pkeyName];
+					if (id)
+						map.set(id, m);
+				}
 			}
-			this.m_value.forEach(e=>{
-				e.m_value[name] = map[value(e, keys)] || null;
+			this.value.forEach(e=>{
+				// TODO private visit
+				(<any>e).m_value[name] = map.get(pkeyValue(e, fetchKeyPath)) || null;
 			});
 		}
 		return this;
 	}
 
-	async fetchChild(name, param, { key, table, method='select', ...opts } = {}) {
-		table = table || name;
-		var dao = this.m_dao;
-		var pk0 = dao.$.primaryKey(this.m_table);
-		var [k,keys] = parseKeys(key || pk0);
-		var ids_set = {};
-		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>(!e||ids_set[e]?0:(ids_set[e]=1,e)));
+	async fetchChild(name: string, param?: sql.QueryParams, { key, table, method='select', ...opts }: FetchOptions = {}) {
+		var _table = table || name;
+		var ds = <sql.DataSource>this.m_ds;
+		utils.assert(ds);
+		var pk0 = ds.primaryKey(this.m_table);
+		var {pkeyName,fetchKeyPath} = primaryKey(key || pk0);
+		var ids_set: Set<string> = new Set();
+		var ids = this.value
+			.map( (m)=>pkeyValue(m,fetchKeyPath) )
+			.filter( (e: string)=>{
+				if (e) {
+					if (!ids_set.has(e)) {
+						ids_set.add(e);
+						return true;
+					}
+				}
+				return false;
+			});
 
 		if (ids.length) {
-			var collection = await dao[table][method]({ [k]:ids, limit: 0, ...param}, opts);
-			var map = {};
+			var collection = <Collection<any>>await ds.dao[_table][method]({ [pkeyName]:ids, limit: 0, ...param}, opts);
+			var map = new Map<ID, Collection<any>>();
 			for (var m of collection.m_value) {
-				var id = m.m_value[k];
+				var id = <ID>m.m_value[pkeyName];
 				if (id) {
-					var ls = map[id];
-					if (ls) {
-						ls = ls.m_value;
+					var col = map.get(id);
+					var ls: Model<any>[];
+					if (col) {
+						ls = col.m_value;
 					} else {
 						ls = [];
-						map[id] = new Collection(ls,{table,dao});
+						map.set(id, new Collection(ls, {table: _table, dataSource: ds}) );
 					}
 					ls.push(m);
 				}
 			}
-			this.m_value.forEach(e=>{
-				e.m_value[name] = map[value(e, keys)] || new Collection([],{table,dao});
-				e.m_value[name].m_parent = e;
+			this.value.forEach(e=>{
+				// TODO private visit
+				var v = <any>e.value;
+				var col = map.get(pkeyValue(e, fetchKeyPath)) || new Collection([],{table:_table, dataSource: ds});
+				v[name] = col;
+				col.m_parent = e;
 			});
 		}
 		return this;

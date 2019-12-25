@@ -57,7 +57,7 @@ export class ReadCookie {
 	 */
 	getAll() {
 		var j = (this._req.headers.cookie || '').split(';');
-		var cookie: AnyObject = {};
+		var cookie: Any = {};
 		for (var item of (this._req.headers.cookie || '').split(';')) {
 			if (item) {
 				var sp = item.split('=');

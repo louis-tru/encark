@@ -39,7 +39,7 @@ export function getLocalNetworkHost() {
 	return result;
 }
 
-export function ip(): AnyObject<string[]> {
+export function ip(): Any<string[]> {
 	/*
 	{ 
 	  lo0: 
@@ -58,7 +58,7 @@ export function ip(): AnyObject<string[]> {
 	}*/
 	
 	var ifaces = os.networkInterfaces();
-	var address: AnyObject<string[]> = {}; // '127.0.0.1';
+	var address: Any<string[]> = {}; // '127.0.0.1';
 	
 	for (var i in ifaces) {
 		for (var j of ifaces[i]) {

@@ -73,7 +73,7 @@ function stringify_arr(self: StringParser, value: any) {
 }
 
 function stringify(self: StringParser, value: any) {
-	var m: AnyObject = { '\n': '\\n', "'": "\\'" };
+	var m: Any = { '\n': '\\n', "'": "\\'" };
 	var is_space = false;
 	
 	switch (typeof value) {
