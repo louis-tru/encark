@@ -28,17 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-// import util from '../util';
-// import document from './document';
-// var element = require('./element');
-// var exception = require('./exception');
-// var named_node_map = require('./named_node_map');
-// var node = require('./node');
-// var parser = require('./parser');
+import {Document} from './document';
 
-// util.assign(exports, node);
-// util.assign(exports, exception);
-// exports.Document = document.Document;
-// exports.Element = element.Element;
-// exports.NamedNodeMap = named_node_map.NamedNodeMap;
-// exports.Parser = parser.Parser;
+export * from './document';
+export * from './node';
+export * from './element';
+export * from './exception';
+export * from './named_node_map';
+export * from './parser';
+export default Document;

@@ -28,161 +28,181 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('./util');
-var path = require('path');
-var xml = require('./xml');
-var {Mysql} = require('./mysql');
-var db = require('./db');
-var memcached = require('./memcached');
-var fs = require('./fs');
-var {Model,Collection} = require('./model');
+import util from './util';
+import * as path from 'path';
+import Document, {
+	NODE_TYPE, Element, Node, Attribute, CDATASection
+} from './xml';
+import {Database} from './db';
+import * as fs from './fs';
 
-var local_cache = {};
-var original_handles = {};
-var original_files = {};
-var REG = /\{(.+?)\}/g;
+var {Mysql} = require('./mysql');
+
+// var memcached = require('./memcached');
+var memcached: any = {};
+
+const {Model,Collection} = require('./model');
+
+const local_cache = {};
+const original_handles: Any<_MapInfo> = {};
+const original_files: Any<Date> = {};
+const REG = /\{(.+?)\}/g;
+
+interface Options {
+
+}
+
+type Params = Any;
 
 /**
  * @createTime 2012-01-18
  * @author xuewen.chu <louis.tru@gmail.com>
  */
-var Transaction = util.class('Transaction', {
-
-	/**
-	 * @field map {SqlMap}
-	 */
-	map: null,
-	
-	/**
-	 * @field {Database} database
-	 */
-	db: null,
+class Transaction {
+	map: SqlMap;
+	db: Database;
+	dao: Any;
+	m_on: number;
 
 	/**
 	 * @constructor
 	 */
-	constructor: function(host) {
+	constructor(host: SqlMap) {
 		this.map = host;
 		this.db = get_db(host);
 		this.db.transaction(); // start transaction
 		this.dao = { $: this };
 		this.m_on = 1;
-
 		for (var {name,methods} of host.m_shortcuts) {
 			this.dao[name] = new Shortcuts(this, name, methods);
 		}
-	},
+	}
 
-	primaryKey(table) {
+	primaryKey(table: string) {
 		return this.map.primaryKey(table);
-	},
+	}
 
 	/**
 	 * @func get(name, param)
 	 */
-	get: function(name, param, opts) {
+	get(name: string, param?: Params, opts?: Options) {
 		return funcs.get(this.map, this.db, this.m_on, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets: function(name, param, opts) {
+	gets(name: string, param?: Params, opts?: Options) {
 		return funcs.gets(this.map, this.db, this.m_on, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func post(name, param)
 	 */
-	post: function(name, param, opts) {
+	post(name: string, param?: Params, opts?: Options) {
 		return funcs.post(this.map, this.db, this.m_on, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func query(name, param, cb)
 	 */
-	query: function(name, param, opts) {
+	query(name: string, param?: Params, opts?: Options) {
 		return funcs.query(this.map, this.db, this.m_on, name, param, opts);
-	},
+	}
 
 	/**
 	 * commit transaction
 	 */
-	commit: function() {
+	commit() {
 		this.m_on = 0;
 		this.db.commit();
 		this.db.close();
-	},
+	}
 
 	/**
 	 * rollback transaction
 	 */
-	rollback: function() {
+	rollback() {
 		this.m_on = 0;
 		this.db.rollback();
 		this.db.close();
-	},
+	}
 
-});
+}
+
+type _Child = _El | string;
+
+interface _El {
+	__t: string;
+	__ls: _Child[];
+	props: Any;
+}
+
+interface _MapInfo extends _El {
+	__is_select: boolean;
+	__table: string;
+}
 
 /**
  * @createTime 2012-01-18
  * @author xuewen.chu <louis.tru@gmail.com>
  */
-function parse_map_node(self, el) {
-	var ls = [];
-	var obj = { __t: el.tagName, __ls: ls };
-	var ns = el.attributes;
+function parse_map_node(self: MapSql, el: Element): _El {
+	var ls: _Child[] = [];
+	var obj: _El = { __t: el.tagName, __ls: ls, props: {} };
+	var attributes = el.attributes;
 
-	for (var i = 0, l = ns.length; i < l; i++) {
-		var n = ns.item(i);
-		obj[n.name] = n.value;
+	for (var i = 0, l = attributes.length; i < l; i++) {
+		var n = <Attribute>attributes.item(i);
+		obj.props[n.name] = n.value;
 	}
 
-	ns = el.childNodes;
+	var ns = el.childNodes;
 	for ( i = 0; i < ns.length; i++ ) {
-		var node = ns.item(i);
-		
+		var node = <Node>ns.item(i);
 		switch (node.nodeType) {
-			case xml.ELEMENT_NODE:
-				ls.push(parse_map_node(self, node));
+			case NODE_TYPE.ELEMENT_NODE:
+				ls.push( parse_map_node(self, <Element>node) );
 				break;
-			case xml.TEXT_NODE:
-			case xml.CDATA_SECTION_NODE:
-				ls.push(node.nodeValue);
+			case NODE_TYPE.TEXT_NODE:
+			case NODE_TYPE.CDATA_SECTION_NODE:
+				ls.push( (<CDATASection>node).nodeValue );
 				break;
 		}
 	}
 	return obj;
 }
 
-function read_original_handles(self, original_path, table) {
+function read_original_handles(self: SqlMap, original_path: string, table: string) {
 
-	var doc = new xml.Document();
-	doc.load(fs.readFileSync(original_path + '.xml').toString('utf8'));
+	var doc = new Document();
+
+	doc.load( fs.readFileSync(original_path + '.xml').toString('utf8') );
+
 	var ns = doc.getElementsByTagName('map');
-
-	if (!ns.length) {
+	if (!ns.length)
 		throw new Error(name + ' : not map the root element');
-	}
 
-	var map = ns.item(0);
-	var attrs = {};
-	var handles = {};
+	var map = <Element>ns.item(0); 
+	if (!map /*|| map.nodeType != NODE_TYPE.ELEMENT_NODE*/)
+		throw new Error('map cannot empty');
+
+	var attrs: Any<string> = {};
+	var handles: Any<_MapInfo> = {};
 	var map_attrs = map.attributes;
 
 	for (var i = 0; i < map_attrs.length; i++) {
-		var attr = map_attrs.item(i);
+		var attr = <Attribute>map_attrs.item(i);
 		attrs[attr.name] = attr.value;
 	}
 	attrs.primaryKey = (attrs.primaryKey || `${table}_id`);
 
-	ns = ns.item(0).childNodes;
+	ns = map.childNodes;
 
 	for (var i = 0; i < ns.length; i++) {
-		var node = ns.item(i);
-		if (node.nodeType === xml.ELEMENT_NODE) {
-			var handle = parse_map_node(self, node);
+		var node = <Element>ns.item(i);
+		if (node.nodeType === NODE_TYPE.ELEMENT_NODE) {
+			var handle: _MapInfo = <_MapInfo>parse_map_node(self, node);
 			handle.__is_select = (handle.__t.indexOf('select') > -1);
 			handle.__table = table;
 			handles[node.tagName] = handle;
@@ -224,7 +244,7 @@ function get_original_handle(self, name) {
 }
 
 //get db
-function get_db(self) {
+function get_db(self): Database {
 	var db_class = null;
 
 	switch (self.type) {
@@ -750,10 +770,11 @@ var funcs = {
  * @class Shortcuts
  */
 class Shortcuts {
-	constructor(host, name, methods) { // handles
+	private m_host: SqlMap;
+	private m_name: string;
+	constructor(host: SqlMap, name: string, methods: string[]) { // handles
 		this.m_host = host;
 		this.m_name = name;
-
 		for (let [method,type] of methods) {
 			let fullname = name + '/' + method;
 			this[method] = (param, options)=>host[type](fullname, param, options);
@@ -765,60 +786,57 @@ class Shortcuts {
 	}
 };
 
-var SqlMap = util.class('SqlMap', {
+interface DatabaseConfig {
+	type?: string;
+	port?: number;
+	host?: string;
+	user?: string;
+	password?: string;
+	database?: string;
+}
 
-	//private:
-	m_original_handles: null,
+export interface Config {
+	db?: DatabaseConfig;
+	memcached?: boolean;
+}
 
-	//public:
-	/**
-	 * @field {String} database type
-	 */
-	type: 'mysql',
+export const defaultConfig: Config = {
+	db: {
+		type: 'mysql',
+		port: 3306,
+		host: 'localhost',
+		user: 'root',
+		password: '',
+		database: '',
+	}
+};
+
+export class SqlMap {
+
+	private m_original_handles: Any = {};
+	private m_shortcuts: Shortcuts[] = [];
+	private m_tables: Any = {};
+	readonly config: Config;
 
 	/**
 	 * @field {Boolean} is use memcached
 	 */
-	memcached: false,
-
-	/**
-	 * 
-	 * @field {Object} db config info
-	 */
-	db: null,
+	memcached = false;
 
 	/**
 	 * original xml base path
 	 * @type {String}
 	 */
-	original: '',
+	original = '';
+	dao: Any = { $: this };
 
 	/**
 	 * @constructor
 	 * @arg [conf] {Object} Do not pass use center server config
 	 */ 
-	constructor: function(conf) {
-		this.m_original_handles = {};
-		if (conf) {
-			util.update(this, conf);
-			this.config = {
-				port: 3306,
-				host: 'localhost',
-				user: 'root',
-				password: '',
-				database: '',
-				...this.config,
-			};
-			this.config = this.db;
-		} else {
-			// use center server config
-			// on event
-			throw new Error('use center server config');
-		}
-
-		this.m_shortcuts = [];
-		this.dao = { $: this };
-		this.m_tables = {};
+	constructor(conf?: Config) {
+		this.config = Object.assign({}, defaultConfig, conf);
+		this.config.db = Object.assign({}, this.config.db, conf?.db);
 
 		fs.readdirSync(this.original).forEach(e=>{
 			if (path.extname(e) == '.xml') {
@@ -836,45 +854,45 @@ var SqlMap = util.class('SqlMap', {
 				this.m_tables[table] = attrs;
 			}
 		});
-	},
+	}
 
-	primaryKey(table) {
+	primaryKey(table: string) {
 		return this.m_tables[table].primaryKey;
-	},
+	}
 
 	/**
 	 * @func get(name, param)
 	 */
-	get: function(name, param, opts) {
+	get(name: string, param?: Params, opts?: Options) {
 		return funcs.get(this, get_db(this), 0, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets: function(name, param, opts) {
+	gets(name: string, param?: Params, opts?: Options) {
 		return funcs.gets(this, get_db(this), 0, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func post(name, param)
 	 */
-	post: function(name, param, opts) {
+	post(name: string, param?: Params, opts?: Options) {
 		return funcs.post(this, get_db(this), 0, name, param, opts);
-	},
+	}
 
 	/**
 	 * @func query(name, param, cb)
 	 */
-	query: function(name, param, opts) {
+	query(name: string, param?: Params, opts?: Options) {
 		return funcs.query(this, get_db(this), 0, name, param, opts);
-	},
+	}
 
 	/**
 		* start transaction
 		* @return {Transaction}
 		*/
-	transaction: function(cb) {
+	transaction(cb: any) {
 		util.assert(cb);
 		util.assert(util.isAsync(cb));
 
@@ -887,23 +905,23 @@ var SqlMap = util.class('SqlMap', {
 			tr.rollback();
 			throw e;
 		});
-	},
+	}
 
-});
+}
 
-var shared = null;
+var shared: SqlMap | null = null;
 
-module.exports = {
+export default {
 
 	SqlMap: SqlMap,
 
 	/**
 	 * @func setShared
 	 */
-	setShared: function(sqlmap) {
+	setShared: function(sqlmap: SqlMap) {
 		shared = sqlmap;
 	},
-	
+
 	/**
 		* get default dao
 		* @return {SqlMap}

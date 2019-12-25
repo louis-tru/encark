@@ -61,6 +61,7 @@ export class NamedNodeMap extends NodeList {
 			if (node.nodeName == key)
 				return node;
 		}
+		return null;
 	}
 	
 	setNamedItem(node: Attribute) {
@@ -69,11 +70,11 @@ export class NamedNodeMap extends NodeList {
 	}
 
 	/* returns Node */
-	// private _setNamedItemNS(node: Attribute) {
-	// 	// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
-	// 	var old = this.getNamedItemNS(node.namespaceURI, node.localName);
-	// 	return this._add(node, old);
-	// }
+	setNamedItemNS(node: Attribute) {
+		// raises: WRONG_DOCUMENT_ERR,NO_MODIFICATION_ALLOWED_ERR,INUSE_ATTRIBUTE_ERR
+		var old = this.getNamedItemNS(node.namespaceURI || '', node.localName || '');
+		return this._add(node, old);
+	}
 
 	private _findNodeIndex(node: Attribute): number {
 		var i = this.length;
@@ -83,7 +84,7 @@ export class NamedNodeMap extends NodeList {
 		return -1;
 	}
 	
-	private _add(node: Attribute, old?: Attribute) {
+	private _add(node: Attribute, old: Attribute | null) {
 		var self = this;
 		if (old) {
 			(<any>self)[this._findNodeIndex(old)] = node;
@@ -98,7 +99,7 @@ export class NamedNodeMap extends NodeList {
 		return old || null;
 	}
 	
-	private _removeItem(node: Attribute) {
+	removeItem(node: Attribute) {
 		var i = this.length;
 		var lastIndex = i - 1;
 		while (i--) {
@@ -110,7 +111,6 @@ export class NamedNodeMap extends NodeList {
 				}
 				this._length = lastIndex;
 				node.ownerElement = null;
-				// var el = this.ownerElement;
 				return old;
 			}
 		}
@@ -120,7 +120,7 @@ export class NamedNodeMap extends NodeList {
 	removeNamedItem(key: string) {
 		var node = this.getNamedItem(key);
 		if (node) {
-			this._removeItem(node);
+			this.removeItem(node);
 		} else {
 			throw new Exception(exception.NOT_FOUND_ERR);
 		}
@@ -141,7 +141,7 @@ export class NamedNodeMap extends NodeList {
 	removeNamedItemNS(namespaceURI: string, localName: string) {
 		var node = this.getNamedItemNS(namespaceURI, localName);
 		if (node) {
-			this._removeItem(node);
+			this.removeItem(node);
 		} else {
 			throw new Exception(exception.NOT_FOUND_ERR);
 		}

@@ -36,173 +36,6 @@ import * as nnm from './named_node_map';
 const html_tag = /^(br|hr|input|frame|img|area|link|col|meta|area|base|basefont|param)$/i;
 const html = /^html$/i;
 
-function xmlEncoder(c: string) {
-	return c == '<' && '&lt;' || c == '&' && '&amp;' || 
-				 c == '"' && '&quot;' || '&#' + c.charCodeAt(0) + ';';
-}
-
-function findNSMap(self: Node) {
-	var el = self;
-
-	while (el.nodeType !== exports.ELEMENT_NODE) {
-		if (el.nodeType === exports.ATTRIBUTE_NODE) {
-			el = el.ownerElement;
-		} else {
-			el = el.parentNode;
-		}
-	}
-	return el._namespaceMap;
-}
-
-function serializeToString(node: Node, buf: string[]) {
-	switch (node.nodeType) {
-		case exports.ELEMENT_NODE:
-			var attrs = node.attributes;
-			var len = attrs.length;
-			var child = node.firstChild;
-			var nodeName = node.tagName;
-			buf.push('<', nodeName);
-			for (var i = 0; i < len; i++) {
-				serializeToString(attrs.item(i), buf);
-			}
-			if (child) {
-				buf.push('>');
-				while (child) {
-					serializeToString(child, buf);
-					child = child.nextSibling;
-				}
-				buf.push('</', nodeName, '>');
-			} else {
-
-				var doc = node.ownerDocument;
-				var doctype = doc.doctype;
-				if (doctype && html.test(doctype.name)) {
-
-					if (html_tag.test(nodeName))
-						buf.push(' />');
-					else
-						buf.push('></', nodeName, '>');
-				}
-				else
-					buf.push(' />');
-			}
-			return;
-		case exports.DOCUMENT_NODE:
-		case exports.DOCUMENT_FRAGMENT_NODE:
-			var child = node.firstChild;
-			while (child) {
-				serializeToString(child, buf);
-				child = child.nextSibling;
-			}
-			return;
-		case exports.ATTRIBUTE_NODE:
-			return buf.push(' ', node.name, '="', node.value.replace(/[<&"]/g, xmlEncoder), '"');
-		case exports.TEXT_NODE:
-			return buf.push(node.data.replace(/[<&]/g, xmlEncoder)); //(?!#?[\w\d]+;)
-		case exports.CDATA_SECTION_NODE:
-			return buf.push('<![CDATA[', node.data, ']]>');
-		case exports.COMMENT_NODE:
-			return buf.push("<!--", node.data, "-->");
-		case exports.DOCUMENT_TYPE_NODE:
-
-			var pubid = node.publicId;
-			var sysid = node.systemId;
-
-			buf.push('<!DOCTYPE ', node.name);
-			if (pubid) {
-				buf.push(' PUBLIC "', pubid);
-				if (sysid && sysid != '.') {
-					buf.push('" "', sysid);
-				}
-				buf.push('">');
-			} else if (sysid && sysid != '.') {
-				buf.push(' SYSTEM "', sysid, '">');
-			} else {
-				var sub = node.internalSubset;
-				if (sub) {
-					buf.push(" [", sub, "]");
-				}
-				buf.push(">");
-			}
-			return;
-		case exports.PROCESSING_INSTRUCTION_NODE:
-			return buf.push("<?", node.nodeName, " ", node.data, "?>");
-		case exports.ENTITY_REFERENCE_NODE:
-			return buf.push('&', node.nodeName, ';');
-			//case ENTITY_NODE:
-			//case NOTATION_NODE:
-		default:
-			buf.push('??', node.nodeName);
-	}
-}
-
-/*
-* attributes;
-* children;
-*
-* writeable properties:
-* nodeValue,Attr:value,CharacterData:data
-* prefix
-*/
-function update(self: Node, el: Node, attr) {
-
-	var doc = self.ownerDocument || self;
-	doc._inc++;
-	if (attr) {
-		if (attr.namespaceURI == 'http://www.w3.org/2000/xmlns/') {
-			//update namespace
-		}
-	} else {//node
-		//update childNodes
-		var cs = el.childNodes;
-		var child = el.firstChild;
-		var i = 0;
-
-		while (child) {
-			cs[i++] = child;
-			child = child.nextSibling;
-		}
-		cs.length = i;
-	}
-}
-
-function cloneNode(doc: Node, node: Node, deep: boolean) {
-	var node2 = new node.constructor();
-	for (var n in node) {
-		var v = node[n];
-		if (typeof v != 'object') {
-			if (v != node2[n]) {
-				node2[n] = v;
-			}
-		}
-	}
-	if (node.childNodes) {
-		node2.childNodes = new NodeList();
-	}
-	node2.ownerDocument = doc;
-	switch (node2.nodeType) {
-		case exports.ELEMENT_NODE:
-			var attrs = node.attributes;
-			var attrs2 = node2.attributes = new NamedNodeMap();
-			var len = attrs.length
-			attrs2._ownerElement = node2;
-			for (var i = 0; i < len; i++) {
-				attrs2.setNamedItem(cloneNode(doc, attrs.item(i), true));
-			}
-			break; ;
-		case exports.ATTRIBUTE_NODE:
-			deep = true;
-	}
-	if (deep) {
-		var child = node.firstChild;
-		while (child) {
-			node2.appendChild(cloneNode(doc, child, deep));
-			child = child.nextSibling;
-		}
-	}
-	return node2;
-}
-
 export enum NODE_TYPE {
 	NODE_NODE = 1,
 	ELEMENT_NODE = 1,
@@ -219,11 +52,141 @@ export enum NODE_TYPE {
 	NOTATION_NODE = 12,
 };
 
+function xmlEncoder(c: string) {
+	return c == '<' && '&lt;' || c == '&' && '&amp;' || 
+				 c == '"' && '&quot;' || '&#' + c.charCodeAt(0) + ';';
+}
+
+function findNSMap(self: Node): Any<string> {
+	var e = self;
+	while (e && e.nodeType !== NODE_TYPE.ELEMENT_NODE) {
+		if (e.nodeType === NODE_TYPE.ATTRIBUTE_NODE) {
+			e = <Node>(<Attribute>e).ownerElement;
+		} else {
+			e = <Node>e.parentNode;
+		}
+	}
+	return e ? ((<el.Element>e).namespaceMap || {}): {};
+}
+
+function serializeToString(node: Node, buf: string[]) {
+	switch (node.nodeType) {
+		case NODE_TYPE.ELEMENT_NODE:
+			var e = (<el.Element>node);
+			var attrs = e.attributes;
+			var len = attrs.length;
+			var child = node.firstChild;
+			var nodeName = e.tagName;
+			buf.push('<', nodeName);
+			for (var i = 0; i < len; i++) {
+				serializeToString(<Node>attrs.item(i), buf);
+			}
+			if (child) {
+				buf.push('>');
+				while (child) {
+					serializeToString(child, buf);
+					child = child.nextSibling;
+				}
+				buf.push('</', nodeName, '>');
+			} else {
+				var doc = node.ownerDocument;
+				var doctype = doc.doctype;
+				if (doctype && html.test((<DocumentType>doctype).name)) {
+					if (html_tag.test(nodeName))
+						buf.push(' />');
+					else
+						buf.push('></', nodeName, '>');
+				}
+				else
+					buf.push(' />');
+			}
+			return;
+		case NODE_TYPE.DOCUMENT_NODE:
+		case NODE_TYPE.DOCUMENT_FRAGMENT_NODE:
+			var child = node.firstChild;
+			while (child) {
+				serializeToString(child, buf);
+				child = child.nextSibling;
+			}
+			return;
+		case NODE_TYPE.ATTRIBUTE_NODE:
+			return buf.push(' ', (<Attribute>node).name, '="', (<Attribute>node).value.replace(/[<&"]/g, xmlEncoder), '"');
+		case NODE_TYPE.TEXT_NODE:
+			return buf.push((<Text>node).data.replace(/[<&]/g, xmlEncoder)); //(?!#?[\w\d]+;)
+		case NODE_TYPE.CDATA_SECTION_NODE:
+			return buf.push('<![CDATA[', (<CDATASection>node).data, ']]>');
+		case NODE_TYPE.COMMENT_NODE:
+			return buf.push("<!--", (<Comment>node).data, "-->");
+		case NODE_TYPE.DOCUMENT_TYPE_NODE:
+			var pubid = (<DocumentType>node).publicId;
+			var sysid = (<DocumentType>node).systemId;
+
+			buf.push('<!DOCTYPE ', (<DocumentType>node).name);
+			if (pubid) {
+				buf.push(' PUBLIC "', pubid);
+				if (sysid && sysid != '.') {
+					buf.push('" "', sysid);
+				}
+				buf.push('">');
+			} else if (sysid && sysid != '.') {
+				buf.push(' SYSTEM "', sysid, '">');
+			} else {
+				var sub = (<DocumentType>node).internalSubset;
+				if (sub) {
+					buf.push(" [", sub, "]");
+				}
+				buf.push(">");
+			}
+			return;
+		case NODE_TYPE.PROCESSING_INSTRUCTION_NODE:
+			// readonly target: string;
+			// readonly data: string;
+			return buf.push("<?", (<ProcessingInstruction>node).nodeName, " ", (<ProcessingInstruction>node).data, "?>");
+		case NODE_TYPE.ENTITY_REFERENCE_NODE:
+			return buf.push('&', (<EntityReference>node).nodeName, ';');
+			//case ENTITY_NODE:
+			//case NOTATION_NODE:
+		default:
+			buf.push('??', node.nodeName || '?');
+	}
+}
+
+/*
+* attributes;
+* children;
+*
+* writeable properties:
+* nodeValue,Attr:value,CharacterData:data
+* prefix
+*/
+function update(self: Node, e: Node, attr?: Attribute) {
+	var doc = self.ownerDocument || self;
+	doc._inc++;
+	if (attr) {
+		if (attr.namespaceURI == 'http://www.w3.org/2000/xmlns/') {
+			//update namespace
+		}
+	} else { //node
+		//update childNodes
+		var cs = e.childNodes;
+		if (cs) {
+			var child = e.firstChild;
+			var i = 0;
+			while (child) {
+				(<any>cs)[i++] = child;
+				child = child.nextSibling;
+			}
+			(<any>cs)._length = i; // TODO private visit
+		}
+	}
+}
+
 export class Node {
 	readonly ownerDocument: doc.Document;
 	readonly nodeType?: NODE_TYPE;
 	readonly childNodes?: NodeList;
 	readonly attributes?: nnm.NamedNodeMap;
+	readonly nodeName?: string;
 	firstChild?: Node;
 	lastChild?: Node;
 	previousSibling?: Node;
@@ -231,8 +194,8 @@ export class Node {
 	parentNode?: Node;
 	nodeValue?: string;
 	namespaceURI?: string;
-	prefix?: string;
 	localName?: string;
+	prefix?: string;
 
 	constructor(ownerDocument: doc.Document) {
 		this.ownerDocument = ownerDocument;
@@ -240,7 +203,8 @@ export class Node {
 
 	// Modified in DOM Level 2:
 	insertBefore(newChild: Node, refChild: Node | null) {//raises
-		utils.assert(newChild.ownerDocument == this.ownerDocument);
+		utils.assert(newChild.ownerDocument == this.ownerDocument, 'OwnerDocument mismatch');
+		utils.assert(this.childNodes, 'Cannot add child node');
 
 		var parentNode = this;
 
@@ -248,9 +212,11 @@ export class Node {
 		if (cp) {
 			cp.removeChild(newChild); //remove and update
 		}
+		var newLast: Node, newFirst: Node;
 		if (newChild.nodeType === NODE_TYPE.DOCUMENT_FRAGMENT_NODE) {
-			var newFirst = newChild.firstChild;
-			var newLast = newChild.lastChild;
+			utils.assert(newChild.firstChild, 'DOCUMENT_FRAGMENT_NODE cannot be empty');
+			newFirst = <Node>newChild.firstChild;
+			newLast = <Node>newChild.lastChild;
 		}
 		else
 			newFirst = newLast = newChild;
@@ -271,7 +237,7 @@ export class Node {
 		newFirst.previousSibling = pre;
 		do
 			newFirst.parentNode = parentNode;
-		while (newFirst !== newLast && (newFirst = newFirst.nextSibling))
+		while (newFirst !== newLast && (newFirst = <Node>newFirst.nextSibling))
 
 		update(this, parentNode);
 	}
@@ -284,26 +250,28 @@ export class Node {
 	}
 
 	removeAllChild() {
-		var ns = this.childNodes;
-		for (var i = 0, l = ns.length; i < l; i++) {
-			ns[i].parentNode = null;
-			delete ns[i];
+		var ns = <NodeList>this.childNodes;
+		if (ns) {
+			for (var i = 0, l = ns.length; i < l; i++) {
+				(<Node> ns.item(i)).parentNode = undefined;
+				delete (<any>ns)[i];
+			}
+			(<any>ns)._length = 0; // TODO private visit
+			this.firstChild = undefined;
+			this.lastChild = undefined;
+			update(this, this);
 		}
-		this.firstChild = null;
-		this.lastChild = null;
-
-		update(this, this);
 	}
 
 	removeChild(oldChild: Node) {
 		var parentNode = this;
-		var previous = null;
+		var previous;
 		var child = this.firstChild;
 
 		while (child) {
 			var next = child.nextSibling;
 			if (child === oldChild) {
-				oldChild.parentNode = null; //remove it as a flag of not in document
+				oldChild.parentNode = undefined; //remove it as a flag of not in document
 				if (previous)
 					previous.nextSibling = next;
 				else
@@ -319,72 +287,82 @@ export class Node {
 			previous = child;
 			child = next;
 		}
+		return null;
 	}
 
 	appendChild(newChild: Node) {
 		return this.insertBefore(newChild, null);
 	}
+
 	hasChildNodes() {
 		return this.firstChild != null;
 	}
-	cloneNode(deep: boolean) {
-		return cloneNode(this.ownerDocument || this, this, deep);
+
+	cloneNode(deep: boolean = false) {
+		// TODO Unrealized
+		return null;
 	}
+
 	// Modified in DOM Level 2:
 	normalize() {
 		var child = this.firstChild;
 		while (child) {
 			var next = child.nextSibling;
-			if (next && next.nodeType == exports.TEXT_NODE && child.nodeType == exports.TEXT_NODE) {
+			if (next && next.nodeType == NODE_TYPE.TEXT_NODE && child.nodeType == NODE_TYPE.TEXT_NODE) {
 				this.removeChild(next);
-				child.appendData(next.data);
+				(<Text>child).appendData((<Text>next).data);
 			} else {
 				child.normalize();
 				child = next;
 			}
 		}
 	}
+
 	// Introduced in DOM Level 2:
-	isSupported(feature, version) {
-		return this.ownerDocument.implementation.hasFeature(feature, version);
+	isSupported(feature: string, version: string) {
+		// TODO Unrealized
+		// return this.ownerDocument.implementation.hasFeature(feature, version);
+		return false;
 	}
+
 	// Introduced in DOM Level 2:
 	hasAttributes() {
-		return this.attributes.length > 0;
+		if (this.attributes)
+			return this.attributes.length > 0;
+		return false;
 	}
-	lookupPrefix(namespaceURI) {
+
+	lookupPrefix(namespaceURI: string) {
 		var map = findNSMap(this)
 		if (namespaceURI in map) {
-			return map[namespaceURI]
+			return <string>map[namespaceURI];
 		}
 		return null;
 	}
+
 	// Introduced in DOM Level 3:
-	isDefaultNamespace(namespaceURI) {
+	isDefaultNamespace(namespaceURI: string) {
 		var prefix = this.lookupPrefix(namespaceURI);
 		return prefix == null;
 	}
+
 	// Introduced in DOM Level 3:
-	lookupNamespaceURI(prefix) {
+	lookupNamespaceURI(prefix: string) {
 		var map = findNSMap(this)
 		for (var n in map) {
-			if (map[n] == prefix) {
+			if (map[n] == prefix)
 				return n;
-			}
 		}
 		return null;
 	}
 
 	toString() {
-		var buf = [];
+		var buf: string[] = [];
 		serializeToString(this, buf);
 		return buf.join('');
 	}
 
 }
-
-// util.assign(Node.prototype, NODE_TYPE);
-// util.assign(exports, NODE_TYPE);
 
 /**
 	* @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-536297177
@@ -417,15 +395,13 @@ export class NodeList {
 	}
 }
 
-const Zero_childNodes = new NodeList();
-
 export class LiveNodeList extends NodeList {
 
 	private _node: Node;
 	private _refresh: (n: Node)=>Node[];
 	private _inc: any;
 
-	private _update_live_node_list() {
+	private _updateLiveNodeList() {
 		var self = this;
 		var inc = (<any>self)._node.ownerDocument._inc;
 		if (self._inc != inc) {
@@ -441,7 +417,7 @@ export class LiveNodeList extends NodeList {
 	}
 
 	get length() {
-		this._update_live_node_list();
+		this._updateLiveNodeList();
 		return this._length;
 	}
 	
@@ -452,7 +428,7 @@ export class LiveNodeList extends NodeList {
 	}
 
 	item(index: number): Node | null {
-		this._update_live_node_list();
+		this._updateLiveNodeList();
 		return (<any>this)[index] || null;
 	}
 }
@@ -461,13 +437,17 @@ class CharacterData extends Node {
 	data = '';
 	length = 0;
 
+	get nodeValue() {
+		return this.data;
+	}
+
 	substringData(offset: number, count: number) {
 		return this.data.substring(offset, offset + count);
 	}
 
 	appendData(text: string) {
 		text = this.data + text;
-		this.nodeValue = this.data = text;
+		this.data = text;
 		this.length = text.length;
 	}
 	
@@ -483,7 +463,7 @@ class CharacterData extends Node {
 		var start = this.data.substring(0, offset);
 		var end = this.data.substring(offset + count);
 		text = start + text + end;
-		this.nodeValue = this.data = text;
+		this.data = text;
 		this.length = text.length;
 	}
 }
@@ -494,6 +474,10 @@ export class Attribute extends CharacterData {
 	readonly name: string;
 	readonly specified: boolean;
 	value: string;
+
+	get nodeValue() {
+		return this.value;
+	}
 
 	get nodeName() {
 		return this.name;
@@ -529,8 +513,11 @@ export class DocumentType extends Node {
 	readonly name: string;
 	readonly publicId: string;
 	readonly systemId: string;
-
 	// Introduced in DOM Level 2:
+	readonly internalSubset?: string;
+	//  readonly attribute NamedNodeMap     entities;
+	//  readonly attribute NamedNodeMap     notations;
+
 	/**
 		* constructor function
 		* @constructor
@@ -538,41 +525,46 @@ export class DocumentType extends Node {
 		* @param {String}              publicId
 		* @param {String}              systemId
 		*/
-	constructor(doc: doc.Document, qualifiedName: string, publicId: string, systemId: string) {
+	constructor(doc: doc.Document, qualifiedName: string, publicId: string, systemId: string, internalSubset?: string) {
 		// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
 		super(doc);
 		this.name = qualifiedName;
 		this.nodeName = qualifiedName;
 		this.publicId = publicId;
 		this.systemId = systemId;
-		// Introduced in DOM Level 2:
-		//readonly attribute DOMString        internalSubset;
-		//TODO:..
-		//  readonly attribute NamedNodeMap     entities;
-		//  readonly attribute NamedNodeMap     notations;
+		this.internalSubset = internalSubset;
 	}
 }
 
 export class Entity extends Node {
 	readonly nodeType = NODE_TYPE.ENTITY_NODE;
+	readonly nodeName = "#entity";
 }
 
 export class EntityReference extends Node {
 	readonly nodeType = NODE_TYPE.ENTITY_REFERENCE_NODE;
-	nodeName = '';
+	readonly nodeName: string;
+	get text() { return this.nodeValue }
+	constructor(doc: doc.Document, nodeName: string, nodeValue?: string) {
+		super(doc);
+		this.nodeName = nodeName;
+		this.nodeValue = nodeValue;
+	}
 }
 
 export class Notation extends Node {
 	readonly nodeType = NODE_TYPE.NOTATION_NODE;
+	readonly nodeName = "#notation";
 }
 
 export class ProcessingInstruction extends Node {
 	readonly nodeType = NODE_TYPE.PROCESSING_INSTRUCTION_NODE;
-	readonly target: string;
+	readonly name: string;
 	readonly data: string;
-	constructor(doc: doc.Document, target: string, data: string) {
+	get nodeName() { return this.name }
+	constructor(doc: doc.Document, name: string, data: string) {
 		super(doc);
-		this.target = target;
+		this.name = name;
 		this.data = data;
 	}
 }
@@ -585,11 +577,11 @@ export class Text extends CharacterData {
 		var text = this.data;
 		var newText = text.substring(offset);
 		text = text.substring(0, offset);
-		this.data = this.nodeValue = text;
+		this.data = text;
 		this.length = text.length;
 		var newNode = this.ownerDocument.createTextNode(newText);
 		if (this.parentNode) {
-			this.parentNode.insertBefore(newNode, this.nextSibling);
+			this.parentNode.insertBefore(newNode, this.nextSibling || null);
 		}
 		return newNode;
 	}

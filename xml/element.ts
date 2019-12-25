@@ -54,7 +54,8 @@ export class Element extends Node {
 	readonly nodeType = NODE_TYPE.ELEMENT_NODE;
 	readonly childNodes = new NodeList();
 	readonly tagName: string;
-	readonly attributes: NamedNodeMap;
+	readonly attributes = new NamedNodeMap(this);
+	readonly namespaceMap?: Any<string>;
 
 	get nodeName() {
 		return this.tagName;
@@ -62,7 +63,6 @@ export class Element extends Node {
 
 	constructor(doc: doc.Document, tagName: string) {
 		super(doc);
-		this.attributes = new NamedNodeMap(this);
 		this.tagName = tagName;
 	}
 
@@ -76,8 +76,7 @@ export class Element extends Node {
 	}
 
 	setAttribute(name: string, value: string) {
-		var attr = this.ownerDocument.createAttribute(name);
-		attr.value = attr.nodeValue = value + '';
+		var attr = this.ownerDocument.createAttribute(name, value);
 		this.setAttributeNode(attr);
 	}
 
@@ -89,8 +88,8 @@ export class Element extends Node {
 		this.attributes.setNamedItem(newAttr);
 	}
 
-	removeAttributeNode(oldAttr: string) {
-		this.attributes._removeItem(oldAttr);
+	removeAttributeNode(oldAttr: Attribute) {
+		this.attributes.removeItem(oldAttr);
 	}
 
 	removeAttribute(name: string) {
@@ -108,8 +107,7 @@ export class Element extends Node {
 	}
 
 	setAttributeNS(namespaceURI: string, qualifiedName: string, value: string) {
-		var attr = this.ownerDocument.createAttributeNS(namespaceURI, qualifiedName);
-		attr.value = attr.nodeValue = value + '';
+		var attr = this.ownerDocument.createAttributeNS(namespaceURI, qualifiedName, value);
 		this.setAttributeNode(attr);
 	}
 
@@ -117,7 +115,7 @@ export class Element extends Node {
 		return this.attributes.getNamedItemNS(namespaceURI, localName);
 	}
 
-	setAttributeNodeNS(newAttr: string) {
+	setAttributeNodeNS(newAttr: Attribute) {
 		this.attributes.setNamedItemNS(newAttr);
 	}
 
@@ -152,14 +150,14 @@ export class Element extends Node {
 		});
 	}
 
-	get innerXml () {
+	get innerXml() {
 		return Array.toArray(this.childNodes).join('');
 	}
 
-	set innerXml (xml) {
+	set innerXml(xml: string) {
 		this.removeAllChild();
 		if(xml){
-			new parser.Parser().fragment(this.ownerDocument, this, xml);
+			new parser.Parser().fragment(this.ownerDocument, xml, this);
 		}
 	}
 

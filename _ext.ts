@@ -47,8 +47,6 @@ interface Any<T = any> {
 	[key: string]: T;
 }
 
-type AnyObject = Any;
-
 type TimeoutResult = any; // NodeJS.Timeout | number;
 
 interface Function {

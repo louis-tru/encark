@@ -35,50 +35,18 @@ import {
 	EntityReference,
 } from './node';
 import {Element, visitNode} from './element';
-import parser from './parser';
+import * as parser from './parser';
 
 var Node_insertBefore = Node.prototype.insertBefore;
 var Node_removeChild = Node.prototype.removeChild;
-
-function importNode(doc: Document, node: Node, deep?: boolean) {
-	var node2;
-	switch (node.nodeType) {
-		case NODE_TYPE.ELEMENT_NODE:
-			node2 = node.cloneNode(false);
-			node2.ownerDocument = doc;
-			var attrs = node2.attributes;
-			var len = attrs.length;
-			for (var i = 0; i < len; i++) {
-				node2.setAttributeNodeNS(importNode(doc, attrs.item(i), deep));
-			}
-		case NODE_TYPE.DOCUMENT_FRAGMENT_NODE:
-			break;
-		case NODE_TYPE.ATTRIBUTE_NODE:
-			deep = true;
-			break;
-	}
-	if (!node2) {
-		node2 = node.cloneNode(false); //false
-	}
-	node2.ownerDocument = doc;
-	node2.parentNode = null;
-	if (deep) {
-		var child = node.firstChild;
-		while (child) {
-			node2.appendChild(importNode(doc, child, deep));
-			child = child.nextSibling;
-		}
-	}
-	return node2;
-}
 
 export class Document extends Node {
 
 	readonly nodeName = '#document';
 	readonly nodeType = NODE_TYPE.DOCUMENT_NODE;
-	readonly doctype: Node | null;
 	readonly childNodes = new NodeList();
 	readonly ownerDocument: Document;
+	doctype: Node | null;
 	_documentElement: Element | null = null;
 	_inc = 1;
 
@@ -109,7 +77,7 @@ export class Document extends Node {
 	}
 
 	load(text: string) {
-		new parser.Parser().fragment(this, null, text);
+		return new parser.Parser().fragment(this, text);
 	}
 
 	insertBefore(newChild: Node, refChild: Node) { //raises
@@ -127,19 +95,20 @@ export class Document extends Node {
 		Node_insertBefore.call(this, newChild, refChild);
 		return newChild;
 	}
-	
+
 	removeChild(oldChild: Node) {
 		if (this.documentElement == oldChild) {
 			this._documentElement = null;
 		}
 		return Node_removeChild.call(this, oldChild);
 	}
-	
+
 	// Introduced in DOM Level 2:
 	importNode(importedNode: Node, deep?: boolean) {
-		return importNode(this, importedNode, deep);
+		// TODO Unrealized
+		return null;
 	}
-	
+
 	// Introduced in DOM Level 2:
 	getElementById(id: string) {
 		var rtv = null;
@@ -155,56 +124,56 @@ export class Document extends Node {
 		});
 		return rtv;
 	}
-	
-	getElementsByTagName(name: string) {
+
+	getElementsByTagName(name: string): NodeList {
 		var el = this.documentElement;
-		return el ? el.getElementsByTagName(name) : [];
+		return el ?
+			el.getElementsByTagName(name): new NodeList();
 	}
-	
-	getElementsByTagNameNS(namespaceURI: string, localName: string) {
-		var el = <Element>this.documentElement;
-		return el ? el.getElementsByTagNameNS(namespaceURI, localName) : [];
+
+	getElementsByTagNameNS(namespaceURI: string, localName: string): NodeList {
+		var el = this.documentElement;
+		return el ? 
+			el.getElementsByTagNameNS(namespaceURI, localName): new NodeList();
 	}
-	
+
 	//document factory method:
 	createElement(tagName: string) {
 		return new Element(this, tagName);
 	}
-	
+
 	createDocumentFragment() {
 		return new DocumentFragment(this);
 	}
-	
+
 	createTextNode(data: string) {
 		var r = new Text(this);
 		r.appendData(data);
 		return r;
 	}
-	
+
 	createComment(data: string) {
 		var r = new Comment(this);
 		r.appendData(data);
 		return r;
 	}
-	
+
 	createCDATASection(data: string) {
 		var r = new CDATASection(this);
 		r.appendData(data);
 		return r;
 	}
-	
+
 	createProcessingInstruction(target: string, data: string) {
 		return new ProcessingInstruction(this, target, data);
 	}
-	
-	createAttribute(name: string) {
-		return new Attribute(this, name, '', true);
+
+	createAttribute(name: string, value: string) {
+		return new Attribute(this, name, value, true);
 	}
 
-	createEntityReference(name: string) {
-		var r = new EntityReference(this);
-		r.nodeName = name;
-		return r;
+	createEntityReference(name: string, value?: string) {
+		return new EntityReference(this, name, value);
 	}
 
 	// Introduced in DOM Level 2:
@@ -222,17 +191,14 @@ export class Document extends Node {
 	}
 
 	// Introduced in DOM Level 2:
-	createAttributeNS(namespaceURI: string, qualifiedName: string) {
-		// var r = new node.Attribute(this);
-		var r = new Attribute(this, qualifiedName, '', true);
+	createAttributeNS(namespaceURI: string, qualifiedName: string, value: string) {
+		var r = new Attribute(this, qualifiedName, value, true);
 		var pl = qualifiedName.split(':');
 		r.namespaceURI = namespaceURI;
-
 		if (pl.length == 2) {
 			r.prefix = pl[0];
 			r.localName = pl[1];
 		} else {
-			//el.prefix = null;
 			r.localName = qualifiedName;
 		}
 		return r;
@@ -242,7 +208,7 @@ export class Document extends Node {
 		var first = this.firstChild;
 		if (!first)
 			return null;
-		var result: AnyObject<string> = {};
+		var result: Any<string> = {};
 		var ns = <NodeList>first.childNodes;
 		if (!ns)
 			return null
