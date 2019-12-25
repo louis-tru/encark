@@ -85,20 +85,20 @@ function parseKeys(mkey) {
  */
 export class Model extends ModelBasic {
 
-	async fetch(name, param, { key, table, select='select', ...opts } = {}) {
+	async fetch(name, param, { key, table, method='select', ...opts } = {}) {
 		table = table || name;
 		var dao = this.m_dao;
 		var [k,keys] = parseKeys(key || dao.$.primaryKey(table));
-		var model = await dao[table][select].get({ [k]: value(this,keys), ...param}, opts);
+		var model = await dao[table][method].get({ [k]: value(this,keys), ...param}, opts);
 		this.m_value[name] = model;
 		return this;
 	}
 
-	async fetchChild(name, param, { key, table, select='select', ...opts } = {}) {
+	async fetchChild(name, param, { key, table, method='select', ...opts } = {}) {
 		table = table || name;
 		var dao = this.m_dao;
 		var [k,keys] = parseKeys(key || dao.$.primaryKey(this.m_table));
-		var collection = await dao[table][select]({ [k]: value(this,keys), limit: 0, ...param}, opts);
+		var collection = await dao[table][method]({ [k]: value(this,keys), limit: 0, ...param}, opts);
 		collection.m_parent = this;
 		this.m_value[name] = collection;
 		return this;
@@ -183,7 +183,7 @@ export class Collection extends ModelBasic {
 		return this;
 	}
 
-	async fetchChild(name, param, { key, table, select='select', ...opts } = {}) {
+	async fetchChild(name, param, { key, table, method='select', ...opts } = {}) {
 		table = table || name;
 		var dao = this.m_dao;
 		var pk0 = dao.$.primaryKey(this.m_table);
@@ -192,7 +192,7 @@ export class Collection extends ModelBasic {
 		var ids = this.m_value.map(e=>value(e,keys)).filter(e=>(!e||ids_set[e]?0:(ids_set[e]=1,e)));
 
 		if (ids.length) {
-			var collection = await dao[table][select]({ [k]:ids, limit: 0, ...param}, opts);
+			var collection = await dao[table][method]({ [k]:ids, limit: 0, ...param}, opts);
 			var map = {};
 			for (var m of collection.m_value) {
 				var id = m.m_value[k];
