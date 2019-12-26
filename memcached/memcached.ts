@@ -28,11 +28,10 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var event = require('../event');
-var { HashRing } = require('./hash_ring');
-var connect = require('./connect');
-var { Buffer } = require('buffer');
+import utils from '../util';
+import {EventNoticer} from '../event';
+import { HashRing } from './hash_ring';
+import connect from './connect';
 
 var LINEBREAK = '\r\n';
 var NOREPLY = ' noreply';
@@ -191,55 +190,47 @@ function multi(self, keys, cb) {
 		cb.call(self, servers[i], map[servers[i]], i, servers.length);
 }
 
-var Memcached = util.class('Memcached', {
+class Memcached {
 
-	//public:
 	/**
 	 * @event onerror
 	 */
-	onerror: null,
+	readonly onError = new EventNoticer<Error>('Error', this);
 
 	/**
 	 * max length of value allowed by Memcached
 	 * @type {Number}
 	 */
-	maxValue: 1048576,
+	readonly maxValue = 1048576;
 
 	/**
 	 * allows you do re-distribute the keys over a x amount of servers
-	 * @type {Boolean}
 	 */
-	redundancy: false,
+	redundancy = false;
 
 	/**
 	 * servers
 	 * @type {Array}
 	 */
-	servers: null,
+	servers: string[];
+
+	readonly hashRing: HashRing;
 
 	/**
 	 * Constructs a new memcached client
 	 * @param {Array} servers  (Optional)  Do not pass use center server config
 	 * @constructor
 	 */
-	constructor: function(servers) {
-		event.initEvents(this, 'error');
-
-		if (servers) {
-			if (!servers.length)
-				throw new Error('No servers where supplied in the arguments');
-			this.servers = servers;
-			this.HashRing = new HashRing(servers);
-		}
-		else {
-			//use center server config
-			//on event
-			throw new Error('use center server config');
-		}
-	},
+	constructor(servers: string[]) {
+		utils.assert(servers, 'use center server config');
+		if (!servers.length)
+			throw new Error('No servers where supplied in the arguments');
+		this.servers = servers;
+		this.hashRing = new HashRing(servers);
+	}
 
 	// This is where the actual Memcached API layer begins:
-	get: function(key, cb) {
+	get(key, cb) {
 		if (Array.isArray(key))
 			return this.getMulti(key, cb);
 
@@ -249,21 +240,21 @@ var Memcached = util.class('Memcached', {
 			type: 'get',
 			command: 'get ' + key
 		});
-	},
+	}
 
 	// the difference between get and gets is that gets, also returns a cas value
 	// and gets doesn't support multi-gets at this moment.
-	gets: function(key, cb) {
+	gets(key, cb) {
 		command(this, {
 			key: key,
 			cb: cb,
 			type: 'gets',
 			command: 'gets ' + key
 		});
-	},
+	}
 
 	// Handles get's with multiple keys
-	getMulti: function(keys, cb) {
+	getMulti(keys, cb) {
 		var self = this;
 		var responses = {};
 		var errors = [];
@@ -296,44 +287,44 @@ var Memcached = util.class('Memcached', {
 				command: 'get ' + key.join(' ')
 			}, server);
 		});
-	},
+	}
 
 	// Curry the function and so we can tell the type our private set function
-	set: function(key, value, lifetime, cb, cas) {
+	set(key, value, lifetime, cb, cas) {
 		setters(this, 'set', key, value, lifetime, cb, cas);
-	},
+	}
 
-	replace: function(key, value, lifetime, cb, cas) {
+	replace(key, value, lifetime, cb, cas) {
 		setters(this, 'replace', key, value, lifetime, cb, cas);
-	},
+	}
 
-	add: function(key, value, lifetime, cb, cas) {
+	add(key, value, lifetime, cb, cas) {
 		setters(this, 'add', key, value, lifetime, cb, cas);
-	},
+	}
 
-	cas: function(key, value, cas, lifetime, cb) {
+	cas(key, value, cas, lifetime, cb) {
 		setters(this, 'cas', key, value, lifetime, cb, cas);
-	},
+	}
 
-	append: function(key, value, cb) {
+	append(key, value, cb) {
 		setters(this, 'append', key, value, 0, cb);
-	},
+	}
 
-	prepend: function(key, value, cb) {
+	prepend(key, value, cb) {
 		setters(this, 'prepend', key, value, 0, cb);
-	},
+	}
 
 	// Curry the function and so we can tell the type our private incrdecr
-	increment: function(key, value, cb) {
+	increment(key, value, cb) {
 		incrdecr(this, 'incr', key, value, cb);
-	},
+	}
 
-	decrement: function(key, value, cb) {
+	decrement(key, value, cb) {
 		incrdecr(this, 'decr', key, value, cb);
-	},
+	}
 
 	// Deletes the keys from the servers
-	del: function(key, cb) {
+	del(key, cb) {
 		command(this, {
 			key: key,
 			cb: cb,
@@ -341,36 +332,36 @@ var Memcached = util.class('Memcached', {
 			command: 'delete ' + key,
 			redundancy: 'delete ' + key + NOREPLY
 		});
-	},
+	}
 
 	// Curry the function and so we can tell the type our private singles
-	version: function(cb) {
+	version(cb) {
 		singles(this, 'version', cb);
-	},
+	}
 
-	flush: function(cb) {
+	flush(cb) {
 		singles(this, 'flush_all', cb);
-	},
+	}
 
-	stats: function(cb) {
+	stats(cb) {
 		singles(this, 'stats', cb);
-	},
+	}
 
-	settings: function(cb) {
+	settings(cb) {
 		singles(this, 'stats settings', cb);
-	},
+	}
 
-	slabs: function(cb) {
+	slabs(cb) {
 		singles(this, 'stats slabs', cb);
-	},
+	}
 
-	items: function(cb) {
+	items(cb) {
 		singles(this, 'stats items', cb);
-	},
+	}
 
 	// You need to use the items dump to get the correct server and slab settings
 	// see simple_cachedump.js for an example
-	cachedump: function(server, slabid, number, cb) {
+	cachedump(server, slabid, number, cb) {
 		command(this, {
 			cb: cb,
 			number: number,
@@ -378,23 +369,23 @@ var Memcached = util.class('Memcached', {
 			type: 'stats cachedump',
 			command: 'stats cachedump ' + slabid + ' ' + number
 		}, server);
-	},
+	}
 
-});
+}
 
-var shared = null;
+var shared: Memcached | null = null;
 
-module.exports = {
+export default {
 
-	Memcached: Memcached,
+	Memcached,
 
 	/**
 	 * @func setShared
 	 */
-	setShared: function(memcache) {
+	setShared: function(memcache: Memcached) {
 		shared = memcache;
 	},
-	
+
 	/**
 		* get default memcached client
 		* @return {Memcached}
@@ -403,6 +394,6 @@ module.exports = {
 	get shared() {
 		return shared;
 	},
-	
+
 };
 

@@ -31,12 +31,17 @@
 import utils from './util';
 import * as path from 'path';
 import Document, {
-	NODE_TYPE, Element, Node, Attribute, CDATASection
+	NODE_TYPE, Element, Node, Attribute, CDATASection,
 } from './xml';
-import db, {Database} from './db';
+import db, {
+	Database, Result,
+	defaultOptions as mysqlDefaultOptions,
+	Options as MysqlOptions,
+} from './db';
 import * as fs from './fs';
 import {Model,Collection, FetchOptions, ModelBasic, ID} from './model';
-var {Mysql} = require('./mysql');
+import {Mysql} from './mysql';
+
 // var memcached = require('./memcached');
 var memcached: any = {};
 
@@ -45,29 +50,15 @@ const original_handles: Any<_MethodInfo> = {};
 const original_files: Any<Date> = {};
 const REG = /\{(.+?)\}/g;
 
-interface DatabaseConfig {
-	port?: number;
-	host?: string;
-	user?: string;
-	password?: string;
-	database?: string;
-}
-
 export interface Config {
 	type?: string;
 	memcached?: boolean;
 	original?: string;
-	db?: DatabaseConfig;
+	db?: MysqlOptions;
 }
 
-export const DEFAULT_CONFIG: Config = {
-	db: {
-		port: 3306,
-		host: 'localhost',
-		user: 'root',
-		password: '',
-		database: '',
-	},
+export const defaultConfig: Config = {
+	db: mysqlDefaultOptions,
 	type: 'mysql',
 	memcached: false,
 	original: '',
@@ -102,13 +93,6 @@ export interface Params extends QueryParams {
 	afterFetch?: FetchParamsMix[];
 	fetchTotal?: boolean;
 	onlyFetchTotal?: boolean;
-}
-
-export interface Result {
-	rows?: Any[];
-	fields?: Any;
-	affectedRows: number;
-	insertId: ID;
 }
 
 export interface DataSource {
@@ -383,14 +367,15 @@ function get_original_mapinfo(self: SqlMap, name: string) {
 function get_db(self: SqlMap): Database {
 	var db_class = null;
 	switch (self.type) {
-		case 'mysql' : db_class = Mysql; break;
+		case 'mysql' : 
+			db_class = Mysql; break;
 		case 'mssql' : 
 		case 'oracle': 
 		default:
 			break;
 	}
 	utils.assert(db_class, 'Not supporting database, {0}', self.type);
-	return new db_class(self.config);
+	return new (<any>db_class)(self.config.db);
 }
 
 // exec script
@@ -729,20 +714,13 @@ function exec(
 			console.log(sql);
 		}
 
-		function handle(err: Error, data: any[]) {
+		function handle(err: Error | null, data?: Result[]) {
 			if (!is_transaction) {
 				db.close(); // Non transaction, shut down immediately after the query
 			}
 			if (err) {
 				cb(err, []);
 			} else {
-				var result: Result[] = data.map(e=>{
-					if (e.rows) {
-						return  { affectedRows: 0, insertId: 0, rows: e.rows, fields: Object.keys(e.fields) };
-					} else {
-						return { affectedRows: 0, insertId: 0, ...e };
-					}
-				});
 				if (type == 'get') {
 					if (cacheTime > 0) {
 						if (self.memcached) {
@@ -752,7 +730,7 @@ function exec(
 						}
 					}
 				}
-				cb(null, data, table);
+				cb(null, <Result[]>data, table);
 			}
 		}
 
@@ -945,8 +923,8 @@ export class SqlMap implements DataSource {
 	 * @arg [conf] {Object} Do not pass use center server config
 	 */ 
 	constructor(conf?: Config) {
-		this.config = Object.assign({}, DEFAULT_CONFIG, conf);
-		this.config.db = Object.assign({}, DEFAULT_CONFIG.db, conf?.db);
+		this.config = Object.assign({}, defaultConfig, conf);
+		this.config.db = Object.assign({}, defaultConfig.db, conf?.db);
 		this.tablesInfo = {};
 
 		fs.readdirSync(this.original).forEach(e=>{

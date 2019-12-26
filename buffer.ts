@@ -29,12 +29,14 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import _codec, {Bytes} from './_codec';
+import _codec from './_codec';
 import _buffer from './_buffer';
 
 const TypedArray = (<any>Uint8Array).prototype.constructor.__proto__;
 
-export interface InterfaceBuffer extends Uint8Array {
+export type Bytes = Uint8Array | number[];
+
+export interface IBuffer extends Uint8Array {
 	toString(encoding?: string, start?: number, end?: number): string;
 }
 
@@ -78,11 +80,11 @@ export function byteLength(
 }
 
 /**
- * @class BufferImpl
+ * @class Buffer
  */
-class BufferIMPL extends Uint8Array implements InterfaceBuffer {
+export class Buffer extends Uint8Array implements IBuffer {
 
-	toString(encoding = 'utf8', start = 0, end = this.length): string {
+	toString(encoding: BufferEncoding = 'utf8', start = 0, end = this.length): string {
 		this[1] = 100;
 		if (encoding == 'utf8' || encoding == 'utf-8') {
 			return _codec.decodeUTF8From(this, start, end);
@@ -99,7 +101,7 @@ class BufferIMPL extends Uint8Array implements InterfaceBuffer {
 		}
 	}
 
-	toLocaleString(encoding = 'utf8', start = 0, end = this.length): string {
+	toLocaleString(encoding: BufferEncoding = 'utf8', start = 0, end = this.length): string {
 		return this.toString(encoding, start, end);
 	}
 
@@ -113,38 +115,42 @@ class BufferIMPL extends Uint8Array implements InterfaceBuffer {
 			return byteLength(string, encoding);
 	}
 
-	// from(value: string, encoding?: string): InterfaceBuffer;
-	// from(value: ArrayBuffer): InterfaceBuffer;
-	static from(value: any, ...args: any[]): InterfaceBuffer {
+	// from(value: string, encoding?: BufferEncoding): IBuffer;
+	// from(value: ArrayBuffer): IBuffer;
+	static from(value: any, ...args: any[]): IBuffer {
 		if (typeof value === 'string') {
 			var encoding: BufferEncoding = args[0] || 'utf8';
 			if (encoding == 'utf8' || encoding == 'utf-8') {
-				return new BufferIMPL(_codec.encodeUTF8(value));
+				return new Buffer(_codec.encodeUTF8(value));
 			} else if (encoding == 'hex') {
-				return new BufferIMPL(_codec.decodeHex(value));
+				return new Buffer(_codec.decodeHex(value));
 			} else if (encoding == 'base64') {
-				return new BufferIMPL(_codec.decodeBase64(value));
+				return new Buffer(_codec.decodeBase64(value));
 			} else if (encoding == 'latin1' || encoding == 'binary') {
-				return new BufferIMPL(_codec.encodeLatin1From(value));
+				return new Buffer(_codec.encodeLatin1From(value));
 			} else if (encoding == 'ascii') {
-				return new BufferIMPL(_codec.encodeAsciiFrom(value));
+				return new Buffer(_codec.encodeAsciiFrom(value));
 			} else {
-				return new BufferIMPL(_codec.encodeUTF8(value));
+				return new Buffer(_codec.encodeUTF8(value));
 			}
 		} else if (value instanceof ArrayBuffer) {
-			return new BufferIMPL(value);
+			return new Buffer(value);
 		} else {
 			var bf = Uint8Array.from(value, ...args);
-			(<any>bf).__proto__ = BufferIMPL.prototype;
-			return <BufferIMPL>bf;
+			(<any>bf).__proto__ = Buffer.prototype;
+			return <Buffer>bf;
 		}
 	}
 
-	static alloc(size: number): InterfaceBuffer {
-		return new BufferIMPL( Number(size) || 0);
+	static alloc(size: number): Buffer {
+		return new Buffer( Number(size) || 0);
 	}
 
-	static concat(list: Bytes[], length?: number): InterfaceBuffer {
+	static allocUnsafe(size: number): Buffer {
+		return new Buffer( Number(size) || 0);
+	}
+
+	static concat(list: Bytes[], length?: number): Buffer {
 		if (length === undefined) {
 			length = 0;
 			for (var bytes of list) {
@@ -174,8 +180,6 @@ class BufferIMPL extends Uint8Array implements InterfaceBuffer {
 
 }
 
-const ZERO = BufferIMPL.alloc(0);
-const _Buffer = 
-	<typeof BufferIMPL>(utils.haveNode ? require('buffer').Buffer: BufferIMPL);
+export const Zero = Buffer.alloc(0);
 
-export default _Buffer;
+export default Buffer;

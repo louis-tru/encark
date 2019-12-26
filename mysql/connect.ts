@@ -28,115 +28,176 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var event = require('../event');
-var parser = require('./parser');
-var constants = require('./constants');
-var auth = require('./auth');
-var OutgoingPacket = require('./outgoing_packet').OutgoingPacket;
-var Buffer = require('buffer').Buffer;
-var Socket = require('net').Socket;
+import utils from '../util';
+import {EventNoticer} from '../event';
+import {
+	Parser, Constants as ParserConstants, Packet
+} from './parser';
+import Constants from './constants';
+import Charsets from './charsets';
+import * as auth from './auth';
+import {OutgoingPacket} from './outgoing_packet';
+import {Buffer} from 'buffer';
+import {Socket} from 'net';
+import {Options, defaultOptions} from '../db';
 
-var CONNECT_TIMEOUT = 1e4;
-var connect_pool = {};
-var require_connect = [];
-var { Parser, GREETING_PACKET, USE_OLD_PASSWORD_PROTOCOL_PACKET, ERROR_PACKET, } = parser;
+const CONNECT_TIMEOUT = 1e4;
+const connect_pool: Any<Connect[]> = {};
+const require_connect: Request[] = [];
 
-function write(self, packet) {
-	self._socket.write(packet.buffer);
+/**
+* <span style="color:#f00">[static]</span>max connect count
+* @type {Numbet}
+* @static
+*/
+var MAX_CONNECT_COUNT = 20;
+
+/**
+	* <b style="color:#f00">[static]</b>max packet size
+	* @type {Number}
+	* @static
+	*/
+	var MAX_PACKET_SIZE = 0x01000000;
+
+/**
+	* <b style="color:#f00">[static]</b>default flags
+	* @type {Number}
+	* @static
+	*/
+var DEFAULT_FLAGS = 
+	Constants.CLIENT_LONG_PASSWORD
+	| Constants.CLIENT_FOUND_ROWS
+	| Constants.CLIENT_LONG_FLAG
+	| Constants.CLIENT_CONNECT_WITH_DB
+	| Constants.CLIENT_ODBC
+	| Constants.CLIENT_LOCAL_FILES
+	| Constants.CLIENT_IGNORE_SPACE
+	| Constants.CLIENT_PROTOCOL_41
+	| Constants.CLIENT_INTERACTIVE
+	| Constants.CLIENT_IGNORE_SIGPIPE
+	| Constants.CLIENT_TRANSACTIONS
+	| Constants.CLIENT_RESERVED
+	| Constants.CLIENT_SECURE_CONNECTION
+	| Constants.CLIENT_MULTI_STATEMENTS
+	| Constants.CLIENT_MULTI_RESULTS;
+
+/**
+	* <b style="color:#f00">[static]</b>charest number
+	* @type {Number}
+	* @static
+	*/
+var CHAREST_NUMBER = Charsets.UTF8_UNICODE_CI;
+
+export default {
+	get MAX_CONNECT_COUNT() { return MAX_CONNECT_COUNT },
+	get MAX_PACKET_SIZE() { return MAX_PACKET_SIZE },
+	get DEFAULT_FLAGS() { return DEFAULT_FLAGS },
+	get CHAREST_NUMBER() { return CHAREST_NUMBER },
+	set MAX_CONNECT_COUNT(value: number) { MAX_CONNECT_COUNT = value },
+	set MAX_PACKET_SIZE(value: number) { MAX_PACKET_SIZE = value },
+	set DEFAULT_FLAGS(value: Constants) { DEFAULT_FLAGS = value },
+	set CHAREST_NUMBER(value: Charsets) { CHAREST_NUMBER = value },
+};
+
+interface Callback {
+	(e: Error | null, connect?: Connect): void;
 }
 
-function sendAuth(self, greeting) {
-	var opt = self.opt;
-	var token = auth.token(opt.password, greeting.scrambleBuffer);
-	var packetSize = (
-		4 + 4 + 1 + 23 +
-		opt.user.length + 1 +
-		token.length + 1 +
-		opt.database.length + 1
-	);
-	var packet = new OutgoingPacket(packetSize, greeting.number + 1);
-
-	packet.writeNumber(4, exports.DEFAULT_FLAGS);
-	packet.writeNumber(4, exports.MAX_PACKET_SIZE);
-	packet.writeNumber(1, exports.CHAREST_NUMBER);
-	packet.writeFiller(23);
-	packet.writeNullTerminated(opt.user);
-	packet.writeLengthCoded(token);
-	packet.writeNullTerminated(opt.database);
-
-	write(self, packet);
-
-	// Keep a reference to the greeting packet. We might receive a
-	// USE_OLD_PASSWORD_PROTOCOL_PACKET as a response, in which case we will need
-	// the greeting packet again. See sendOldAuth()
-	self._greeting = greeting;
+interface Request {
+	timeout: any;
+	args: [ Options, Callback ];
 }
 
-function sendOldAuth(self, greeting) {
-	var token = auth.scramble323(greeting.scrambleBuffer, self.opt.password);
-	var packetSize = (token.length + 1);
+export class Connect {
+	private _greeting: any = null;
+	private _socket: Socket | null;
+	private _tomeout = 0;
+	private _isUse = true;
+	private _isReady = false;
+	private _connectError = false;
 
-	var packet = new OutgoingPacket(packetSize, greeting.number + 3);
+	private _write(packet: OutgoingPacket) {
+		(<Socket>this._socket).write(packet.buffer);
+	}
+	
+	private _sendAuth(greeting: any) {
+		var opt = this.options;
+		var token = auth.token(<string>opt.password, greeting.scrambleBuffer);
+		var packetSize = (
+			4 + 4 + 1 + 23 +
+			(<string>opt.user).length + 1 +
+			token.length + 1 +
+			(<string>opt.database).length + 1
+		);
+		var packet = new OutgoingPacket(packetSize, greeting.number + 1);
+	
+		packet.writeNumber(4, DEFAULT_FLAGS);
+		packet.writeNumber(4, MAX_PACKET_SIZE);
+		packet.writeNumber(1, CHAREST_NUMBER);
+		packet.writeFiller(23);
+		packet.writeNullTerminated(<string>opt.user);
+		packet.writeLengthCoded(token);
+		packet.writeNullTerminated(<string>opt.database);
+	
+		this._write(packet);
+	
+		// Keep a reference to the greeting packet. We might receive a
+		// USE_OLD_PASSWORD_PROTOCOL_PACKET as a response, in which case we will need
+		// the greeting packet again. See sendOldAuth()
+		this._greeting = greeting;
+	}
+	
+	private _sendOldAuth(greeting: any) {
+		var token = auth.scramble323(greeting.scrambleBuffer, <string>this.options.password);
+		var packetSize = (token.length + 1);
+	
+		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
+	
+		// I could not find any official documentation for this, but from sniffing
+		// the mysql command line client, I think this is the right way to send the
+		// scrambled token after receiving the USE_OLD_PASSWORD_PROTOCOL_PACKET.
+		packet.write(token);
+		packet.writeFiller(1);
+	
+		this._write(packet);
+	}
+	
+	private _destroyConnect() {
+		utils.assert(!this._isUse, 'useing');
+		clearTimeout(this._tomeout);
+		if (!this._socket) return;
+		this.onError.off();
+		this.onPacket.off();
+		this.onReady.off();
+		this._socket.destroy();
+		this._socket = null;
+		connect_pool[this.options.host + ':' + this.options.port].deleteOf(this);
+	}
 
-	// I could not find any official documentation for this, but from sniffing
-	// the mysql command line client, I think this is the right way to send the
-	// scrambled token after receiving the USE_OLD_PASSWORD_PROTOCOL_PACKET.
-	packet.write(token);
-	packet.writeFiller(1);
-
-	write(self, packet);
-}
-
-function destroyConnect(self) {
-	utils.assert(!self._isUse, 'useing');
-	clearTimeout(self._tomeout);
-	if (!self._socket) return;
-	self.onError.off();
-	self.onPacket.off();
-	self.onReady.off();
-	self._socket.destroy();
-	self._socket = null;
-	connect_pool[self.opt.host + ':' + self.opt.port].deleteValue(self);
-}
-
-var Connect = utils.class('Connect', {
-	//private:
-	_greeting: null,
-	_socket: null,
-	_parser: null,
-	_tomeout: 0,
-	_isUse: true,
-	_isReady: false,
-
-	// public:
 	/**
 	 * option
 	 * @type {Object}
 	 */
-	opt: null,
-
-	onError: null,
-	onPacket: null,
-	onReady: null,
+	readonly options: Options;
+	readonly onError = new EventNoticer<Error>('Error', this);
+	readonly onPacket = new EventNoticer<Packet>('Packet', this);
+	readonly onReady = new EventNoticer<void>('Ready', this);
 	
 	/**
 	 * constructor function
 	 * @param {Object}   opt
 	 * @constructor
 	 */
-	constructor: function(opt) {
-		event.initEvents(this, 'Error', 'Packet', 'Ready');
-
-		this.opt = opt;
+	constructor(options?: Options) {
+		this.options = Object.assign({}, defaultOptions, options);
 		var self = this;
-		var parser = self._parser = new Parser();
-		var socket = self._socket = new Socket();
+		var parser = new Parser();
+		var socket = this._socket = new Socket();
 
-		function error(err) {
+		function error(err: any) {
 			self._connectError = true;
 			self.onError.trigger(Error.new(err));
-			destroyConnect(self);
+			self._destroyConnect();
 		}
 		socket.setNoDelay(true);
 		socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
@@ -144,39 +205,40 @@ var Connect = utils.class('Connect', {
 		socket.on('error', err=>error(err));
 		socket.on('end', ()=>error('mysql server has been disconnected'));
 
-		parser.onpacket.on(function(e) {
-			var packet = e.data;
-			if (packet.type === ERROR_PACKET) {
-				error({ message: 'ERROR_PACKET', packet: packet.toUserObject() });
-			} else if (this._isReady) {
+		parser.onPacket.on(function(e) {
+			var packet = <Packet>e.data;
+			if (packet.type === ParserConstants.ERROR_PACKET) {
+				error({ message: 'ERROR_PACKET', ...packet.toJSON() });
+			} else if (self._isReady) {
 				self.onPacket.trigger(packet);
-			} else if (packet.type == GREETING_PACKET) {
-				sendAuth(self, packet);
-			} else if (packet.type == USE_OLD_PASSWORD_PROTOCOL_PACKET) {
-				sendOldAuth(self, self._greeting);
+			} else if (packet.type == ParserConstants.GREETING_PACKET) {
+				self._sendAuth(packet);
+			} else if (packet.type == ParserConstants.USE_OLD_PASSWORD_PROTOCOL_PACKET) {
+				self._sendOldAuth(self._greeting);
 			} else { // ok
-				this._isReady = true;
+				self._isReady = true;
 				self.onReady.trigger();
 			}
 		});
 
-		socket.connect(opt.port, opt.host);
-	},
+		socket.connect(<number>this.options.port, <string>this.options.host);
+	}
 
 	/**
 	 * write buffer
 	 * @param {node.Buffer}
 	 */
-	write: function (buffer) {
-		this._socket.write(buffer);
-	},
+	write(buffer: Buffer) {
+		(<Socket>this._socket).write(buffer);
+	}
 
 	/**
 	 * return connection pool
 	 */
-	idle: function() {
+	idle() {
 		utils.assert(this.onPacket.length === 0, 'Connect.idle(), this.onPacket.length');
 		utils.assert(this._isUse, 'Connect.idle(), _isUse');
+
 		this._isUse = false;
 		this.onPacket.off();
 		this.onError.off();
@@ -189,8 +251,8 @@ var Connect = utils.class('Connect', {
 			var args = req.args;
 			var [opt] = args;
 			if (
-				opt.host == this.opt.host && opt.port === this.opt.port &&
-				opt.user == this.opt.user && opt.password == this.opt.password
+				opt.host == this.options.host && opt.port === this.options.port &&
+				opt.user == this.options.user && opt.password == this.options.password
 			) {
 				require_connect.splice(i, 1);
 				clearTimeout(req.timeout);
@@ -198,129 +260,82 @@ var Connect = utils.class('Connect', {
 				return;
 			}
 		}
-		this._tomeout = destroyConnect.setTimeout(CONNECT_TIMEOUT, this);
-	},
+		this._tomeout = (()=>this._destroyConnect()).setTimeout(CONNECT_TIMEOUT);
+	}
 
-	_changeDB(db, cb) {
-		if (db != this.opt.database) { // change  db
+	private _changeDB(db: string, cb: Callback) {
+		if (db != this.options.database) { // change  db
 			// init db, change db
 			utils.assert(this._isReady);
-			this.opt.database = db;
+			this.options.database = db;
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
-			packet.writeNumber(1, constants.COM_INIT_DB);
+			packet.writeNumber(1, Constants.COM_INIT_DB);
 			packet.write(db, 'utf-8');
-			write(this, packet);
+			this._write(packet);
 			this._isReady = false;
 		}
 		this._ready(cb);
-	},
+	}
 
-	_ready: function(cb) {
+	private _ready(cb: Callback) {
 		if (this._isReady)
 			return cb(null, this);
 		// wait ready
 		this.onReady.once(()=>cb(null, this));
-		this.onError.once(e=>cb(e.data));
-	},
+		this.onError.once(e=>cb(<Error>e.data));
+	}
 
 	/**
 		* start use connect
 		*/
-		_use: function () {
+	private _use() {
 		this._isUse = true;
 		clearTimeout(this._tomeout);
-	},
+	}
 
-});
+	/**
+	 * get connect
+	 * @param {Object}   opt
+	 * @param {Function} cb
+	 */
+	static resolve(opt: Options, cb: Callback) {
+		var key = opt.host + ':' + opt.port;
+		var pool = connect_pool[key] || (connect_pool[key] = []);
 
-/**
- * get connect
- * @param {Object}   opt
- * @param {Function} cb
- */
-function resolve(opt, cb) {
-	var key = opt.host + ':' + opt.port;
-	var pool = connect_pool[key] || (connect_pool[key] = []);
-
-	for (var c of pool) {
-		var options = c.opt;
-		if (!c._isUse && !c._connectError) {
-			if (options.user == opt.user && options.password == opt.password) {
-				c._use();
-				if (options.database == opt.database) {
-					utils.nextTick(cb, null, c);
-				} else {
-					c._changeDB(opt.database, cb);
+		for (var c of pool) {
+			var options = c.options;
+			if (!c._isUse && !c._connectError) {
+				if (options.user == opt.user && options.password == opt.password) {
+					c._use();
+					if (options.database == opt.database) {
+						utils.nextTick(cb, null, c);
+					} else {
+						c._changeDB(<string>opt.database, cb);
+					}
+					return;
 				}
-				return;
 			}
 		}
+
+		//is max connect
+		if (pool.length < MAX_CONNECT_COUNT) {
+			var con = new Connect(opt);
+			pool.push(con);
+			con._ready(cb);
+			return;
+		}
+
+		// queue up
+		var req: Request = {
+			timeout: function() {
+				require_connect.deleteOf(req);
+				cb(new Error('obtaining a connection from the connection pool timeout'));
+			} .setTimeout(CONNECT_TIMEOUT),
+			args: [opt, cb]
+		};
+		//append to require connect
+		require_connect.push(req);
 	}
+}
 
-	//is max connect
-	if (pool.length < exports.MAX_CONNECT_COUNT) {
-		var con = new Connect(opt);
-		pool.push(con);
-		con._ready(cb);
-		return;
-	}
-
-	// queue up
-	var req = {
-		timeout: function() {
-			require_connect.deleteValue(req);
-			cb(new Error('obtaining a connection from the connection pool timeout'));
-		} .setTimeout(CONNECT_TIMEOUT),
-		args: Array.toArray(arguments)
-	};
-	//append to require connect
-	require_connect.push(req);
-};
-
-exports.resolve = resolve;
-
-/**
-	* <span style="color:#f00">[static]</span>max connect count
-	* @type {Numbet}
-	* @static
-	*/
-exports.MAX_CONNECT_COUNT = 20;
-
-/**
-	* <b style="color:#f00">[static]</b>default flags
-	* @type {Number}
-	* @static
-	*/
-exports.DEFAULT_FLAGS = 
-		constants.CLIENT_LONG_PASSWORD
-	| constants.CLIENT_FOUND_ROWS
-	| constants.CLIENT_LONG_FLAG
-	| constants.CLIENT_CONNECT_WITH_DB
-	| constants.CLIENT_ODBC
-	| constants.CLIENT_LOCAL_FILES
-	| constants.CLIENT_IGNORE_SPACE
-	| constants.CLIENT_PROTOCOL_41
-	| constants.CLIENT_INTERACTIVE
-	| constants.CLIENT_IGNORE_SIGPIPE
-	| constants.CLIENT_TRANSACTIONS
-	| constants.CLIENT_RESERVED
-	| constants.CLIENT_SECURE_CONNECTION
-	| constants.CLIENT_MULTI_STATEMENTS
-	| constants.CLIENT_MULTI_RESULTS;
-
-/**
-	* <b style="color:#f00">[static]</b>max packet size
-	* @type {Number}
-	* @static
-	*/
-exports.MAX_PACKET_SIZE = 0x01000000;
-
-/**
-	* <b style="color:#f00">[static]</b>charest number
-	* @type {Number}
-	* @static
-	*/
-exports.CHAREST_NUMBER = constants.UTF8_UNICODE_CI;
-
-
-export default {}
+export const resolve = Connect.resolve;

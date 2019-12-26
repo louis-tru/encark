@@ -28,16 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var Buffer = require('buffer').Buffer;
-var util = require('../util');
-
-exports.OutgoingPacket = util.class('OutgoingPacket', {
+export class OutgoingPacket {
 
 	/**
 	 * index
 	 * @type {Number}
 	 */
-	index: 0,
+	index = 0;
+	buffer: Buffer;
 
 	/**
 	 * constructor function
@@ -45,40 +43,39 @@ exports.OutgoingPacket = util.class('OutgoingPacket', {
 	 * @param {Number} num
 	 * @constructor
 	 */
-	constructor: function (size, num) {
+	constructor(size: number, num?: number) {
 		this.buffer = Buffer.alloc(size + 3 + 1);
 		this.writeNumber(3, size);
 		this.writeNumber(1, num || 0);
-	},
+	}
 
-	writeNumber: function (bytes, number) {
+	writeNumber(bytes: number, number: number) {
 		for (var i = 0; i < bytes; i++) {
 			this.buffer[this.index++] = (number >> (i * 8)) & 0xff;
 		}
-	},
+	}
 
-	writeFiller: function (bytes) {
+	writeFiller(bytes: number) {
 		for (var i = 0; i < bytes; i++) {
 			this.buffer[this.index++] = 0;
 		}
-	},
+	}
 
-	write: function (bufferOrString, encoding) {
+	write(bufferOrString: Buffer | string, encoding?: BufferEncoding) {
 		if (typeof bufferOrString == 'string') {
 			this.index += this.buffer.write(bufferOrString, this.index, encoding);
 			return;
 		}
-
 		bufferOrString.copy(this.buffer, this.index, 0);
 		this.index += bufferOrString.length;
-	},
+	}
 
-	writeNullTerminated: function (bufferOrString, encoding) {
+	writeNullTerminated(bufferOrString: Buffer | string, encoding?: BufferEncoding) {
 		this.write(bufferOrString, encoding);
 		this.buffer[this.index++] = 0;
-	},
+	}
 
-	writeLengthCoded: function (bufferOrStringOrNumber, encoding) {
+	writeLengthCoded(bufferOrStringOrNumber: Buffer | string | number, encoding?: BufferEncoding) {
 		if (bufferOrStringOrNumber === null) {
 			this.buffer[this.index++] = 251;
 			return;
@@ -119,9 +116,6 @@ exports.OutgoingPacket = util.class('OutgoingPacket', {
 		}
 
 		throw new Error('passed argument not a buffer, string or number: ' + bufferOrStringOrNumber);
-	},
+	}
 
-});
-
-
-export default {}
+}

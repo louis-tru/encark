@@ -28,9 +28,9 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var Bisection = require('./bisection').Bisection;
-var createHash = require('crypto').createHash;
+import utils from '../util';
+import {Bisection} from './bisection';
+import {createHash} from 'crypto';
 var StringDecoder = require('string_decoder').StringDecoder;
 
 /*

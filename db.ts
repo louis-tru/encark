@@ -29,65 +29,78 @@
  * ***** END LICENSE BLOCK ***** */
 
 import {EventNoticer} from './event';
+import {PacketData} from './mysql/parser';
+import {Field} from './mysql/query';
+
+export interface Result extends PacketData {
+	rows?: Any[];
+	fields?: Any<Field>;
+}
+
+export interface Callback {
+	(err: Error | null, data?: Result[]): void;
+}
+
+export interface Options {
+	port?: number;
+	host?: string;
+	user?: string;
+	password?: string;
+	database?: string;
+}
+
+export const defaultOptions: Options = {
+	port: 3306,
+	host: 'localhost',
+	user: 'root',
+	password: '',
+	database: '',
+};
 
 /**
  * @class Database
  */
-export class Database {
+export abstract class Database {
 	
-	// @public:
+	readonly options: Options;
+	readonly onError = new EventNoticer<Error>('Error', this);
 
-	/**
-	 * host
-	 * @type {String}
-	 */
-	host: string = 'localhost';
-
-	/**
-	 * prot
-	 * @type {Number}
-	 */
-	port: number = 0;
-	
-	/**
-	 * username
-	 * @type {String}
-	 */
-	user: string = 'root';
-	
-	/**
-	 * password
-	 * @type {String}
-	 */
-	password: string = 'root';
-	
-	/**
-	 * database name
-	 * @type {String}
-	 */
-	database: string = '';
-
-	/**
-	 * @event onError
-	 */
-	onError = new EventNoticer('Error', this);
+	constructor(options?: Options) {
+		this.options = Object.assign({}, defaultOptions, options);
+	}
 
 	/**
 	 * database statistics
-	 * @method statistics
-	 * @param {Function} cb
 	 */
-	statistics() {}
+	abstract statistics(cb: Callback): void;
 
 	/**
 	 * @func query()
 	 */
-	query(sql: string, cb: any) {}
+	abstract query(sql: string, cb: Callback): void;
+
+	/**
+	 * close database connection
+	 */
+	abstract close(): void;
+	
+	/**
+	 * srart transaction
+	 */
+	abstract transaction(): void;
+	
+	/**
+	 * commit transaction
+	 */
+	abstract commit(): void;
+	
+	/**
+	 * rollback transaction and clear sql command queue
+	 */
+	abstract rollback(): void;
 
 	/**
 	 * exec query database
-	 * @method exec
-	 * @param  {String}   sql
 	 */
 	exec(sql: string): Promise<any> {
 		return new Promise((resolve, reject)=>{
@@ -97,66 +110,35 @@ export class Database {
 		});
 	}
 
-	/**
-	 * close database connection
-	 * @method close
-	 */
-	close() {}
-	
-	/**
-	 * srart transaction
-	 * @method transaction
-	 */
-	transaction() {}
-	
-	/**
-	 * commit transaction
-	 * @method commit
-	 */
-	commit() {}
-	
-	/**
-	 * rollback transaction and clear sql command queue
-	 * @method rollback
-	 */
-	rollback() {}
-	// @end
+}
+
+/**
+ * escape sql param
+ */
+export function escape(param: any) {
+	if (param === undefined || param === null)
+		return 'NULL';
+
+	var type = typeof param;
+	if (type == 'boolean' || type == 'number')
+		return param + '';
+
+	if (param instanceof Date) 
+		return param.toString("'yyyy-MM-dd hh:mm:ss'");
+		
+	return "'" + (param + '').replace(/[\0\n\r\b\t\\\'\"\x1a]/g, function (s) {
+		switch (s) {
+			case "\0": return "\\0";
+			case "\n": return "\\n";
+			case "\r": return "\\r";
+			case "\b": return "\\b";
+			case "\t": return "\\t";
+			case "\x1a": return "\\Z";
+			default: return "\\" + s;
+		}
+	}) + "'";
 }
 
 export default {
-
-	Database: Database,
-
-	/**
-	 * escape sql param
-	 * @param  {String} param
-	 * @return {String}
-	 * @static
-	 */
-	escape(param: any) {
-
-		if (param === undefined || param === null)
-			return 'NULL';
-
-		var type = typeof param;
-		if (type == 'boolean' || type == 'number')
-			return param + '';
-
-		if (param instanceof Date) 
-			return param.toString("'yyyy-MM-dd hh:mm:ss'");
-			
-		return "'" + (param + '').replace(/[\0\n\r\b\t\\\'\"\x1a]/g, function (s) {
-			switch (s) {
-				case "\0": return "\\0";
-				case "\n": return "\\n";
-				case "\r": return "\\r";
-				case "\b": return "\\b";
-				case "\t": return "\\t";
-				case "\x1a": return "\\Z";
-				default: return "\\" + s;
-			}
-		}) + "'";
-	}
-	// @end
+	Database, escape,
 };
-

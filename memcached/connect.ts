@@ -28,18 +28,16 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var Socket = require('net').Socket;
-var Buffer = require('buffer').Buffer;
+import utils from '../util';
+import {Socket} from 'net';
 
-var LINEBREAK = '\r\n';
-var FLUSH = 1E3;
-var BUFFER = 1E2;
-var CONTINUE = 1E1;
-var FLAG_JSON = 1 << 1;
-var FLAG_BINARY = 2 << 1;
-var CONNECT_TIMEOUT = 1e4;
-var connections = {};
+const LINEBREAK = '\r\n';
+const FLUSH = 1E3;
+const BUFFER = 1E2;
+const CONTINUE = 1E1;
+const FLAG_JSON = 1 << 1;
+const FLAG_BINARY = 2 << 1;
+const connections = {};
 
 // These do not need to be publicly available as it's one of the most important
 // parts of the whole client, the parser commands:
@@ -344,109 +342,99 @@ function connectionErrorHandler(self, err) {
  * @author xuewen.chu <louis.tru@gmail.com>
  */
 
-var private$connect = util.class('private$connect', {
+class Connect {
 
-	//private:
-	_socket: null,
-	_buffer: '',
-	_init_queue: null,
+	private _socket: Socket;
+	private _buffer: Buffer | null = null;
+	private _init_queue: Any[] = [];
 
-	//public:
-	/**
-		* meta data
-		*
-		*/
-	metaData: null,
+	metaData: Any[] = [];
 
 	/**
 		* server
-		* @type {String}
 		*/
-	server: null,
+	readonly server: string;
 
 	/**
 		* connected
-		* @type {Boolean}
 		*/
-	connected: false,
+	connected: boolean = false;
 
 	/**
 		* constructor function
-		* @param {String}   server
-		* @param {Function} cb
-		* @constructor
 		*/
-	constructor: function (server, cb) {
-		var self = this;
+	constructor(server: string) {
+		this.server = server;
 
-		self.metaData = [];
-		self._init_queue = [];
-		self.server = server;
-
-		var mat = server.match(/(.*):(\d+)$/);
+		var mat = <RegExpMatchArray>server.match(/(.*)(:(\d+))?$/);
+		utils.assert(mat, 'Incorrect server');
 		var host = mat[1];
-		var port = parseInt(mat[2]);
+		var port = Number(mat[3]) || 11211;
 
 		var socket = this._socket = new Socket();
-		socket.setTimeout(Connect.CONNECT_TIMEOUT);
+
+		socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
 		socket.setNoDelay(true);
-		socket.connect(port, host);
 
 		socket.on('error', function (err) {
 			connectionErrorHandler(self, err);
 			removeConnect(self);
 		});
+
 		socket.on('end', function () {
 			var err = new Error('memcached server has been disconnected')
 			connectionErrorHandler(self, err);
 			removeConnect(self);
 		});
+
 		socket.on('connect', function () {
 			var cmd;
 			self.connected = true;
 			while (cmd = self._init_queue.shift())
 				self._socket.write(cmd);
 		});
+		
 		socket.on('data', parser.bind(null, self));
-	},
+
+		socket.connect(port, host);
+	}
 
 	/**
 		* write
 		* @param {String} cmd
 		* @param {Object} data (Optional)
 		*/
-	write: function (cmd, data) {
+	write(cmd: string, data?: any) {
 		if (data)
 			this.metaData.push(data);
-		this.connected ?
-			this._socket.write(cmd) : this._init_queue.push(cmd);
+		if (this.connected) {
+			this._socket.write(cmd); // : this._init_queue.push(cmd);
+		} else {
+			this._init_queue.push(cmd);
+		}
 	}
+}
 
-});
+export default function write(server: string, cmd: string, data?: any) {
+	var connect = connections[server];
+	if (!connect) {
+		connections[server] = connect = new Connect(server)
+	}
+	connect.write(cmd, data);
+}
 
-module.exports = {
-
-	/**
-		* write connect
-		* @param {String}   server
-		* @param {String}   cmd
-		* @param {Object}   data (Optional)
-		* @static
-		*/
-	write: function (server, cmd, data) {
-
-		var connect =
-		connections[server] || (connections[server] = new private$connection(server));
-
-		connect.write(cmd, data);
-	},
-
-	/**
-		* <span style="color:#f00">[static]</span>connect max timeout
-		* @type {Numbet}
-		* @static
-		*/
-	CONNECT_TIMEOUT: CONNECT_TIMEOUT
-
-};
+// module.exports = {
+// 	/**
+// 		* write connect
+// 		* @param {String}   server
+// 		* @param {String}   cmd
+// 		* @param {Object}   data (Optional)
+// 		* @static
+// 		*/
+// 	write(server, cmd, data) {
+// 		var connect =
+// 		connections[server] || (connections[server] = new private$connection(server));
+// 		connect.write(cmd, data);
+// 	},
+// };
 

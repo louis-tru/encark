@@ -28,185 +28,182 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var {Database} = require('../db');
-var constants = require('./constants');
-var {Query} = require('./query');
-var {OutgoingPacket} = require('./outgoing_packet');
-var {Buffer} = require('buffer');
-var connect_lib = require('./connect');
+import utils from '../util';
+import {Database, Callback, Options, Result} from '../db';
+import constants from './constants';
+import {Query, Field} from './query';
+import {OutgoingPacket} from './outgoing_packet';
+import { Connect } from './connect';
+import { Constants, Packet, IPacket } from './parser';
 
-//private:
-//close back connect
-function close(self) {
-	var connect = self._connect;
-	self._connect = null;
-	if (connect) {
-		connect.onPacket.off('using');
-		connect.onError.off('using');
-		connect.idle();
-	} else if (self._connecting) {
-		self._connecting = false;
-	}
+interface After {
+	(packet: IPacket): void;
 }
 
-//net error and connection error
-function handlError(self, err) {
-	close(self); // close this connect
-	var item = self._queue[0];
-	var after = item ? item.after : null;
-
-	if (after) {
-		after({ toUserObject: function() { return err } });
-	} else {
-		self.onError.trigger(err);
-		dequeue(self);
-		console.error(err);
-	}
-}
-
-//onpacket handle
-function handlePacket(self, e) {
-	var packet = e.data;
-	// @TODO Simplify the code below and above as well
-	var item = self._queue[0];
-	var after = item ? item.after : null;
-	if (after) {
-		after(packet);
-	} else {
-		if (packet.type === Parser.ERROR_PACKET) {
-			self.onError.trigger(packet);
-			console.error(packet);
-		}
-		dequeue(self);
-	}
-}
-
-function after(self, cb) {
-	return function(packet) {
-		var data = packet.toUserObject();
-		if (packet.type === Parser.ERROR_PACKET) {
-			cb(data);
-		} else {
-			cb(null, data);
-		}
-		dequeue(self);
-	}
-}
-
-//get connect
-function connect(self) {
-	if (self._connecting) return;
-	self._connecting = true;
-
-	connect_lib.resolve({
-		host: self.host,
-		port: self.port,
-		user: self.user,
-		password: self.password,
-		database: self.database
-	}, function (err, connect) {
-		util.assert(self._connecting);
-		if (err) {
-			handlError(self, err);
-		} else {
-			connect.onPacket.on2(handlePacket, self, 'using');
-			connect.onError.on(e=>handlError(self, e.data), 'using');
-			self._connect = connect;
-			self._connecting = false;
-			self._queue[0].exec();
-		}
-	});
-}
-
-//write packet
-function write(self, packet) {
-	self._connect.write(packet.buffer);
-}
-
-//enqueue
-function enqueue(self, exec, after) {
-	self._queue.push({ exec, after });
-	if (self._connect) {
-		if (self._queue.length === 1) {
-			if (self._connect)
-				exec();
-		}
-	} else {
-		connect(self);
-	}
-}
-
-//dequeue
-function dequeue(self) {
-	var queue = self._queue;
-	queue.shift();
-	if (queue.length) {
-		if (self._connect) {
-			queue[0].exec();
-		} else {
-			connect(self);
-		}
-	}
+interface Queue {
+	exec(): void;
+	after?: After;
 }
 
 //public:
-exports.Mysql = util.class('Mysql', Database, {
+export class Mysql extends Database {
 
-	//private:
-	_queue: null,
-	_connect: null,
-	_transaction: false,
-	_connecting: false,
+	private _queue: Queue[];
+	private _connect: Connect | null = null;
+	private _transaction = false;
+	private _connecting = false;
 
-	//public:
-	port: 3306,
-	host: '127.0.0.1',
-	user: 'root',
-	password: '',
-	database: '',
+	//close back connect
+	private _close() {
+		var self = this;
+		var connect = self._connect;
+		self._connect = null;
+		if (connect) {
+			connect.onPacket.off('using');
+			connect.onError.off('using');
+			connect.idle();
+		} else if (self._connecting) {
+			self._connecting = false;
+		}
+	}
+
+	//net error and connection error
+	private _handlError(err: Error) {
+		var self = this;
+		self._close(); // close this connect
+		var item = self._queue[0];
+		var after = item ? item.after : null;
+		if (after) {
+			after({ type: Constants.ERROR_PACKET, toJSON: function() { return err } });
+		} else {
+			self.onError.trigger(err);
+			self._dequeue();
+			console.error(err);
+		}
+	}
+
+	//onpacket handle
+	private _handlePacket(packet: Packet) {
+		var self = this;
+		// @TODO Simplify the code below and above as well
+		var item = self._queue[0];
+		var after = item ? item.after : null;
+		if (after) {
+			after(packet);
+		} else {
+			if (packet.type === Constants.ERROR_PACKET) {
+				self.onError.trigger(<Error>packet.toJSON());
+				console.error(packet);
+			}
+			self._dequeue();
+		}
+	}
+
+	private _after(cb: Callback): After {
+		var self = this;
+		return function(packet: IPacket) {
+			var data = packet.toJSON();
+			if (packet.type === Constants.ERROR_PACKET) {
+				cb(<Error>data);
+			} else {
+				cb(null, [data]);
+			}
+			self._dequeue();
+		}
+	}
+
+	//get connect
+	private __connect() {
+		var self = this;
+		if (self._connecting)
+			return;
+		self._connecting = true;
+
+		Connect.resolve(self.options, function(err, connect) {
+			utils.assert(self._connecting);
+			if (err) {
+				self._handlError(err);
+			} else {
+				if (!connect)
+					throw new Error('Type error');
+				connect.onPacket.on(e=>self._handlePacket(<Packet>e.data), 'using');
+				connect.onError.on(e=>self._handlError(<Error>e.data), 'using');
+				self._connect = connect;
+				self._connecting = false;
+				self._queue[0].exec();
+			}
+		});
+	}
+
+	//write packet
+	private _write(packet: OutgoingPacket) {
+		(<Connect>this._connect).write(packet.buffer);
+	}
+
+	//enqueue
+	private _enqueue(exec: ()=>void, after?: After) {
+		var self = this;
+		self._queue.push({ exec, after });
+		if (self._connect) {
+			if (self._queue.length === 1) {
+				if (self._connect)
+					exec();
+			}
+		} else {
+			self.__connect();
+		}
+	}
+
+	//dequeue
+	private _dequeue() {
+		var self = this;
+		var queue = self._queue;
+		queue.shift();
+		if (queue.length) {
+			if (self._connect) {
+				queue[0].exec();
+			} else {
+				self.__connect();
+			}
+		}
+	}
 
 	/**
 		* is connection
-		* @get connected
 		*/
 	get connected() {
 		return !!this._connect;
-	},
+	}
 
 	/**
 		* constructor function
-		* @param {Object} conf (Optional)
-		* @constructor
 		*/
-	constructor: function(conf) {
-		Database.call(this);
-		util.update(this, conf);
+	constructor(options?: Options) {
+		super(options);
 		this._queue = [];
-	},
+	}
 
-	//overlay
-	statistics: function(cb) {
+	statistics(cb: Callback) {
 		var self = this;
-		enqueue(self, function() {
+		self._enqueue(function() {
 			var packet = new OutgoingPacket(1);
 			packet.writeNumber(1, constants.COM_STATISTICS);
-			write(self, packet);
-		}, after(this, cb));
-	},
+			self._write(packet);
+		}, self._after(cb));
+	}
 
-	//overlay
-	query: function(sql, cb) {
+	query(sql: string, cb?: Callback) {
 		var self = this;
 		var query = new Query(sql);
-		
+
 		if (cb) {
-			var dataSet = [];
-			var rows = [], ields = {};
+			var dataSet: Result[] = [];
+			var rows: Any[] = [];
+			var fields: Any<Field> = {};
 
 			query.onError.on(function (e) {
 				cb(e.data);
-				dequeue(self);
+				self._dequeue();
 			});
 			query.onResolve.on(function(e) {
 				rows = []; fields = {};
@@ -219,68 +216,62 @@ exports.Mysql = util.class('Mysql', Database, {
 			query.onRow.on(function(e) {
 				rows.push(e.data);
 			});
-			query.onEnd.on(function(e) { 
+			query.onEnd.on(function(e) {
 				cb(null, dataSet);
-				dequeue(self);
+				self._dequeue();
 			});
 		}
 		else {
 			query.onError.on(function (e) {
-				dequeue(self);
+				self._dequeue();
 			});
 			query.onEnd.on(function () {
-				dequeue(self);
+				self._dequeue();
 			});
 		}
 
-		enqueue(self, function() {
+		self._enqueue(function() {
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(sql, 'utf-8'));
 			packet.writeNumber(1, constants.COM_QUERY);
 			packet.write(sql, 'utf-8');
-			write(self, packet);
-		}, function(packet) {
-			query.handlePacket(packet);
+			self._write(packet);
+		}, function(packet: IPacket) {
+			query.handlePacket(<Packet>packet);
 		});
 
 		return query;
-	},
+	}
 
-	//overlay
-	close: function() {
+	close() {
 		var self = this;
 		if (self._queue.length) {
 			if (self._transaction)
 				self.commit();
-			enqueue(self, function() {
-				close(self);
-				dequeue(self);
+			self._enqueue(function() {
+				self._close();
+				self._dequeue();
 			});
 		} else {
-			close(self);
+			self._close();
 		}
-	},
+	}
 
-	//overlay
-	transaction: function() {
+	transaction() {
 		if (this._transaction)
 			return;
 		this._transaction = true;
 		this.query('START TRANSACTION');
-	},
+	}
 
-	//overlay
-	commit: function() {
+	commit() {
 		this._transaction = false;
 		this.query('COMMIT');
-	},
+	}
 
-	//overlay
-	rollback: function() {
+	rollback() {
 		this._queue = [];
 		this._transaction = false;
 		this.query('ROLLBACK');
-	},
+	}
 	
-});
-
-export default {}
+}

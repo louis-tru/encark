@@ -142,7 +142,7 @@ export class Notification<Data = any, Return = number, Sender = any> {
 	* @arg name {String}       事件名称
 	* @arg data {Object}       要发送的消数据
 	*/
-	trigger(name: string, data?: Data) {
+	trigger(name: string, data: Data) {
 		return this.triggerWithEvent(name, new Event<Data, Return, Sender>(data));
 	}
 
@@ -177,7 +177,7 @@ export class Notification<Data = any, Return = number, Sender = any> {
 	/**
 	 * @func removeEventListener(name,[func[,scope]])
 	 */
-	removeEventListener(name: string, listen: any, scope?: any) {
+	removeEventListener(name: string, listen?: any, scope?: any) {
 		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			noticer.off(listen, scope);

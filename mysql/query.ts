@@ -28,110 +28,118 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var util = require('../util');
-var event = require('../event');
-var parser = require('./parser');
-var { Buffer } = require('buffer');
+import { EventNoticer } from '../event';
+import { Packet, Constants, PacketData } from './parser';
 
-var Query = util.class('Query', {
+export enum FieldType {
+	FIELD_TYPE_DECIMAL = 0x00,
+	FIELD_TYPE_TINY = 0x01,
+	FIELD_TYPE_SHORT = 0x02,
+	FIELD_TYPE_LONG = 0x03,
+	FIELD_TYPE_FLOAT = 0x04,
+	FIELD_TYPE_DOUBLE = 0x05,
+	FIELD_TYPE_NULL = 0x06,
+	FIELD_TYPE_TIMESTAMP = 0x07,
+	FIELD_TYPE_LONGLONG = 0x08,
+	FIELD_TYPE_INT24 = 0x09,
+	FIELD_TYPE_DATE = 0x0a,
+	FIELD_TYPE_TIME = 0x0b,
+	FIELD_TYPE_DATETIME = 0x0c,
+	FIELD_TYPE_YEAR = 0x0d,
+	FIELD_TYPE_NEWDATE = 0x0e,
+	FIELD_TYPE_VARCHAR = 0x0f,
+	FIELD_TYPE_BIT = 0x10,
+	FIELD_TYPE_NEWDECIMAL = 0xf6,
+	FIELD_TYPE_ENUM = 0xf7,
+	FIELD_TYPE_SET = 0xf8,
+	FIELD_TYPE_TINY_BLOB = 0xf9,
+	FIELD_TYPE_MEDIUM_BLOB = 0xfa,
+	FIELD_TYPE_LONG_BLOB = 0xfb,
+	FIELD_TYPE_BLOB = 0xfc,
+	FIELD_TYPE_VAR_STRING = 0xfd,
+	FIELD_TYPE_STRING = 0xfe,
+	FIELD_TYPE_GEOMETRY = 0xff
+};
 
-	_eofs: 0,
+export class Field {
+	readonly name: string;
+	readonly type: FieldType;
+	constructor(name: string, type: FieldType) {
+		this.name = name;
+		this.type = type;
+	}
+}
 
-	/**
-	 * query sql
-	 * @type {String}
-	 */
-	sql: '',
+export class Query {
+	private _eofs = 0;
+	private _fields: Field[] | null = null;
+	private _rowIndex: number = 0;
+	private _row?: Any;
+	readonly sql: string;
+	readonly onError = new EventNoticer<Error>('Error', this);
+	readonly onResolve = new EventNoticer<PacketData>('Resolve', this);
+	readonly onField = new EventNoticer<Field>('Field', this);
+	readonly onRow = new EventNoticer<Any>('Row', this);
+	readonly onEnd = new EventNoticer<void>('End', this);
 
-	/**
-	 * @event onError
-	 */
-	onError: null,
-
-	/**
-	 * @event onResolve
-	 */
-	onResolve: null,
-
-	/**
-	 * @event onField
-	 */
-	onField: null,
-
-	/**
-	 * @event onRow
-	 */
-	onRow: null,
-
-	/**
-	 * @event onEnd
-	 */
-	onEnd: null,
-
-	/**
-	 * @constructor
-	 * @arg sql {String}
-	 */
-	constructor: function (sql) {
-		event.initEvents(this, 'Resolve', 'Row', 'Field', 'End', 'Error');
+	constructor(sql: string) {
 		this.sql = sql;
-	},
+	}
 
-	handlePacket: function(packet) {
-
+	handlePacket(packet: Packet) {
 		// We can't do this require() on top of the file.
 		// That's because there is circular dependency and we're overwriting
-		// module.exports
 		var self = this;
 
 		switch (packet.type) {
-			case parser.OK_PACKET:
-				self.onResolve.trigger(packet.toUserObject());
-				if (packet.serverStatus == 2 || packet.serverStatus == 3) {
-					self.onEnd.trigger();
+			case Constants.OK_PACKET:
+				this.onResolve.trigger(<PacketData>packet.toJSON());
+				if (packet.d.serverStatus == 2 || packet.d.serverStatus == 3) {
+					this.onEnd.trigger();
 				}
 				break;
-			case parser.ERROR_PACKET:
-				packet.sql = self.sql;
-				self.onError.trigger(packet.toUserObject());
+			case Constants.ERROR_PACKET:
+				// packet.sql = self.sql;
+				this.onError.trigger(<Error>packet.toJSON());
 				break;
-			case parser.FIELD_PACKET:
-				if (!self._fields) {
-					self._fields = [];
-					self.onResolve.trigger();
+			case Constants.FIELD_PACKET:
+				if (!this._fields) {
+					this._fields = [];
+					this.onResolve.trigger({});
 				}
-				this._fields.push(packet);
-				self.onField.trigger(packet);
+				var field = new Field(packet.d.name || '', packet.d.fieldType || -1);
+				this._fields.push(field);
+				this.onField.trigger(field);
 				break;
-			case parser.EOF_PACKET:
-				if (!self._eofs) {
-					self._eofs = 1;
+			case Constants.EOF_PACKET:
+				if (!this._eofs) {
+					this._eofs = 1;
 				} else {
-					self._eofs++; 
+					this._eofs++; 
 				}
-				if (self._eofs == 2) {
+				if (this._eofs == 2) {
 					this._fields = null;
-					self._eofs = 0;
-					if (packet.serverStatus == 34 || packet.serverStatus == 2) {
-						self.onEnd.trigger();
+					this._eofs = 0;
+					if (packet.d.serverStatus == 34 || packet.d.serverStatus == 2) {
+						this.onEnd.trigger();
 					}
 				}
 				break;
-			case parser.ROW_DATA_PACKET:
-				var row = {};
-				var field, value;
-				self._rowIndex = 0;
-				self._row = row;
+			case Constants.ROW_DATA_PACKET: {
+				let row: Any = {};
+				let field: Field | null = null;
+				let value: Buffer | null = null;
+				let fields = <Field[]>this._fields;
+				this._rowIndex = 0;
+				this._row = row;
 
-				packet.ondata.on(function (e) {
-
+				packet.onData.on(function(e) {
 					var data = e.data;
 					var buffer = data.buffer;
 					var remaining = data.remaining;
 
-					if (!field) {
-						field = self._fields[self._rowIndex];
-					}
+					if (!field)
+						field = fields[self._rowIndex];
 
 					if (buffer) {
 						if (value) {
@@ -149,85 +157,55 @@ var Query = util.class('Query', {
 					}
 
 					self._rowIndex++;
+
 					// NOTE: need to handle more data types, such as binary data
 					if (value !== null) {
-						value = value.toString('utf8');
+						var str_value = value.toString('utf8');
 
-						switch (field.fieldType) {
-							case exports.FIELD_TYPE_TIMESTAMP:
-							case exports.FIELD_TYPE_DATE:
-							case exports.FIELD_TYPE_DATETIME:
-							case exports.FIELD_TYPE_NEWDATE:
-								row[field.name] = new Date(value);
+						switch (field.type) {
+							case FieldType.FIELD_TYPE_TIMESTAMP:
+							case FieldType.FIELD_TYPE_DATE:
+							case FieldType.FIELD_TYPE_DATETIME:
+							case FieldType.FIELD_TYPE_NEWDATE:
+								row[field.name] = new Date(str_value);
 								break;
-							case exports.FIELD_TYPE_TINY:
-							case exports.FIELD_TYPE_SHORT:
-							case exports.FIELD_TYPE_LONG:
-							case exports.FIELD_TYPE_LONGLONG:
-							case exports.FIELD_TYPE_INT24:
-							case exports.FIELD_TYPE_YEAR:
-								row[field.name] = parseInt(value, 10);
+							case FieldType.FIELD_TYPE_TINY:
+							case FieldType.FIELD_TYPE_SHORT:
+							case FieldType.FIELD_TYPE_LONG:
+							case FieldType.FIELD_TYPE_LONGLONG:
+							case FieldType.FIELD_TYPE_INT24:
+							case FieldType.FIELD_TYPE_YEAR:
+								row[field.name] = parseInt(str_value, 10);
 								break;
-							case exports.FIELD_TYPE_FLOAT:
-							case exports.FIELD_TYPE_DOUBLE:
+							case FieldType.FIELD_TYPE_FLOAT:
+							case FieldType.FIELD_TYPE_DOUBLE:
 								// decimal types cannot be parsed as floats because
 								// V8 Numbers have less precision than some MySQL Decimals
-								row[field.name] = parseFloat(value);
+								row[field.name] = parseFloat(str_value);
 								break;
-							case exports.FIELD_TYPE_BIT:
-								row[field.name] = value == '\u0000' ? false : true;
+							case FieldType.FIELD_TYPE_BIT:
+								row[field.name] = str_value == '\u0000' ? false : true;
 								break;
 							default:
-								row[field.name] = value;
+								row[field.name] = str_value;
 								break;
 						}
 					}
 					
-					if (self._rowIndex == self._fields.length) {
+					if (self._rowIndex == fields.length) {
 						delete self._row;
 						delete self._rowIndex;
 						self.onRow.trigger(row);
 						return;
 					}
+
 					field = null;
 					value = null;
 				});
+
 				break;
+			}
 			default: break;
 		}
-	},
-
-});
-
-exports = module.exports = {
-	Query: Query,
-	FIELD_TYPE_DECIMAL: 0x00,
-	FIELD_TYPE_TINY: 0x01,
-	FIELD_TYPE_SHORT: 0x02,
-	FIELD_TYPE_LONG: 0x03,
-	FIELD_TYPE_FLOAT: 0x04,
-	FIELD_TYPE_DOUBLE: 0x05,
-	FIELD_TYPE_NULL: 0x06,
-	FIELD_TYPE_TIMESTAMP: 0x07,
-	FIELD_TYPE_LONGLONG: 0x08,
-	FIELD_TYPE_INT24: 0x09,
-	FIELD_TYPE_DATE: 0x0a,
-	FIELD_TYPE_TIME: 0x0b,
-	FIELD_TYPE_DATETIME: 0x0c,
-	FIELD_TYPE_YEAR: 0x0d,
-	FIELD_TYPE_NEWDATE: 0x0e,
-	FIELD_TYPE_VARCHAR: 0x0f,
-	FIELD_TYPE_BIT: 0x10,
-	FIELD_TYPE_NEWDECIMAL: 0xf6,
-	FIELD_TYPE_ENUM: 0xf7,
-	FIELD_TYPE_SET: 0xf8,
-	FIELD_TYPE_TINY_BLOB: 0xf9,
-	FIELD_TYPE_MEDIUM_BLOB: 0xfa,
-	FIELD_TYPE_LONG_BLOB: 0xfb,
-	FIELD_TYPE_BLOB: 0xfc,
-	FIELD_TYPE_VAR_STRING: 0xfd,
-	FIELD_TYPE_STRING: 0xfe,
-	FIELD_TYPE_GEOMETRY: 0xff
-};
-
-export default {}
+	}
+}

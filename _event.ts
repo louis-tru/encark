@@ -172,7 +172,7 @@ export class List<T> {
 	* @class Event
 	*/
 export class Event<Data = any, Return = number, Sender = any> {
-	private m_data?: Data;
+	private m_data: Data;
 	protected m_noticer: EventNoticer<Data, Return, Sender> | null = null;
 	private m_return_value: Return | null = null;
 	protected __has_event = true;
@@ -215,7 +215,7 @@ export class Event<Data = any, Return = number, Sender = any> {
 	/**
 	 * @constructor
 	 */
-	constructor(data?: Data) {
+	constructor(data: Data) {
 		this.m_data = data;
 	}
 	// @end
@@ -436,7 +436,7 @@ export class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg data {Object} # 要发送的数据
 	 * @ret {Object}
 	 */
-	trigger(data?: Data): Return | null {
+	trigger(data: Data): Return | null {
 		return this.triggerWithEvent(new Event(data));
 	}
 
@@ -469,7 +469,7 @@ export class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg [func] {Object}   # 可以是侦听函数,id,如果不传入参数卸载所有侦听器
 	 * @arg [scope] {Object}  # scope
 	 */
-	off(listen: any, scope?: any): number {
+	off(listen?: any, scope?: any): number {
 		if ( !this.m_length ) {
 			return 0;
 		}
