@@ -28,4 +28,4 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-module.exports = require('../path');
+export * from '../errno';

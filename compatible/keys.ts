@@ -28,4 +28,4 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-module.exports = require('../ws/cli');
+export * from '../keys';

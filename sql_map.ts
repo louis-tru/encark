@@ -42,17 +42,13 @@ import * as fs from './fs';
 import {Model,Collection, FetchOptions, ModelBasic, ID} from './model';
 import {Mysql} from './mysql';
 
-// var memcached = require('./memcached');
-var memcached: any = {};
-
-const local_cache: Any = {};
 const original_handles: Any<_MethodInfo> = {};
 const original_files: Any<Date> = {};
 const REG = /\{(.+?)\}/g;
 
 export interface Config {
 	type?: string;
-	memcached?: boolean;
+	redis?: Any;
 	original?: string;
 	db?: MysqlOptions;
 }
@@ -60,7 +56,7 @@ export interface Config {
 export const defaultConfig: Config = {
 	db: mysqlDefaultOptions,
 	type: 'mysql',
-	memcached: false,
+	redis: undefined,
 	original: '',
 };
 
@@ -646,31 +642,69 @@ function parseSql(self: SqlMap, name: string, param: QueryParams, options: Optio
 	return map;
 }
 
+export interface Cache {
+	get(key: string): Promise<Result[] | null>;
+	set(key: string, data: Result[], cacheTime?: number): Promise<boolean>;
+	remove(key: string): Promise<boolean>;
+	close(): void;
+}
+
 interface LocalCacheData {
-	[key: string]: {
-		data: any;
-		id: any;
-		timeout: number;
+	data: Result[];
+	timeout: number;
+}
+
+export class LocalCache implements Cache {
+	private m_host: SqlMap;
+	private m_cache: Map<string, LocalCacheData>;
+	private m_tntervalid: any;
+
+	constructor(host: SqlMap) {
+		this.m_host = host;
+		this.m_cache = new Map();
+		this.m_tntervalid = setInterval(()=>this._ClearTimeout(), 3e4/*30s*/);
 	}
-}
 
-// del cache
-// Special attention,
-// taking into account the automatic javascript resource management,
-// where there is no "This", more conducive to the release of resources
-//
-function delCache(self: SqlMap, key: string) {
-	delete (<any>self).local_cache[key];
-}
-
-function setCache(self: SqlMap, key: string, data: any, timeout: number) {
-	if (timeout > 0) {
-		var c = local_cache[key];
-		if (c) {
-			clearTimeout(c.id);
+	async get(key: string): Promise<Result[] | null> {
+		var data = this.m_cache.get(key);
+		if (data) {
+			if (data.timeout > Date.now()) {
+				this.m_cache.delete(key);
+				return null;
+			}
+			return data.data;
 		}
-		var id = delCache.setTimeout(timeout * 1e3, self, key);
-		(<any>self).m_local_cache[key] = { data, id, timeout };
+		return null;
+	}
+
+	async set(key: string, data: Result[], cacheTime: number = 0): Promise<boolean> {
+		this.m_cache.set(key, {
+			data: data,
+			timeout: cacheTime ? Date.now() + cacheTime: 0 
+		});
+		return true;
+	}
+
+	async remove(key: string): Promise<boolean> {
+		this.m_cache.delete(key);
+		return true;
+	}
+
+	_ClearTimeout() {
+		var now = Date.now();
+		var cache = this.m_cache;
+		for (var [key, data] of cache) {
+			if (data.timeout) {
+				if (data.timeout < now) {
+					cache.delete(key); // clear data
+				}
+			}
+		}
+	}
+
+	close(): void {
+		clearInterval(this.m_tntervalid)
+		this.m_cache = new Map();
 	}
 }
 
@@ -723,11 +757,7 @@ function exec(
 			} else {
 				if (type == 'get') {
 					if (cacheTime > 0) {
-						if (self.memcached) {
-							memcached.shared.set(key, data, cacheTime);
-						} else {
-							setCache(self, key, data, cacheTime);
-						}
+						self.cache.set(key, <Result[]>data, cacheTime);
 					}
 				}
 				cb(null, <Result[]>data, table);
@@ -737,23 +767,16 @@ function exec(
 		if (type == 'get') { // use cache
 			if (cacheTime > 0) {
 				key = utils.hash('get:' + sql);
-				if (self.memcached) {
-					memcached.shared.get(key, function(err?: Error, data?: any[]) {
-						if (err) {
-							console.error(err);
-							db.query(sql, handle);
-						} else {
-							cb(err || null, data || [], table);
-						}
-					});
-				} else {
-					var c = local_cache[key];
-					if (c) {
-						cb(null, c.data, table);
+				self.cache.get(key).then(e=>{
+					if (e) {
+						cb(null, e, table);
 					} else {
 						db.query(sql, handle);
 					}
-				}
+				}).catch(e=>{
+					console.error(e);
+					db.query(sql, handle);
+				});
 			} else {
 				db.query(sql, handle);
 			}
@@ -893,16 +916,20 @@ export class SqlMap implements DataSource {
 
 	private m_original_mapinfo: Any<_MethodInfo> = {};
 	private m_tables: Any = {};
-	private m_local_cache: LocalCacheData = {};
+	private m_cache: Cache;
 	readonly config: Config;
 	readonly tablesInfo: TablesInfo;
 	readonly map: SqlMap = this;
 
 	/**
-	 * @field {Boolean} is use memcached
+	 * @field {Cache} is use cache
 	 */
-	get memcached() {
-		return !!this.config.memcached;
+	get cache() {
+		return this.m_cache;
+	}
+
+	set cache(value: Cache) {
+		this.m_cache = value;
 	}
 
 	/**
@@ -945,6 +972,7 @@ export class SqlMap implements DataSource {
 		});
 
 		this.dao = new DataAccessObject(this, this.tablesInfo);
+		this.m_cache = new LocalCache(this);
 	}
 
 	primaryKey(table: string) {
