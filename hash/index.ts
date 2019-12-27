@@ -28,12 +28,16 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var crypto = require('crypto');
+import uuid from './uuid';
+import md5 from './md5';
+import sha1 from './sha1';
 
-function md5(s) {
-	return crypto.createHash('md5').update(s).digest().toJSON().data;
-}
+export * from './uuid';
+export * from './md5';
+export * from './sha1';
 
-// console.log(md5('abc'))
-
-module.exports = md5;
+export default {
+	uuid,
+	md5,
+	sha1,
+};

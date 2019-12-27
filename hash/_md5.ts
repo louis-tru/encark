@@ -8,38 +8,17 @@
  * See http://pajhome.org.uk/crypt/md5 for more info.
  */
 
-var {chrsz,str2bin,bin2binl,binl2bin,bin2str,bin2hex,bin2b64} = require('./util');
+// compatible code
 
-/*
- * These are the functions you'll usually want to call
- * They take string arguments and return either hex or base-64 encoded strings
- */
-function md5_hex(s){ return bin2hex(md5(s));}
-function md5_b64(s){ return bin2b64(md5(s));}
-function md5_str(s){ return bin2str(md5(s));}
+import util from './util';
+import Buffer, {Bytes} from '../buffer';
 
-/*
- * Perform a simple self-test to see if the VM is working
- */
-function md5_vm_test()
-{
-	var crypto = require('crypto');
-	var md5_ = crypto.createHash('md5');
-	md5_.update('abc');
-	console.log(md5_.digest());
-	console.log(Buffer.from(md5('abc')));
-
-	var hash = md5_hex("abc");
-	console.log(hash, '\n900150983cd24fb0d6963f7d28e17f72');
-	return md5_hex("abc") == "900150983cd24fb0d6963f7d28e17f72";
-}
-
-// md5_vm_test();
+const {chrsz,bin2binl,binl2bin} = util;
 
 /*
  * Calculate the MD5 of an array of little-endian words, and a bit length
  */
-function core_md5(x, len)
+function core_md5(x: number[], len: number)
 {
 	// console.log(x, len);
 
@@ -141,23 +120,23 @@ function core_md5(x, len)
 /*
  * These functions implement the four basic operations the algorithm uses.
  */
-function md5_cmn(q, a, b, x, s, t)
+function md5_cmn(q: number, a: number, b: number, x: number, s: number, t: number)
 {
 	return safe_add(bit_rol(safe_add(safe_add(a, q), safe_add(x, t)), s),b);
 }
-function md5_ff(a, b, c, d, x, s, t)
+function md5_ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number)
 {
 	return md5_cmn((b & c) | ((~b) & d), a, b, x, s, t);
 }
-function md5_gg(a, b, c, d, x, s, t)
+function md5_gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number)
 {
 	return md5_cmn((b & d) | (c & (~d)), a, b, x, s, t);
 }
-function md5_hh(a, b, c, d, x, s, t)
+function md5_hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number)
 {
 	return md5_cmn(b ^ c ^ d, a, b, x, s, t);
 }
-function md5_ii(a, b, c, d, x, s, t)
+function md5_ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number)
 {
 	return md5_cmn(c ^ (b | (~d)), a, b, x, s, t);
 }
@@ -166,7 +145,7 @@ function md5_ii(a, b, c, d, x, s, t)
  * Add integers, wrapping at 2^32. This uses 16-bit operations internally
  * to work around bugs in some JS interpreters.
  */
-function safe_add(x, y)
+function safe_add(x: number, y: number)
 {
 	var lsw = (x & 0xFFFF) + (y & 0xFFFF);
 	var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
@@ -176,24 +155,12 @@ function safe_add(x, y)
 /*
  * Bitwise rotate a 32-bit number to the left.
  */
-function bit_rol(num, cnt)
+function bit_rol(num: number, cnt: number)
 {
 	return (num << cnt) | (num >>> (32 - cnt));
 }
 
-function md5(s) {
-	if (typeof s == 'string') {
-		s = str2bin(s);
-	}	else if (s instanceof ArrayBuffer) {
-		s = new Uint8Array(s);
-	} else if (s && s.buffer instanceof ArrayBuffer) {
-		s = new Uint8Array(s.buffer);
-	}
-	return binl2bin(core_md5(bin2binl(s), s.length * chrsz));
+export default function md5(s: string | Bytes) {
+	var b = Buffer.from(s);
+	return Buffer.from(binl2bin(core_md5(bin2binl(b), b.length * chrsz)));
 }
-
-md5.md5_hex = md5_hex;
-md5.md5_b64 = md5_b64;
-md5.md5_str = md5_str;
-
-module.exports = md5;

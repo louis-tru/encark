@@ -7,40 +7,19 @@
  * See http://pajhome.org.uk/crypt/md5 for details.
  */
 
-var {chrsz,str2bin,bin2binl,binl2bin,bin2str,bin2hex,bin2b64} = require('./util');
+// compatible code
 
-/*
- * These are the functions you'll usually want to call
- * They take string arguments and return either hex or base-64 encoded strings
- */
-function sha1_hex(s){ return bin2hex(sha1(s));}
-function sha1_b64(s){ return bin2b64(sha1(s));}
-function sha1_str(s){ return bin2str(sha1(s));}
+import util from './util';
+import Buffer, {Bytes} from '../buffer';
 
-/*
- * Perform a simple self-test to see if the VM is working
- */
-function sha1_vm_test()
-{
-	var crypto = require('crypto');
-	var sha1_ = crypto.createHash('sha1');
-	sha1_.update('abc');
-	console.log(sha1_.digest());
-	console.log(Buffer.from(sha1('abc')));
-
-	var hash = sha1_hex("abc");
-	console.log(hash, '\na9993e364706816aba3e25717850c26c9cd0d89d');
-	return hash == "a9993e364706816aba3e25717850c26c9cd0d89d";
-}
-
-// sha1_vm_test();
+const {chrsz,bin2binl,binl2bin} = util;
 
 /*
  * Calculate the SHA-1 of an array of big-endian words, and a bit length
  */
-function core_sha1(x, len)
+function core_sha1(x: number[], len: number)
 {
-	x = x.map(e=>transpose(e));
+	x = x.map((e: number)=>transpose(e));
 
 	// console.log(x, len);
 
@@ -88,7 +67,7 @@ function core_sha1(x, len)
 
 }
 
-function transpose(int32) {
+function transpose(int32: number) {
 	return (
 		((int32 >> 24) & 0xff)   |
 		((int32 >> 8)  & 0xff00) |
@@ -101,7 +80,7 @@ function transpose(int32) {
  * Perform the appropriate triplet combination function for the current
  * iteration
  */
-function sha1_ft(t, b, c, d)
+function sha1_ft(t: number, b: number, c: number, d: number)
 {
 	if(t < 20) return (b & c) | ((~b) & d);
 	if(t < 40) return b ^ c ^ d;
@@ -112,7 +91,7 @@ function sha1_ft(t, b, c, d)
 /*
  * Determine the appropriate additive constant for the current iteration
  */
-function sha1_kt(t)
+function sha1_kt(t: number)
 {
 	return (t < 20) ?  1518500249 : (t < 40) ?  1859775393 :
 				 (t < 60) ? -1894007588 : -899497514;
@@ -122,7 +101,7 @@ function sha1_kt(t)
  * Add integers, wrapping at 2^32. This uses 16-bit operations internally
  * to work around bugs in some JS interpreters.
  */
-function safe_add(x, y)
+function safe_add(x: number, y: number)
 {
 	var lsw = (x & 0xFFFF) + (y & 0xFFFF);
 	var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
@@ -132,24 +111,12 @@ function safe_add(x, y)
 /*
  * Bitwise rotate a 32-bit number to the left.
  */
-function rol(num, cnt)
+function rol(num: number, cnt: number)
 {
 	return (num << cnt) | (num >>> (32 - cnt));
 }
 
-function sha1(s) {
-	if (typeof s == 'string') {
-		s = str2bin(s);
-	}	else if (s instanceof ArrayBuffer) {
-		s = new Uint8Array(s);
-	} else if (s && s.buffer instanceof ArrayBuffer) {
-		s = new Uint8Array(s.buffer);
-	}
-	return binl2bin(core_sha1(bin2binl(s), s.length * chrsz));
+export default function sha1(s: Bytes) {
+	var b = Buffer.from(s);
+	return binl2bin(core_sha1(bin2binl(b), b.length * chrsz));
 }
-
-sha1.sha1_hex = sha1_hex;
-sha1.sha1_b64 = sha1_b64;
-sha1.sha1_str = sha1_str;
-
-module.exports = sha1;

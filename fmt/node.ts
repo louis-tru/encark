@@ -39,7 +39,7 @@ var errno = require('../errno');
 /**
  * @class FNode
  */
-class FNode {
+export class FNode {
 	get id() {return null}
 	get publishURL() {return null}
 	get center() {return this.m_center}
@@ -59,7 +59,7 @@ class FNode {
 /**
  * @class FMTNodeLocal
  */
-class FNodeLocal extends FNode {
+export class FNodeLocal extends FNode {
 	get id() {
 		return this.m_center.id;
 	}
@@ -97,7 +97,7 @@ class FNodeLocal extends FNode {
 /**
  * @class FNodeRemote
  */
-class FNodeRemote extends FNode {
+export class FNodeRemote extends FNode {
 
 	constructor(center, impl, id) {
 		super(center);
@@ -212,7 +212,7 @@ class FNodeRemoteIMPL {
 /**
  * @class FNodeRemoteService
  */
-class FNodeRemoteService extends wss.WSService {
+export class FNodeRemoteService extends wss.WSService {
 
 	async requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);

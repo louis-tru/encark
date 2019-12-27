@@ -28,12 +28,31 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-if (require('../util').haveNode) {
-	var crypto = require('crypto');
-	var rng = function nodeRNG() {
-		return crypto.randomBytes(16);
-	};
-} else {
+import utils from '../util';
+import Buffer, { Bytes } from '../buffer';
+
+const rnds8 = Buffer.alloc(16);
+// Math.random()-based (RNG)
+//
+// If all else fails, use Math.random().  It's fast, but is of unspecified
+// quality.
+var _rng: ()=>Buffer = function() {
+	for (var i = 0, r = 0; i < 16; i++) {
+		if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
+		rnds8[i] = r >>> ((i & 0x03) << 3) & 0xff;
+	}
+	return rnds8;
+};
+
+if (utils.haveNode) { // node 
+
+	import('crypto').then(crypto=>{
+		_rng = function() {
+			return crypto.randomBytes(16);
+		};
+	});
+
+} else if (utils.haveWeb) {
 
 	// Unique ID creation requires a high quality random # generator.  In the
 	// browser this is a little complicated due to unknown quality of Math.random()
@@ -42,53 +61,40 @@ if (require('../util').haveNode) {
 
 	// getRandomValues needs to be invoked in a context where "this" is a Crypto
 	// implementation. Also, find the complete implementation of crypto on IE11.
-	var getRandomValues = 
+	let getRandomValues: (b: Buffer)=>Buffer =
 		(
 			typeof(crypto) != 'undefined' && 
 			crypto.getRandomValues && crypto.getRandomValues.bind(crypto)
 		) || 
 		(
-			typeof(msCrypto) != 'undefined' && 
-			typeof window.msCrypto.getRandomValues == 'function' && 
-			msCrypto.getRandomValues.bind(msCrypto)
+			typeof((<any>globalThis).msCrypto) != 'undefined' && 
+			typeof (<any>globalThis).msCrypto.getRandomValues == 'function' && 
+			(<any>globalThis).msCrypto.getRandomValues.bind((<any>globalThis).msCrypto)
 		);
 
 	if (getRandomValues) {
 		// WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
-		var rnds8 = new Uint8Array(16); // eslint-disable-line no-undef
-
-		var rng = function whatwgRNG() {
-			getRandomValues(rnds8);
-			return rnds8;
-		};
-	} else {
-		// Math.random()-based (RNG)
-		//
-		// If all else fails, use Math.random().  It's fast, but is of unspecified
-		// quality.
-		var rnds = new Array(16);
-
-		var rng = function mathRNG() {
-			for (var i = 0, r; i < 16; i++) {
-				if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
-				rnds[i] = r >>> ((i & 0x03) << 3) & 0xff;
-			}
-
-			return rnds;
+			// eslint-disable-line no-undef
+			_rng = function() {
+			return Buffer.from(getRandomValues(rnds8));
 		};
 	}
+}
+
+export function rng() {
+	return _rng();
 }
 
 /**
  * Convert array of 16 byte values to UUID string format of the form:
  * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
  */
-var byteToHex = [];
+var byteToHex: string[] = [];
 for (var i = 0; i < 256; ++i) {
 	byteToHex[i] = (i + 0x100).toString(16).substr(1);
 }
 
-function bytesToUuid(buf, offset) {
+function bytesToUuid(buf: Bytes, offset?: number) {
 	var i = offset || 0;
 	var bth = byteToHex;
 	// join used to fix memory issue caused by concatenation: https://bugs.chromium.org/p/v8/issues/detail?id=3175#c4
@@ -102,7 +108,7 @@ function bytesToUuid(buf, offset) {
 	bth[buf[i++]], bth[buf[i++]]]).join('');
 }
 
-function uuid_v4() {
+export default function uuid_v4() {
 	var rnds = rng();
 
 	// Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
@@ -111,7 +117,3 @@ function uuid_v4() {
 
 	return bytesToUuid(rnds);
 }
-
-uuid_v4.rng = rng;
-
-module.exports = uuid_v4;

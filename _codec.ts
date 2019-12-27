@@ -30,6 +30,7 @@
 
 import utils from './util';
 import errno from './errno';
+import {Bytes} from './_buffer';
 
 var b64pad = '=';
 var hex_tab = '0123456789abcdef';
@@ -39,8 +40,6 @@ var base64_keys = new Map<string, number>([['=', 65 ]]);
 
 hex_tab.split('').forEach((e,i)=>(hex_keys.set(e, i), hex_keys.set(e.toUpperCase(), i)));
 base64_tab.split('').forEach((e,i)=>base64_keys.set(e, i));
-
-type Bytes = Uint8Array | number[];
 
 // string => bytes
 // convert unicode to utf-8 codeing

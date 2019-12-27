@@ -175,10 +175,7 @@ interface ErrorDescribe {
 	error?: string;
 	description?: string;
 	errno?: number;
-	code?: string;
-	path?: string;
-	syscall?: string;
-	stack?: string;
+	child?: Error | Error[];
 	[prop: string]: any;
 }
 
@@ -186,17 +183,15 @@ type ErrnoCode = [number/*errno*/, string/*message*/, string?/*description*/];
 type ErrorNewArg = ErrnoCode | Error | string | ErrorDescribe;
 
 interface ErrorConstructor {
-	'new'(err: ErrorNewArg, errno?: number | null): Error;
+	'new'(err: ErrorNewArg, ...child: ErrorNewArg[]): Error;
 	toJSON(err: Error): any;
+	setStackTraceJSON(enable: boolean): void;
 }
 
 interface Error {
-	description?: string;
 	errno?: number;
-	code?: any;
-	path?: string;
-	syscall?: string;
-	stack?: string;
+	description?: string;
+	child?: Error[];
 	[prop: string]: any;
 }
 
@@ -204,8 +199,6 @@ interface Error {
 
 if (Date.formatTimeSpan !== undefined)
 	return;
-
-// ----------------------------- impl -----------------------------
 
 var currentTimezone = new Date().getTimezoneOffset() / -60;
 var G_slice = Array.prototype.slice;
@@ -240,7 +233,7 @@ definePropertys(Object, {
 });
 
 definePropertys(Object.prototype, {
-	hashCode: function(): number {
+	hashCode(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
 		G_hash_code_set.add(this);
@@ -255,7 +248,7 @@ definePropertys(Object.prototype, {
 
 definePropertys(Function.prototype, {
 	
-	hashCode: function(): number {
+	hashCode(): number {
 		if (!this.hasOwnProperty('M_hashCode')) {
 			Object.defineProperty(this, 'M_hashCode', { 
 				enumerable: false, configurable: false, writable: false, value: G_hash_code_id++
@@ -264,7 +257,7 @@ definePropertys(Function.prototype, {
 		return this.M_hashCode;
 	},
 
-	setTimeout: function(time: number, ...args: any[]): TimeoutResult {
+	setTimeout(time: number, ...args: any[]): TimeoutResult {
 		var fn = this;
 		return setTimeout(function() {
 			fn(...args);
@@ -274,14 +267,14 @@ definePropertys(Function.prototype, {
 });
 
 definePropertys(Array, {
-	toArray: function (obj: any, index: number, end: number): any[] {
+	toArray(obj: any, index: number, end: number): any[] {
 		return G_slice.call(obj, index, end);
 	},
 });
 
 definePropertys(Array.prototype, {
 
-	hashCode: function(): number {
+	hashCode(): number {
 		if (G_hash_code_set.has(this)) 
 			return 0;
 		G_hash_code_set.add(this);
@@ -295,7 +288,7 @@ definePropertys(Array.prototype, {
 		return _hash;
 	},
 
-	deleteOf: function(value: any): any[] {
+	deleteOf(value: any): any[] {
 		var i = this.indexOf(value);
 		if (i != -1) {
 			this.splice(i, 1);
@@ -303,14 +296,14 @@ definePropertys(Array.prototype, {
 		return this;
 	},
 
-	indexReverse: function (index: number): any {
+	indexReverse (index: number): any {
 		return this[this.length - 1 - index];
 	},
 
 });
 
 definePropertys(String, {
-	format: function(str: string, ...args: any[]): string {
+	format(str: string, ...args: any[]): string {
 		var val = String(str);
 		for (var i = 0, len = args.length; i < len; i++)
 			val = val.replace(new RegExp('\\{' + i + '\\}', 'g'), args[i]);
@@ -330,11 +323,11 @@ definePropertys(String.prototype, {
 
 definePropertys(Number.prototype, {
 
-	hashCode: function(): number {
+	hashCode(): number {
 		return this;
 	},
 
-	toFixedBefore: function(before: number, after: number): string {
+	toFixedBefore(before: number, after: number): string {
 		if (!isFinite(this)) {
 			return String(this);
 		} else {
@@ -351,7 +344,7 @@ definePropertys(Number.prototype, {
 });
 
 definePropertys(Boolean.prototype, {
-	hashCode: function(): number {
+	hashCode(): number {
 		return this == true ? -1186256: -23547257;
 	},
 });
@@ -360,7 +353,7 @@ definePropertys(Date, {
 
 	currentTimezone: currentTimezone,
 
-	parseDate: function(
+	parseDate(
 		date_str: string, 
 		format?: string, /* = 'yyyyMMddhhmmssfff', */
 		timezone?: number, /* = currentTimezone*/
@@ -392,7 +385,7 @@ definePropertys(Date, {
 		);
 	},
 
-	formatTimeSpan: function(time_span: number, format: string = 'dd hh:mm:ss'): string {
+	formatTimeSpan(time_span: number, format: string = 'dd hh:mm:ss'): string {
 
 		var data = [];
 		var items = [
@@ -435,16 +428,16 @@ definePropertys(Date, {
 
 definePropertys(Date.prototype, {
 
-	hashCode: function(): number {
+	hashCode(): number {
 		return this.valueOf();
 	},
 
-	add: function(ms: number): Date {
+	add(ms: number): Date {
 		this.setMilliseconds(this.getMilliseconds() + ms);
 		return this;
 	},
 
-	toString: function(format?: string, timezone?: number): string {
+	toString(format?: string, timezone?: number): string {
 		if (format/*typeof format == 'string'*/) {
 			var d = new Date(this.valueOf());
 			if (typeof timezone == 'number') {
@@ -481,29 +474,49 @@ const errors: Errors = {
 	URIError,
 };
 
+if (!Error.captureStackTrace) {
+	definePropertys(Error, {
+		captureStackTrace(targetObject: Object, constructorOpt?: Function): void {
+			// TODO ...
+		}
+	});
+}
+
+var stackTraceJSON = true;
+
 definePropertys(Error, {
 
-	new: function(arg: ErrorNewArg, errno?: number | null): Error {
+	new(arg: ErrorNewArg, ...child: ErrorNewArg[]): Error {
 		var err: Error;
 		if (arg as Object) { // ErrnoCode | Error | ErrorDescribe;
 			if (arg as Error) {
 				err = <Error>arg;
 			} if (Array.isArray(arg)) { // ErrnoCode
-				var errno_code = <ErrnoCode>arg;
-				err = new Error(errno_code[1] || errno_code[2] || 'unknown');
-				err.errno = errno_code[0];
-				err.description = errno_code[2] || '';
+				var errnoCode = <ErrnoCode>arg;
+				err = new Error(errnoCode[1] || errnoCode[2] || 'Unknown error');
+				err.errno = errnoCode[0];
+				err.description = errnoCode[2] || '';
+				Error.captureStackTrace(err, Error.new);
 			} else { // ErrorDescribe
 				var describe = <ErrorDescribe>arg;
 				var Err = <ErrorConstructor>(errors[(<Error>arg).name] || Error);
-				var msg = describe.message || describe.error || 'unknown';
+				var msg = describe.message || describe.error || 'Unknown error';
 				err = <Error>Object.assign(new Err(msg), arg);
+				Error.captureStackTrace(err, Error.new);
 			}
 		} else { // string
 			err = new Error(String(arg));
+			Error.captureStackTrace(err, Error.new);
 		}
+		err.errno = Number(err.errno) || -30000;
 
-		err.errno = Number(errno || err.errno) || -1;
+		if (child.length) {
+			if (!Array.isArray(err.child))
+				err.child = [];
+			for (var ch of child) {
+				err.child.push(Error.new(ch));
+			}
+		}
 		return err;
 	},
 
@@ -511,27 +524,30 @@ definePropertys(Error, {
 		return Error.new(err).toJSON()
 	},
 
+	setStackTraceJSON(enable: boolean) {
+		stackTraceJSON = !!enable;
+	},
+
 });
 
 definePropertys(Error.prototype, {
 
-	hashCode: function(): number {
+	hashCode(): number {
 		var _hash = Object.prototype.hashCode.call(this);
 		_hash += (_hash << 5) + this.message.hashCode();
 		return _hash;
 	},
 
-	toJSON: function(): any {
-		var err = this;
-		var r = Object.assign({}, err);
+	toJSON(): any {
+		var err: Error = this;
+		var r: any = Object.assign({}, err);
 		r.name = err.name || '';
-		r.message = err.message || 'unknown';
-		r.errno = Number(err.errno) || -1;
-		if (r.code) // compatible old
-			r.rawCode = r.code;
+		r.message = err.message || 'Unknown error';
+		r.errno = Number(err.errno) || -30000;
 		r.code = r.errno; // compatible old
 		r.description = err.description || '';
-		r.stack = err.stack || '';
+		if (stackTraceJSON)
+			r.stack = err.stack || '';
 		return r;
 	},
 });

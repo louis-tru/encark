@@ -35,7 +35,7 @@ import * as https from 'https';
 import * as url from 'url';
 import * as fs from 'fs';
 import errno from './errno';
-import {userAgent} from './request';
+import req from './request';
 
 export interface Options {
 	renewal?: boolean;
@@ -101,7 +101,7 @@ export default function wget(www: string, save: string, options?: Options): Prom
 			path: <string>uri.path,
 			method: 'GET',
 			headers: {
-				'User-Agent': userAgent,
+				'User-Agent': req.userAgent,
 			},
 			timeout: timeout || 12e4,
 			rejectUnauthorized: false,
@@ -125,7 +125,7 @@ export default function wget(www: string, save: string, options?: Options): Prom
 						download_size = start_range;
 					} else {
 						ok = true; // abort
-						return reject(Error.new(errno.ERR_DOWNLOAD_FAIL));
+						return reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
 					}
 				}
 				if (start_range) {
@@ -274,7 +274,7 @@ export default function wget(www: string, save: string, options?: Options): Prom
 				}
 			});
 
-			req.on('abort', ()=>error(errno.ERR_REQUEST_ABORT));
+			req.on('abort', ()=>error(errno.ERR_HTTP_REQUEST_ABORT));
 			req.on('error', e=>error(e));
 			req.on('timeout', ()=>{
 				error(errno.ERR_HTTP_REQUEST_TIMEOUT);
@@ -282,8 +282,6 @@ export default function wget(www: string, save: string, options?: Options): Prom
 			});
 			req.end(); // send
 		});
-
-		// 
 	});
 
 	promise.abort = abort;

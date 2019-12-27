@@ -30,29 +30,29 @@
 
 import utils from './util';
 import _codec from './_codec';
-import _buffer from './_buffer';
+import * as _buffer from './_buffer';
+
+export type InterfaceBuffer = _buffer.InterfaceBuffer;
+export type IBuffer = _buffer.InterfaceBuffer;
+export type Bytes = _buffer.Bytes;
+export type BinaryLike = _buffer.BinaryLike;
 
 const TypedArray = (<any>Uint8Array).prototype.constructor.__proto__;
-
-export type Bytes = Uint8Array | number[];
-
-export interface IBuffer extends Uint8Array {
-	toString(encoding?: string, start?: number, end?: number): string;
-}
-
-// export interface MutableBuffer extends Buffer {}
 
 export type BufferEncoding = 
 	"ascii" | "utf8" | "utf-8" | "base64" | "latin1" | "binary" | "hex";
 
 export function byteLength(
-	string: string | NodeJS.ArrayBufferView | ArrayBuffer | SharedArrayBuffer,
+	string: string | BinaryLike,
 	encoding?: BufferEncoding): number {
 	if (typeof string !== 'string') {
-		if (string instanceof ArrayBuffer || string instanceof TypedArray) {
+		if ('byteLength' in string
+			/*string as BinaryLike */
+			/*string instanceof ArrayBuffer || string instanceof TypedArray*/) {
 			return string.byteLength;
 		}
-		throw _buffer.invalidArgType(string, ['string', 'Buffer', 'ArrayBuffer'], 'string');
+		throw _buffer.default.invalidArgType(string, 
+				['string', 'Buffer', 'ArrayBuffer', 'SharedArrayBuffer', 'DataView'], 'string');
 	}
 
 	if (encoding == 'utf8' || encoding == 'utf-8') {
@@ -82,20 +82,23 @@ export function byteLength(
 /**
  * @class Buffer
  */
-export class Buffer extends Uint8Array implements IBuffer {
+export class Buffer extends Uint8Array implements InterfaceBuffer {
 
 	toString(encoding: BufferEncoding = 'utf8', start = 0, end = this.length): string {
-		this[1] = 100;
-		if (encoding == 'utf8' || encoding == 'utf-8') {
-			return _codec.decodeUTF8From(this, start, end);
-		} else if (encoding == 'hex') {
-			return _codec.encodeHexFrom(this, start, end);
-		} else if (encoding == 'base64') {
-			return _codec.encodeBase64From(this, start, end);
-		} else if (encoding == 'latin1' || encoding == 'binary') {
-			return _codec.decodeLatin1From(this, start, end);
-		} else if (encoding == 'ascii') {
-			return _codec.decodeAsciiFrom(this, start, end);
+		if (encoding) {
+			if (encoding == 'utf8' || encoding == 'utf-8') {
+				return _codec.decodeUTF8From(this, start, end);
+			} else if (encoding == 'hex') {
+				return _codec.encodeHexFrom(this, start, end);
+			} else if (encoding == 'base64') {
+				return _codec.encodeBase64From(this, start, end);
+			} else if (encoding == 'latin1' || encoding == 'binary') {
+				return _codec.decodeLatin1From(this, start, end);
+			} else if (encoding == 'ascii') {
+				return _codec.decodeAsciiFrom(this, start, end);
+			} else {
+				return _codec.decodeUTF8From(this, start, end);
+			}
 		} else {
 			return _codec.decodeUTF8From(this, start, end);
 		}
@@ -106,20 +109,20 @@ export class Buffer extends Uint8Array implements IBuffer {
 	}
 
 	static byteLength(
-		string: string | NodeJS.ArrayBufferView | ArrayBuffer | SharedArrayBuffer,
+		string: string | BinaryLike,
 		encoding?: BufferEncoding
 	): number {
-		if (utils.haveNgui)
-			return Buffer.byteLength(string, encoding);
-		else
-			return byteLength(string, encoding);
+		return byteLength(string, encoding);
 	}
 
-	// from(value: string, encoding?: BufferEncoding): IBuffer;
-	// from(value: ArrayBuffer): IBuffer;
-	static from(value: any, ...args: any[]): IBuffer {
+	static from(
+		value: string | Bytes | Iterable<number> | ArrayLike<number>,
+		encodingOrMapfn?: BufferEncoding | ((v: number, k: number) => number),
+		thisArg?: any
+	): Buffer 
+	{
 		if (typeof value === 'string') {
-			var encoding: BufferEncoding = args[0] || 'utf8';
+			var encoding: BufferEncoding = typeof encodingOrMapfn == 'string' ? encodingOrMapfn : 'utf8';
 			if (encoding == 'utf8' || encoding == 'utf-8') {
 				return new Buffer(_codec.encodeUTF8(value));
 			} else if (encoding == 'hex') {
@@ -133,10 +136,14 @@ export class Buffer extends Uint8Array implements IBuffer {
 			} else {
 				return new Buffer(_codec.encodeUTF8(value));
 			}
+		} else if (value as InterfaceBuffer) {
+			return <Buffer>value;
 		} else if (value instanceof ArrayBuffer) {
 			return new Buffer(value);
+		} if (value instanceof DataView) {
+			return new Buffer(value.buffer);
 		} else {
-			var bf = Uint8Array.from(value, ...args);
+			var bf = Uint8Array.from(<any>value, <any>encodingOrMapfn, thisArg);
 			(<any>bf).__proto__ = Buffer.prototype;
 			return <Buffer>bf;
 		}
@@ -148,9 +155,10 @@ export class Buffer extends Uint8Array implements IBuffer {
 
 	static allocUnsafe(size: number): Buffer {
 		return new Buffer( Number(size) || 0);
+		
 	}
 
-	static concat(list: Bytes[], length?: number): Buffer {
+	static concat(list: (Bytes | ArrayLike<number>)[], length?: number): Buffer {
 		if (length === undefined) {
 			length = 0;
 			for (var bytes of list) {
@@ -163,7 +171,7 @@ export class Buffer extends Uint8Array implements IBuffer {
 		}
 
 		if (list.length === 0 || length === 0)
-			return ZERO;
+			return Zero;
 
 		var bf = new Buffer(length);
 		var offset = 0;

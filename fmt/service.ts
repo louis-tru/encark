@@ -38,7 +38,7 @@ var errno = require('../errno');
 /**
  * @class FMTService
  */
-class FMTService extends wss.WSService {
+export class FMTService extends wss.WSService {
 
 	/**
 	 * @get id client
@@ -187,7 +187,7 @@ class FMTService extends wss.WSService {
 /**
  * @class FMTServerClient
  */
-class FMTServerClient {
+export class FMTServerClient {
 
 	get id() {
 		return this.m_id;
@@ -218,7 +218,3 @@ class FMTServerClient {
 }
 
 service.set('_fmt', FMTService);
-
-module.exports = {
-	FMTServerClient,
-};

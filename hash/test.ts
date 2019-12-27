@@ -28,12 +28,10 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var crypto = require('crypto');
+import hash from './index';
 
-function sha1(s) {
-	return crypto.createHash('sha1').update(s).digest().toJSON().data;
-}
+var s = hash.uuid();
+var s1 = hash.md5('a');
+var s2 = hash.sha1('a');
 
-// console.log(sha1('abc'))
-
-module.exports = sha1;
+console.log(s, s1, s2);

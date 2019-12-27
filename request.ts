@@ -182,8 +182,8 @@ function requestNgui(
 			requestHeaders: soptions.headers,
 			requestData: options.params,
 		});
-	}).catch((err:any)=>{
-		reject(err);
+	}).catch((err: any)=>{
+		reject(Error.new(err));
 	});
 }
 
@@ -243,10 +243,9 @@ function requestWeb(
 		}
 	};
 	xhr.onerror = (e: any)=>{
-		var err = Error.new(e.message);
-		reject(err);
+		reject(Error.new(e.message));
 	};
-	xhr.ontimeout = e=>{
+	xhr.ontimeout = ()=>{
 		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
 	};
 	xhr.send(post_data);
@@ -295,7 +294,7 @@ function requestNode(	options: Any,
 		});
 	});
 
-	req.on('abort', ()=>console.log('request abort'));
+	req.on('abort', ()=>reject(Error.new(errno.ERR_HTTP_REQUEST_ABORT)));
 	req.on('error', (e: any)=>reject(Error.new(e)));
 	req.on('timeout', ()=>{
 		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
@@ -559,10 +558,10 @@ export class Request {
 		var json = buf.toString('utf8');
 		var res = parseJSON(json);
 		if (this.m_enable_strict_response_data) {
-			if (res.code === 0) {
+			if (res.errno === 0) {
 				return res.data;
 			} else {
-				throw Error.new(res, res.code);
+				throw Error.new(res);
 			}
 		} else {
 			return res;
@@ -578,15 +577,26 @@ export class Request {
 
 			headers = Object.assign({}, this.getRequestHeaders(), headers);
 
-			var result = await request(url, {
-				method,
-				params,
-				headers,
-				timeout: timeout || this.m_timeout,
-				dataType: this.m_data_type,
-				userAgent: this.m_user_agent,
-				signer: signer || undefined,
-			});
+			var result: Result;
+
+			try {
+				result = await request(url, {
+					method,
+					params,
+					headers,
+					timeout: timeout || this.m_timeout,
+					dataType: this.m_data_type,
+					userAgent: this.m_user_agent,
+					signer: signer || undefined,
+				});
+			} catch(err) {
+				err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
+				err.url = url;
+				err.requestHeaders = headers;
+				err.requestData = params;
+				throw err;
+			}
+
 			try {
 				result.data = this.parseResponseData(result.data);
 				return result;

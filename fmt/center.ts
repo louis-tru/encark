@@ -28,14 +28,15 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var event = require('../event');
-var uuid = require('../hash/uuid');
-var fmtc = require('./fmtc');
-var ser = require('./service');
-var fnode = require('./node');
-var path = require('../path');
-var errno = require('../errno');
+import utils from '../util';
+import {EventNoticer, Notification} from '../event';
+import uuid from '../hash/uuid';
+import fmtc from './fmtc';
+import {FMTService, FMTServerClient} from './service';
+import {Server} from '../server';
+import {FNode, FNodeRemoteService} from './node';
+import {URL} from '../path';
+import errno from '../errno';
 
 const OFFLINE_CACHE_TIME = 1e4; // 10s
 
@@ -44,27 +45,35 @@ const OFFLINE_CACHE_TIME = 1e4; // 10s
 /**
  * @class FastMessageTransferCenterDelegate
  */
-class FastMessageTransferCenterDelegate {
+export class FastMessageTransferCenterDelegate {
+	private m_host: FastMessageTransferCenter;
+	private m_impl: FastMessageTransferCenter_IMPL;
+
+	constructor(host: FastMessageTransferCenter) {
+		this.m_host = host;
+		(<any>host).m_delegate = this; // TODO private visit
+		this.m_impl = (<any>host).m_impl; // TODO private visit
+	}
 
 	get host() {
 		return this.m_host;
 	}
 
-	exec(...args) {
-		return this.m_host.m_impl.exec(...args);
+	exec(id: string, args: any[] = [], method?: string) {
+		return this.m_impl.exec(id, args, method);
 	}
 
 	/** 
 	 * @func auth() auth client, return client user info
 	*/
-	auth(fmtService) {
+	auth(fmtService: FMTService) {
 		return {/* user info */};
 	}
 
 	/** 
 	 * @func authFnode() auth fnode
 	*/
-	authFnode(fnodeRemoteService) {
+	authFnode(fnodeRemoteService: FNodeRemoteService) {
 		return fnodeRemoteService.headers.certificate;
 	}
 
@@ -75,15 +84,15 @@ class FastMessageTransferCenterDelegate {
 		return 'Certificate';
 	}
 
-	triggerTo(id, event, data, sender) {
+	triggerTo(id: string, event: string, data: any, sender: string) {
 		return this.exec(id, [event, data, sender], 'triggerTo');
 	}
 
-	callTo(id, method, data, timeout, sender) {
+	callTo(id: string, method: string, data: any, timeout: number, sender: string) {
 		return this.exec(id, [method, data, timeout, sender], 'callTo');
 	}
 
-	sendTo(id, method, data, sender) {
+	sendTo(id: string, method: string, data: any, sender: string) {
 		return this.exec(id, [method, data, sender], 'sendTo');
 	}
 
@@ -92,7 +101,15 @@ class FastMessageTransferCenterDelegate {
 /**
  * @class FastMessageTransferCenter
  */
-class FastMessageTransferCenter extends event.Notification {
+export class FastMessageTransferCenter extends Notification {
+
+	private m_impl: FastMessageTransferCenter_IMPL;
+	private m_delegate: FastMessageTransferCenterDelegate;
+
+	readonly onAddNode = new EventNoticer('AddNode', this);
+	readonly onDeleteNode = new EventNoticer('DeleteNode', this);
+	readonly onLogin = new EventNoticer('Login', this);
+	readonly onLogout = new EventNoticer('Logout', this);
 
 	get id() {
 		return this.m_impl.id;
@@ -106,34 +123,29 @@ class FastMessageTransferCenter extends event.Notification {
 		return this.m_impl.routeTable;
 	}
 
-	constructor(server, fnodes = [/* 'fnode://127.0.0.1:9081/' */], publish = null) {
+	constructor(server: Server, fnodes: string[] = [/* 'fnode://127.0.0.1:9081/' */], publish?: string) {
 		super();
 		this.m_impl = new FastMessageTransferCenter_IMPL(this, server, fnodes, publish);
-		this.setDelegate(new FastMessageTransferCenterDelegate());
+		this.m_delegate = new FastMessageTransferCenterDelegate(this);
 	}
 
-	setDelegate(delegate) {
-		this.m_delegate = delegate;
-		delegate.m_host = this;
-	}
-
-	client(id) {
+	client(id: string) {
 		return this.m_impl.client(id);
 	}
 
-	hasOnline(id) {
+	hasOnline(id: string) {
 		return this.m_impl.hasOnline(id);
 	}
 
-	user(id) {
+	user(id: string) {
 		return this.m_impl.user(id);
 	}
 
-	trigger(event, data) {
+	trigger(event: string, data: any) {
 		return this.publish(event, data);
 	}
 
-	publish(event, data) {
+	publish(event: string, data: any) {
 		return this.m_impl.publish(event, data);
 	}
 
@@ -142,15 +154,30 @@ class FastMessageTransferCenter extends event.Notification {
 /**
  * @class Route
  */
-class Route {
-	constructor(host, id, uuid, time, fnodeId) {
+export class Route {
+	readonly id: string;
+	readonly uuid: string;
+	readonly time: number;
+	readonly fnodeId: string;
+	constructor(
+		host: FastMessageTransferCenter_IMPL, 
+		id: string, 
+		uuid: string, 
+		time: number, fnodeId: string
+	) {
 		this.id = id;
 		this.fnodeId = fnodeId;
 		this.time = time;
 		this.uuid = uuid;
-		host.m_routeTable.set(id, this);
-		host.m_markOffline.delete(id);
+		(<any>host).m_routeTable.set(id, this);
+		(<any>host).m_markOffline.delete(id);
 	}
+}
+
+interface FnodesCfg {
+	url: string;
+	init: boolean;
+	retry: number;
 }
 
 /**
@@ -158,6 +185,18 @@ class Route {
  * @private
  */
 class FastMessageTransferCenter_IMPL {
+	private m_host: FastMessageTransferCenter;
+	private m_server: Server;
+	private m_fnode_id: string = uuid(); // center server global id
+	private m_publish_url: URL | null;
+	private m_fnodes: Any<FNode> = {};
+	private m_isRun = false;
+	private m_fnodesCfg: Any<FnodesCfg> = {};
+	private m_fmtservice: Map<string, Route> = new Map(); // client service handle
+	private m_routeTable: Map<string, Route> = new Map(); // { 0_a: {fnodeId:'fnodeId-abcdefg-1',uuid,time} }
+	private m_connecting = new Set<string>();
+	private m_broadcastMark = new Set<string>();
+	private m_markOffline = new Map<string, number>(); // Date.now() + OFFLINE_CACHE_TIME;
 
 	get id() {
 		return this.m_fnode_id;
@@ -171,26 +210,18 @@ class FastMessageTransferCenter_IMPL {
 		return this.m_publish_url;
 	}
 
-	get delegate() {
-		return this.m_host.m_delegate;
+	get delegate(): FastMessageTransferCenterDelegate {
+		return (<any>this).m_host.m_delegate;
 	}
 
 	get routeTable() {
 		return this.m_routeTable;
 	}
 
-	constructor(host, server, fnodes, publish) {
+	constructor(host: FastMessageTransferCenter, server: Server, fnodes: string[] = [], publish?: string) {
 		this.m_host = host;
 		this.m_server = server;
-		this.m_fnode_id = uuid(); // center server global id
-		this.m_publish_url = publish ? new path.URL(publish): null;
-		this.m_fnodes = null;
-		this.m_fnodesCfg = {}; // node server cfg
-		this.m_fmtservice = new Map(); // client service handle
-		this.m_routeTable = new Map(); // { 0_a: {fnodeId:'fnodeId-abcdefg-1',uuid,time} }
-		this.m_connecting = new Set();
-		this.m_broadcastMark = new Set();
-		this.m_markOffline = new Map(); // Date.now() + OFFLINE_CACHE_TIME;
+		this.m_publish_url = publish ? new URL(publish): null;
 
 		this.m_host.addEventListener('AddNode', e=>{ // New Node connect
 			if (e.data.publish)
@@ -253,7 +284,7 @@ class FastMessageTransferCenter_IMPL {
 		fmtc._register(server, this);
 	}
 
-	addFnodeCfg(url, init = false) {
+	addFnodeCfg(url: string, init = false) {
 		if (url && !this.m_fnodesCfg.hasOwnProperty(url)) {
 			if (!this.m_publish_url || url != this.m_publish_url.href) {
 				this.m_fnodesCfg[url] = { url, init, retry: 0 };
@@ -262,7 +293,8 @@ class FastMessageTransferCenter_IMPL {
 	}
 
 	async run() {
-		utils.assert(!this.m_fnodes);
+		utils.assert(!this.m_isRun);
+		this.m_isRun = true;
 		this.m_fnodes = {};
 
 		// init local node
@@ -297,7 +329,7 @@ class FastMessageTransferCenter_IMPL {
 				console.error(err);
 			}
 		}
-		this.m_fnodes = null;
+		this.m_fnodes = {};
 	}
 
 	async connect(fNodePublishURL) {
@@ -313,21 +345,21 @@ class FastMessageTransferCenter_IMPL {
 		}
 	}
 
-	client(id) {
-		return new ser.FMTServerClient(this, id);
+	client(id: string) {
+		return new FMTServerClient(this, id);
 	}
 
-	getFMTService(id) {
+	getFMTService(id: string) {
 		var handle = this.m_fmtservice.get(id);
 		utils.assert(handle, errno.ERR_FMT_CLIENT_OFFLINE);
 		return handle;
 	}
 
-	getFMTServiceNoError(id) {
+	getFMTServiceNoError(id: string) {
 		return this.m_fmtservice.get(id);
 	}
 
-	async hasOnline(id) {
+	async hasOnline(id: string) {
 		try {
 			await this.exec(id);
 		} catch(err) {
@@ -336,15 +368,15 @@ class FastMessageTransferCenter_IMPL {
 		return true;
 	}
 
-	user(id) {
+	user(id: string) {
 		return this.exec(id, [], 'user');
 	}
 
-	markOffline(id) {
+	markOffline(id: string) {
 		this.m_markOffline.set(id, Date.now() + OFFLINE_CACHE_TIME);
 	}
 
-	async exec(id, args = [], method = null) {
+	async exec(id: string, args: any[] = [], method?: string) {
 
 		var route = this.m_routeTable.get(id);
 		if (route) {

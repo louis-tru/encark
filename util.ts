@@ -335,17 +335,16 @@ function equalsClass(baseclass: Function, subclass: Function): boolean {
 function assert(condition: any, code?: ErrnoCode | number | string, ...args: string[]): void {
 	if (condition)
 		return;
-	if (Array.isArray(code)) {
+	if (Array.isArray(code)) { // ErrnoCode
 		throw Error.new(code);
 	} else {
-		var str: string;
+		var errno: ErrnoCode;
 		if (typeof code == 'number') {
-			str = 'assert fail, unforeseen exceptions';
+			errno = [code, 'assert fail, unforeseen exceptions'];
 		} else {
-			code = -2;
-			str = String(code);
+			errno = [-30009, String.format(String(code), ...args)];
 		}
-		throw Error.new(String.format(str, ...args), code);
+		throw Error.new(errno);
 	}
 }
 

@@ -53,7 +53,7 @@ if (!!globalThis.BigInt) {
 		if (utils.haveWeb) {
 			import('./_bigint').then(ok); // bigint syntax, webpack delay load
 		} else {
-			ok(arguments[1]("./_bigint"));
+			ok(arguments[1]('./_bigint'));
 		}
 	})(function(bigint: any) {
 		_bigint = bigint;
@@ -650,8 +650,15 @@ var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
+export interface InterfaceBuffer extends Uint8Array {
+	toString(encoding?: string, start?: number, end?: number): string;
+}
+
+export type Bytes = Uint8Array | Uint8ClampedArray | InterfaceBuffer;
+export type BinaryLike = NodeJS.ArrayBufferView | ArrayBuffer | InterfaceBuffer;
+
 export default {
-	get isBigInt() { return !!globalThis.BigInt },
+	get isBigInt() { return !!_bigint },
 	// read
 	readInt8, readUInt8,
 	readInt16BE, readUInt16BE,
