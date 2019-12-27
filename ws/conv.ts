@@ -36,7 +36,13 @@ var {WSService} = require('./service');
 var {Buffer} = require('buffer');
 var crypto = require('crypto');
 var uuid = require('../hash/uuid');
-var errno = require('../errno');
+import errno from '../errno';
+
+import * as net from 'net';
+import * as http from 'http';
+import * as s from '../server';
+import {EventNoticer} from '../event';
+
 var { Conversation: _Conversation } = require('./cli/conv');
 var { PacketParser, sendDataPacket, sendPingPacket, sendPongPacket } = require('./parser');
 var {DataFormater, T_BIND, T_PING, T_PONG, PING_BUFFER, PONG_BUFFER } = require('./data');
@@ -47,76 +53,68 @@ var ZERO_BUFFER = new Uint8Array(0);
 /**
  * @class Conversation
  */
-var Conversation = utils.class('Conversation', {
+export class Conversation {
 
-	m_isOpen: false,
-	m_services: null,
-	m_default_service: '',
-	m_services_count: 0,
-	m_last_packet_time: 0,
-	m_KEEP_ALIVE_TIME: KEEP_ALIVE_TIME,
+	private m_isOpen = false;
+	private m_services: Any<any> = {};
+	private m_default_service = '';
+	private m_services_count = 0;
+	private m_last_packet_time = 0;
+	private m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
 
-	/**
-	 * @field server {Server}
-	 */
-	server: null,
-	
-	/**
-	 * @field request {http.ServerRequest}
-	 */
-	request: null,
-	
-	/**
-	 * @field socket 
-	 */
-	socket: null,
+	readonly server: s.Server;
+	readonly request: http.IncomingMessage;
+	readonly socket: net.Socket;
+	readonly token = uuid();
 
-	/**
-	 * @field token {Number}
-	 */
-	token: '',
+	readonly onPing = new EventNoticer('Ping', this);
+	readonly onClose = new EventNoticer('Close', this);
+	readonly onOpen = new EventNoticer('Open', this);
+	readonly onDrain = new EventNoticer('Drain', this);
+	readonly onOverflow = new EventNoticer('Overflow', this);
 
-	isGzip: false,
-	replyPong: true,
+	private m_isGzip = false;
+	private m_replyPong = true;
+	private m_overflow = false;
 
-	// @event:
-	onPing: null,
-	onClose: null,
-	onOpen: null,
-	onDrain: null,
-	onOverflow: null,
+	get isGzip() {
+		return this.m_isGzip;
+	}
+
+	get replyPong() {
+		return this.m_replyPong;
+	}
 
 	get lastPacketTime() {
 		return this.m_last_packet_time;
-	},
+	}
 
 	get keepAliveTime() {
 		return this.m_KEEP_ALIVE_TIME;
-	},
+	}
 
 	set keepAliveTime(value) {
 		this.m_KEEP_ALIVE_TIME = Math.max(5e3, Number(value) || KEEP_ALIVE_TIME);
-	},
+	}
 
 	get overflow() {
 		return this.m_overflow;
-	},
+	}
 
 	/**
 	 * @param {http.ServerRequest}   req
 	 * @param {String}   bind_services
-	 * @constructor
 	 */
-	constructor: function(req, bind_services) {
-		event.initEvents(this, 'Open', 'Ping', 'Pong', 'Close', 'Drain', 'Overflow');
+	constructor(req: any, bind_services: string) {
+		// event.initEvents(this, 'Open', 'Ping', 'Pong', 'Close', 'Drain', 'Overflow');
 
-		this.server = req.socket.server.wrap;
-		this.request = req;
-		this.socket = req.socket;
-		this.token = uuid();
-		this.m_services = {};
-		this.m_services_count = 0;
-		this.m_overflow = false;
+		// this.server = req.socket.server.wrap;
+		// this.request = req;
+		// this.socket = req.socket;
+		// this.token = uuid();
+		// this.m_services = {};
+		// this.m_services_count = 0;
+		// this.m_overflow = false;
 
 		var self = this;
 
@@ -353,12 +351,12 @@ var Conversation = utils.class('Conversation', {
 	close: function () {},
 
 	// @end
-});
+}
 
 /**
  * @class Hybi
  */
-class Hybi extends Conversation {
+export class Hybi extends Conversation {
 
 	constructor(req, upgradeHead, bind_services) {
 		super(req, bind_services);
@@ -500,8 +498,8 @@ class Hybi extends Conversation {
 
 }
 
-module.exports = {
-	PacketParser,
-	Conversation,
-	Hybi,
-};
+// module.exports = {
+// 	PacketParser,
+// 	Conversation,
+// 	Hybi,
+// };

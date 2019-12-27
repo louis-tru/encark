@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var Hybi = require('./conv').Hybi;
+import {Hybi} from './conv';
 import * as querystring from 'querystring';
 import * as http from 'http';
 
