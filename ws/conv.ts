@@ -39,7 +39,7 @@ import * as http from 'http';
 import * as net from 'net';
 import * as s from '../_server';
 import * as url from 'url';
-import {KEEP_ALIVE_TIME, ConversationBasic} from './_conv';
+import {ConversationBasic, KEEP_ALIVE_TIME} from './_conv';
 export * from './_conv';
 
 import { PacketParser, sendDataPacket } from './parser';

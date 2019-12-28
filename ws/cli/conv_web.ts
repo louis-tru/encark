@@ -32,12 +32,12 @@ import utils from '../../util';
 import Buffer from '../../buffer';
 import errno from '../../errno';
 import {PING_BUFFER,PONG_BUFFER} from '../data';
-import _conv, {WSConversation, SendData} from './conv';
+import {WSConversationBasic, SendData} from './conv';
 
 const WebSocket = globalThis.WebSocket;
 
 // Web implementation
-export default class WebConversation extends WSConversation {
+export default class WebConversation extends WSConversationBasic {
 
 	private m_req: any;
 

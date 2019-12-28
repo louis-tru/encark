@@ -43,7 +43,7 @@ export function syscall(cmd: string): SpawnResult {
 		}
 		// console.log('status != 0 exit process');
 		// process.exit(ch.status);
-		throw Error.new('status != 0 exit process', ch.status);
+		throw Error.new([ch.status, 'status != 0 exit process']);
 	} else {
 		var stdout = ch.stdout.length ? ch.stdout.split('\n'): [];
 		var stderr = ch.stderr.length ? ch.stderr.split('\n'): [];

@@ -32,6 +32,8 @@ import utils from './util';
 import _codec from './_codec';
 import * as _buffer from './_buffer';
 
+import {Buffer} from 'buffer';
+
 export type TypedArray = Uint8Array | Uint8ClampedArray | Uint16Array | 
 	Uint32Array | Int8Array | Int16Array | Int32Array | Float32Array | Float64Array;
 export type ArrayBufferView = TypedArray | DataView;
@@ -43,6 +45,8 @@ const _bufferDefault = _buffer.default;
 
 export type BufferEncoding = 
 	"ascii" | "utf8" | "utf-8" | "base64" | "latin1" | "binary" | "hex";
+
+new Buffer('')
 
 export function byteLength(
 	string: string | BinaryLike,
@@ -81,7 +85,7 @@ export function byteLength(
 	}
 }
 
-type Buffer = InterfaceBuffer;
+// type Buffer = InterfaceBuffer;
 
 /**
  * @class BufferIMPL

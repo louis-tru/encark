@@ -32,30 +32,32 @@ import utils from '../../util'
 import errno from '../../errno';
 import { Notification, Event } from '../../event';
 import { Types } from '../data';
-import {WSConversation} from './conv';
+import {WSConversationBasic} from './conv';
 export * from './conv';
 
-const METHOD_CALL_TIMEOUT = 12e4; // 120s
+export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 const print_log = false; // util.dev
 
-var _WSConversation: any;
+export interface WSConversation extends WSConversationBasic {}
 
-if (utils.haveWeb) {
-	_WSConversation = <typeof WSConversation>require('./conv_web');
-} else if (utils.haveNode) {
-	_WSConversation = require('./conv_node');
-} else {
-	throw new Error('Unimplementation');
+interface WSConversationConstructor {
+	new(path: string): WSConversation;
 }
 
-export function createConversation(path: string): WSConversation {
-	return new _WSConversation(path)
+export var WSConversation: WSConversationConstructor;
+
+if (utils.haveWeb) {
+	WSConversation = require('./conv_web');
+} else if (utils.haveNode) {
+	WSConversation = require('./conv_node');
+} else {
+	throw new Error('Unimplementation');
 }
 
 /**
  * @class WSClient
  */
-class WSClient extends Notification {
+export class WSClient extends Notification {
 	// @private:
 	// m_calls: null,
 	// m_sends: null,
@@ -247,8 +249,3 @@ class WSClient extends Notification {
 	}
 
 }
-
-// module.exports = exports = Object.assign({
-// 	METHOD_CALL_TIMEOUT,
-// 	WSClient,
-// }, conv);

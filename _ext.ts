@@ -195,19 +195,17 @@ interface Error {
 	[prop: string]: any;
 }
 
-interface InterfaceBuffer extends Uint8Array {
+interface Buffer extends Uint8Array {
 	toString(encoding?: string, start?: number, end?: number): string;
-	copy(targetBuffer: InterfaceBuffer, targetStart?: number, sourceStart?: number, sourceEnd?: number): number;
-	clone(start?: number, end?: number): InterfaceBuffer;
-	slice(start?: number, end?: number): InterfaceBuffer;
-	filter(callbackfn: (value: number, index: number, array: InterfaceBuffer) => any, thisArg?: any): InterfaceBuffer;
-	map(callbackfn: (value: number, index: number, array: InterfaceBuffer) => number, thisArg?: any): InterfaceBuffer;
-	reverse(): InterfaceBuffer;
-	some(callbackfn: (value: number, index: number, array: InterfaceBuffer) => unknown, thisArg?: any): boolean;
-	subarray(begin?: number, end?: number): InterfaceBuffer;
+	copy(targetBuffer: Buffer, targetStart?: number, sourceStart?: number, sourceEnd?: number): number;
+	clone(start?: number, end?: number): Buffer;
+	slice(start?: number, end?: number): Buffer;
+	filter(callbackfn: (value: number, index: number, array: Buffer) => any, thisArg?: any): Buffer;
+	map(callbackfn: (value: number, index: number, array: Buffer) => number, thisArg?: any): Buffer;
+	reverse(): Buffer;
+	some(callbackfn: (value: number, index: number, array: Buffer) => unknown, thisArg?: any): boolean;
+	subarray(begin?: number, end?: number): Buffer;
 }
-
-type IBuffer = InterfaceBuffer;
 
 (function() {
 

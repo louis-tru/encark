@@ -39,10 +39,10 @@ import * as crypto from 'crypto';
 import {
 	PacketParser, sendDataPacket,
 	sendPingPacket, sendPongPacket } from '../parser';
-import _conv, {WSConversation, KEEP_ALIVE_TIME, SendData} from './conv';
+import _conv, {WSConversationBasic,KEEP_ALIVE_TIME, SendData} from './conv';
 
 // Node implementation
-export default class NodeConversation extends WSConversation {
+export default class NodeConversation extends WSConversationBasic {
 
 	private m_req: http.ClientRequest | null = null;
 	private m_socket: net.Socket | null = null; // web socket connection
@@ -185,9 +185,9 @@ export default class NodeConversation extends WSConversation {
 	send(data: SendData): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		if (data instanceof ArrayBuffer) {
-			return WSConversation.write(this, sendDataPacket, [this.m_socket, Buffer.from(data)]);
+			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, Buffer.from(data)]);
 		} else { // send json string message or ibuffer
-			return WSConversation.write(this, sendDataPacket, [this.m_socket, data]);
+			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
 		}
 	}
 
@@ -196,7 +196,7 @@ export default class NodeConversation extends WSConversation {
 	 */
 	ping(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversation.write(this, sendPingPacket, [this.m_socket]);
+		return WSConversationBasic.write(this, sendPingPacket, [this.m_socket]);
 	}
 
 	/**
@@ -204,7 +204,7 @@ export default class NodeConversation extends WSConversation {
 	 */
 	pong(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversation.write(this, sendPongPacket, [this.m_socket]);
+		return WSConversationBasic.write(this, sendPongPacket, [this.m_socket]);
 	}
 
 }

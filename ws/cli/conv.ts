@@ -40,9 +40,9 @@ import { EventNoticer } from '../../event';
 var USE_GZIP_DATA = false;
 
 /**
- * @class WSConversation 
+ * @class WSConversationBasic
  */
-export abstract class WSConversation extends ConversationBasic {
+export abstract class WSConversationBasic extends ConversationBasic {
 
 	protected m_connect = false; // 是否尝试连接中
 	protected m_signer: Signer | null = null;
