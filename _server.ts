@@ -36,6 +36,7 @@ import * as net from 'net';
 import * as fs from './fs';
 import * as path from 'path';
 import incoming_form from './incoming_form';
+import * as _conv from './ws/_conv';
 
 var shared: Server | null = null;
 var mimeTypes: Any = {};
@@ -100,7 +101,7 @@ export interface ServerConfig {
 	*/
 export class Server extends Notification {
 
-	protected m_ws_conversations: Any = {};
+	protected m_ws_conversations: Any<_conv.ConversationBasic> = {};
 	private m_server: http.Server;
 	protected m_isRun: boolean = false;
 	private m_host: string = '';
@@ -253,8 +254,8 @@ export class Server extends Notification {
 		return this.m_server;
 	}
 
-	readonly onWSConversationOpen = new EventNoticer('WSConversationOpen', this);
-	readonly onWSConversationClose = new EventNoticer('WSConversationClose', this);
+	readonly onWSConversationOpen = new EventNoticer<_conv.Conversation>('WSConversationOpen', this);
+	readonly onWSConversationClose = new EventNoticer<_conv.Conversation>('WSConversationClose', this);
 
 	/**
 	 * 构造函数
@@ -326,6 +327,16 @@ export class Server extends Notification {
 			router: config.router,
 		});
 
+		this.onWSConversationOpen.on(e=>{
+			var conv = e.data;
+			this.m_ws_conversations[conv.token] = conv; // TODO private visit
+		});
+
+		this.onWSConversationClose.on(e=>{
+			var conv = e.data;
+			delete this.m_ws_conversations[conv.token]; // TODO private visit
+		});
+
 		this._initializ(this.m_server);
 	}
 
@@ -380,7 +391,7 @@ export class Server extends Notification {
 			this.m_host = addr.address;
 			this.m_port = addr.port;
 			this.m_isRun = true;
-			this.trigger('Startup');
+			this.trigger('Startup', {});
 		}
 		if (this.m_port) {
 			this.m_server.listen(this.m_port, this.m_host, complete);

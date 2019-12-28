@@ -471,15 +471,15 @@ function writeU_Int32BE(buf: Uint8Array, value: number, offset: number, min: num
 }
 
 function writeU_Int24BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
-  value = +value;
-  checkInt(value, min, max, buf, offset, 2);
+	value = +value;
+	checkInt(value, min, max, buf, offset, 2);
 
-  buf[offset + 2] = value;
-  value = value >>> 8;
-  buf[offset + 1] = value;
-  value = value >>> 8;
-  buf[offset] = value;
-  return offset + 3;
+	buf[offset + 2] = value;
+	value = value >>> 8;
+	buf[offset + 1] = value;
+	value = value >>> 8;
+	buf[offset] = value;
+	return offset + 3;
 }
 
 function writeU_Int40BE(buf: Uint8Array, value: number, offset: number, min: number, max: number) {
@@ -650,12 +650,84 @@ var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
-export interface InterfaceBuffer extends Uint8Array {
-	toString(encoding?: string, start?: number, end?: number): string;
+const MathFloor = Math.floor;
+
+export const __TypedArray = (<any>Uint8Array).prototype.constructor.__proto__;
+
+function isTypedArray(arr: NodeJS.TypedArray) {
+	return arr instanceof __TypedArray;
 }
 
-export type Bytes = Uint8Array | Uint8ClampedArray | InterfaceBuffer;
-export type BinaryLike = NodeJS.ArrayBufferView | ArrayBuffer | InterfaceBuffer;
+function toInteger(n: number, defaultVal: number) {
+	n = +n;
+	if (!Number.isNaN(n) &&
+			n >= Number.MIN_SAFE_INTEGER &&
+			n <= Number.MAX_SAFE_INTEGER) {
+		return ((n % 1) === 0 ? n : MathFloor(n));
+	}
+	return defaultVal;
+}
+
+function copy(source: NodeJS.TypedArray, target: NodeJS.TypedArray, 
+	targetStart?: number, sourceStart?: number, sourceEnd?: number) 
+{
+	if (!isTypedArray(source))
+	  throw invalidArgType(source, ['Buffer', 'TypedArray'], 'source');
+	if (!isTypedArray(target))
+	  throw invalidArgType(target, ['Buffer', 'TypedArray'], 'target');
+
+	if (targetStart === undefined) {
+		targetStart = 0;
+	} else {
+		targetStart = toInteger(targetStart, 0);
+		if (targetStart < 0)
+			throw ERR_OUT_OF_RANGE('targetStart', '>= 0', targetStart);
+	}
+
+	if (sourceStart === undefined) {
+		sourceStart = 0;
+	} else {
+		sourceStart = toInteger(sourceStart, 0);
+		if (sourceStart < 0)
+			throw ERR_OUT_OF_RANGE('sourceStart', '>= 0', sourceStart);
+	}
+
+	if (sourceEnd === undefined) {
+		sourceEnd = source.byteLength;
+	} else {
+		sourceEnd = toInteger(sourceEnd, 0);
+		if (sourceEnd < 0)
+			throw ERR_OUT_OF_RANGE('sourceEnd', '>= 0', sourceEnd);
+	}
+
+	if (targetStart >= target.byteLength || sourceStart >= sourceEnd)
+		return 0;
+
+	if (sourceStart > source.byteLength) {
+		throw ERR_OUT_OF_RANGE('sourceStart',
+															 `<= ${source.byteLength}`,
+															 sourceStart);
+	}
+
+	if (sourceEnd - sourceStart > target.byteLength - targetStart)
+		sourceEnd = sourceStart + target.byteLength - targetStart;
+
+	let nb = sourceEnd - sourceStart;
+	const targetLen = target.byteLength - targetStart;
+	const sourceLen = source.byteLength - sourceStart;
+	if (nb > targetLen)
+		nb = targetLen;
+	if (nb > sourceLen)
+		nb = sourceLen;
+
+	var src: Uint8Array;
+	if (sourceStart !== 0 || sourceEnd !== source.byteLength)
+		src = new Uint8Array(source.buffer, source.byteOffset + sourceStart, nb);
+	else
+		src = new Uint8Array(source.buffer);
+	(new Uint8Array(target.buffer)).set(src, targetStart);
+	return nb;
+}
 
 export default {
 	get isBigInt() { return !!_bigint },
@@ -680,4 +752,5 @@ export default {
 	writeBigIntLE,
 	//
 	invalidArgType,
+	copy,
 };

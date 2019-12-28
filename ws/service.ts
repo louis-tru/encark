@@ -28,88 +28,77 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-const util = require('../../util');
-const errno = require('../../errno');
-const { Notification, Event } = require('../../event');
-const { T_CALLBACK,T_CALL} = require('../data');
-const conv = require('./conv');
+import utils from '../util';
+import {Service} from '../service';
+import {Session} from '../session';
+import errno from '../errno';
+import {Types, DataFormater} from './data';
+import * as conv from './conv';
 
-const METHOD_CALL_TIMEOUT = 12e4; // 120s
+// T_CALLBACK,T_CALL,T_EVENT
+export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 const print_log = false; // util.dev
 
 /**
- * @class WSClient
+ * @class WSService
  */
-class WSClient extends Notification {
-	// @private:
-	// m_calls: null,
-	// m_sends: null,
-	// m_service_name: '',
-	// m_conv: null,   // conversation
+export class WSService extends Service {
+	private m_conv: conv.Conversation;
+	private m_session: Session | null = null;
+	private m_calls = new Map();
+	private m_loaded = false;
+	private m_Intervalid: any;
+	
+	get conv() {
+		return this.m_conv;
+	}
 
-	// @public:
-	get name() { return this.m_service_name }
-	get conv() { return this.m_conv }
-	get loaded() { return this.m_loaded }
+	get session() {
+		if (!this.m_session) {
+			this.m_session = new Session(this);
+		}
+		return this.m_session;
+	}
+
+	get loaded() {
+		return this.m_loaded;
+	}
 
 	/**
-	 * @constructor constructor(service_name, conv)
+	 * @arg conv {Conversation}
+	 * @constructor
 	 */
-	constructor(service_name, conv) {
-		super();
+	constructor(conv: conv.Conversation) {
+		super(conv.request);
+		this.m_conv = conv;
+		this.m_Intervalid = setInterval(()=>this._checkInterval(), 3e4); // 30s
 
-		this.m_calls = new Map();
-		this.m_service_name = service_name;
-		this.m_conv = conv || new WSConversation();
-		this.m_loaded = false;
-		this.m_sends = [];
-
-		util.assert(service_name);
-		util.assert(this.m_conv);
-
-		this.m_conv.onOpen.on(e=>{
-			this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
-		});
-
-		this.m_conv.onClose.on(async e=>{
-			this.m_loaded = false;
+		this.m_conv.onClose.on(async ()=>{
 			var err = Error.new(errno.ERR_CONNECTION_DISCONNECTION);
 			for (var [,handle] of this.m_calls) {
 				handle.cancel = true;
 				handle.err(err);
 			}
 			clearInterval(this.m_Intervalid);
-			this.m_sends = []; // clear calling
 		});
-
-		this.addEventListener('Load', async e=>{
-			console.log('CLI Load', conv.url.href);
-			this.m_conv.m_token = e.data.token; // TODO private visit
-			this.m_loaded = true;
-			var sends = this.m_sends;
-			this.m_sends = [];
-			// await util.sleep(1000); // 
-			for (var data of sends) {
-				if (!data.cancel) {
-					// console.log('CLI Load send');
-					this._send(data).catch(data.err);
-				}
-			}
-		});
-
-		this.m_conv.bind(this);
 	}
 
-	_checkMethodName(method) {
-		util.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
+	load() {}
+	destroy() {}
+
+	_checkMethodName(method: string) {
+		utils.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
 	}
 
 	/**
-	 * @func receiveMessage(msg)
+	 * @fun receiveMessage() # 消息处理器
 	 */
-	async receiveMessage(msg) {
+	async receiveMessage(msg: DataFormater) {
+		if (!this.m_loaded) 
+			console.warn('Unable to process message WSService.receiveMessage, loaded=false');
+
 		var self = this;
-		var { data = {}, name, cb, sender } = msg;
+		var { data = {}, name = '', cb, sender } = msg;
 
 		if (msg.isCallback()) {
 			var handle = this.m_calls.get(cb);
@@ -121,7 +110,7 @@ class WSClient extends Notification {
 				}
 			}
 		} else {
-			var r = {};
+			var r: { data?: any, error?: Error } = {};
 			if (msg.isCall()) {
 				this._checkMethodName(name);
 				if (print_log) 
@@ -131,54 +120,45 @@ class WSClient extends Notification {
 				} catch(e) {
 					r.error = e;
 				}
-			} else if (msg.isEvent()) {
-				// console.log('CLI Event receive', name);
+			} /*else if (msg.isEvent()) { // none event
 				try {
-					var evt = new Event(data);
-					evt.origin = sender;
-					this.triggerWithEvent(name, evt); // TODO
+					this.trigger(name, data);
 				} catch(err) {
 					console.error(err);
 				}
-			} else {
+			} */ else {
 				return;
 			}
 
 			if (cb) {
 				self.m_conv.sendFormatData(Object.assign(r, {
 					service: self.m_conv._service(self.name),
-					type: T_CALLBACK, 
+					type: Types.T_CALLBACK, 
 					cb: cb,
 				})).catch(console.warn); // callback
 			}
 		}
-
 	}
 
 	/**
-	 * @class handleCall
+	 * @func handleCall
 	 */
-	handleCall(method, data, sender) {
-		if (method in WSClient.prototype)
+	handleCall(method: string, data: any, sender: string) {
+		if (method in WSService.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
-		var fn = this[method];
+		var fn: (data: any, sender?: string)=>any = (<any>this)[method];
 		if (typeof fn != 'function')
-			throw Error.new('"{0}" no defined function'.format(method));
+			throw Error.new(String.format('"{0}" no defined function', method));
 		return fn.call(this, data, sender);
 	}
 
 	async _send(data) {
-		if (this.m_loaded) {
-			await this.m_conv.sendFormatData(data);
-			delete data.data;
-		} else {
-			this.m_sends.push(data);
-			this.m_conv.connect(); // 尝试连接
-		}
+		await this.m_conv.sendFormatData(data);
+		delete data.data;
 		return data;
 	}
 
-	_checkTimeout() {
+	_checkInterval() {
 		var now = Date.now();
 		for (var [,handle] of this.m_calls) {
 			if (handle.timeout) {
@@ -199,18 +179,29 @@ class WSClient extends Notification {
 				timeout: timeout ? timeout + Date.now(): 0,
 				ok: e=>(calls.delete(id),resolve(e)),
 				err: e=>(calls.delete(id),reject(e)),
-				service: this.m_conv._service(this.name),
+				service: this.conv._service(this.name),
 				type: type,
 				name: name,
 				data: data,
 				cb: id,
 				sender: sender,
 			}));
+			// console.log('SER send', name);
+		});
+	}
+
+	async _trigger(event, data, sender) {
+		await this._send({
+			service: this.conv._service(this.name),
+			type: T_EVENT,
+			name: event,
+			data: data,
+			sender: sender,
 		});
 	}
 
 	/**
-	 * @func call(method, data, timeout)
+	 * @func call(method, data)
 	 * @async
 	 */
 	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
@@ -218,7 +209,15 @@ class WSClient extends Notification {
 	}
 
 	/**
-	 * @func send(method, data, sender) method call
+	 * @func  trigger(event, data)
+	 * @async
+	 */
+	async trigger(event, data, sender = null) {
+		return this._trigger(event, data, sender);
+	}
+
+	/**
+	 * @func send(method, data, sender) method call, No response
 	 * @async
 	 */
 	async send(method, data, sender = null) {
@@ -231,9 +230,7 @@ class WSClient extends Notification {
 		});
 	}
 
+	// @end
 }
 
-module.exports = exports = Object.assign({
-	METHOD_CALL_TIMEOUT,
-	WSClient,
-}, conv);
+WSService.type = 'event';

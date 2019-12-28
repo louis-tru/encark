@@ -195,6 +195,20 @@ interface Error {
 	[prop: string]: any;
 }
 
+interface InterfaceBuffer extends Uint8Array {
+	toString(encoding?: string, start?: number, end?: number): string;
+	copy(targetBuffer: InterfaceBuffer, targetStart?: number, sourceStart?: number, sourceEnd?: number): number;
+	clone(start?: number, end?: number): InterfaceBuffer;
+	slice(start?: number, end?: number): InterfaceBuffer;
+	filter(callbackfn: (value: number, index: number, array: InterfaceBuffer) => any, thisArg?: any): InterfaceBuffer;
+	map(callbackfn: (value: number, index: number, array: InterfaceBuffer) => number, thisArg?: any): InterfaceBuffer;
+	reverse(): InterfaceBuffer;
+	some(callbackfn: (value: number, index: number, array: InterfaceBuffer) => unknown, thisArg?: any): boolean;
+	subarray(begin?: number, end?: number): InterfaceBuffer;
+}
+
+type IBuffer = InterfaceBuffer;
+
 (function() {
 
 if (Date.formatTimeSpan !== undefined)

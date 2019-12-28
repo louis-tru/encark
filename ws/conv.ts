@@ -28,125 +28,71 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var event = require('../event');
-var url = require('url');
-var service = require('../service');
-var {WSService} = require('./service');
-var {Buffer} = require('buffer');
-var crypto = require('crypto');
-var uuid = require('../hash/uuid');
+import utils from '../util';
+import service from '../service';
+import {WSService} from './service';
 import errno from '../errno';
-
-import * as net from 'net';
+import Buffer from '../buffer';
+import uuid from '../hash/uuid';
+import * as crypto from 'crypto';
 import * as http from 'http';
-import * as s from '../server';
-import {EventNoticer} from '../event';
+import * as net from 'net';
+import * as s from '../_server';
+import * as url from 'url';
+import {KEEP_ALIVE_TIME, ConversationBasic} from './_conv';
+export * from './_conv';
 
-var { Conversation: _Conversation } = require('./cli/conv');
-var { PacketParser, sendDataPacket, sendPingPacket, sendPongPacket } = require('./parser');
-var {DataFormater, T_BIND, T_PING, T_PONG, PING_BUFFER, PONG_BUFFER } = require('./data');
+import { PacketParser, sendDataPacket } from './parser';
+import { PING_BUFFER, PONG_BUFFER } from './data';
 
-var KEEP_ALIVE_TIME = 5e4; // 50s
-var ZERO_BUFFER = new Uint8Array(0);
+export class Hybi extends ConversationBasic  {
 
-/**
- * @class Conversation
- */
-export class Conversation {
-
-	private m_isOpen = false;
-	private m_services: Any<any> = {};
-	private m_default_service = '';
-	private m_services_count = 0;
-	private m_last_packet_time = 0;
-	private m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
-
+	protected m_token = uuid();
 	readonly server: s.Server;
 	readonly request: http.IncomingMessage;
 	readonly socket: net.Socket;
-	readonly token = uuid();
-
-	readonly onPing = new EventNoticer('Ping', this);
-	readonly onClose = new EventNoticer('Close', this);
-	readonly onOpen = new EventNoticer('Open', this);
-	readonly onDrain = new EventNoticer('Drain', this);
-	readonly onOverflow = new EventNoticer('Overflow', this);
-
-	private m_isGzip = false;
-	private m_replyPong = true;
-	private m_overflow = false;
-
-	get isGzip() {
-		return this.m_isGzip;
-	}
-
-	get replyPong() {
-		return this.m_replyPong;
-	}
-
-	get lastPacketTime() {
-		return this.m_last_packet_time;
-	}
-
-	get keepAliveTime() {
-		return this.m_KEEP_ALIVE_TIME;
-	}
-
-	set keepAliveTime(value) {
-		this.m_KEEP_ALIVE_TIME = Math.max(5e3, Number(value) || KEEP_ALIVE_TIME);
-	}
-
-	get overflow() {
-		return this.m_overflow;
-	}
 
 	/**
 	 * @param {http.ServerRequest}   req
 	 * @param {String}   bind_services
 	 */
-	constructor(req: any, bind_services: string) {
-		// event.initEvents(this, 'Open', 'Ping', 'Pong', 'Close', 'Drain', 'Overflow');
+	constructor(req: http.IncomingMessage, upgradeHead: Buffer, bind_services: string) {
+		super();
 
-		// this.server = req.socket.server.wrap;
-		// this.request = req;
-		// this.socket = req.socket;
-		// this.token = uuid();
-		// this.m_services = {};
-		// this.m_services_count = 0;
-		// this.m_overflow = false;
-
-		var self = this;
+		var server = <http.Server>(<any>req.socket).server;
+		this.server = <s.Server>(<any>server).__wrap__;
+		this.request = req;
+		this.socket = req.socket;
 
 		// initialize
-		self._initialize(bind_services).catch(err=>{
-			self.close();
-			self._safeDestroy();  // 关闭连接
+		this._initialize(bind_services).catch(err=>{
+			this.close();
+			this._safeDestroy();  // 关闭连接
 			// console.warn(err);
 		});
-	},
+	}
 
-	_safeDestroy: function() {
+	private _safeDestroy() {
 		try {
 			if (this.socket)
 				this.socket.destroy();  // 关闭连接
 		} catch(err) {
 			console.warn(err);
 		}
-	},
+	}
 
-	_initialize: async function(bind_services) {
+	private async _initialize(bind_services: string) {
 		var self = this;
 		var services = bind_services.split(',');
 		utils.assert(services[0], 'Bind Service undefined');
 
 		self.socket.pause();
 
-		if (!self.initialize())
+		if (!self.__initialize())
 			return self._safeDestroy();  // 关闭连接
 
 		utils.assert(!self.m_isOpen);
-		self.server.m_ws_conversations[self.token] = self; // TODO private visit
+
 		self.m_isOpen = true;
 		self.m_last_packet_time = Date.now();
 		self.m_overflow = false;
@@ -155,220 +101,71 @@ export class Conversation {
 			utils.assert(self.m_isOpen);
 
 			console.log('WS conv close');
-			delete self.server.m_ws_conversations[self.token]; // private visit
 
 			self.m_isOpen = false;
-			self.request = null;
-			self.socket = null;
-			self.token = '';
+			// self.request = null;
+			// self.socket = null;
+			// self.token = '';
 			// self.onOpen.off();
 
 			try {
-				for (var s of Object.values(self.m_services))
+				for (var s of Object.values(self.m_handles))
 					if (s.loaded) 
 						s.destroy();
-				self.server.trigger('WSConversationClose', self);
+				self.server.onWSConversationClose.trigger(self);
 			} catch(err) {
 				console.error(err);
 			}
-			self.server = null;
-			utils.nextTick(e=>self.onClose.off());
+
+			// self.server = null;
+			utils.nextTick(()=>self.onClose.off());
 		});
 
-		self.onOpen.trigger();
-		self.server.trigger('WSConversationOpen', self);
+		self.onOpen.trigger({});
+		self.server.onWSConversationOpen.trigger(self);
 
 		try {
-			await self._bind(services);
+			await self.bindServices(services);
 		} catch(err) {
 			await utils.sleep(5e3); // delay 5s
 			throw err;
 		}
 		self.socket.resume();
-	},
-
-	/** 
-	 * @func _bind() 绑定服务
-	*/
-	_bind: async function(services) {
-		var self = this;
-		for (var name of services) {
-			var cls = service.get(name);
-			utils.assert(cls, name + ' not found');
-			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
-			utils.assert(!(name in self.m_services), 'Service no need to repeat binding');
-
-			var ser = new cls(self);
-			ser.name = name;
-			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
-			self.isGzip = ser.headers['use-gzip'] == 'on';
-
-			await ser.load(); // load
-
-			if (!self.m_default_service)
-				self.m_default_service = name;
-			self.m_services[name] = ser;
-			self.m_services_count++;
-			ser.m_loaded = true; // TODO ptinate visit
-
-			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
-			ser._trigger('Load', {token:this.token}).catch(e=>console.error(e));
-			console.log('SER Load', this.request.url);
-		}
-	},
-
-	_service: function(service) {
-		return this.m_services_count == 1 ? undefined: service;
-	},
-
-	/**
-	 * 是否已经打开
-	 */
-	get isOpen() {
-		return this.m_isOpen;
-	},
-
-	/**
-	 * verifies the origin of a request.
-	 * @param  {String} origin
-	 * @return {Boolean}
-	 */
-	verifyOrigin: function(origin) {
-		var origins = this.server.origins;
-		if (origin == 'null') {
-			origin = '*';
-		}
-		if (origins.indexOf('*:*') != -1) {
-			return true;
-		}
-		if (origin) {
-			try {
-				var parts = url.parse(origin);
-				var ok =
-					~origins.indexOf(parts.hostname + ':' + parts.port) ||
-					~origins.indexOf(parts.hostname + ':*') ||
-					~origins.indexOf('*:' + parts.port);
-				if (!ok) {
-					console.warn('illegal origin: ' + origin);
-				}
-				return ok;
-			}
-			catch (ex) {
-				console.warn('error parsing origin');
-			}
-		} else {
-			console.warn('origin missing from websocket call, yet required by config');
-		}
-		return false;
-	},
-
-	/**
-	 * 获取绑定的服务
-	 */
-	get wsServices() {
-		return {...this.m_services};
-	},
-
-	/**
-	 * @func handlePacket() 进一步解析数据
-	 * @arg {String|Buffer} packet
-	 * @arg {Boolean} isText
-	 */
-	handlePacket: async function(packet, isText) {
-		this.m_last_packet_time = Date.now();
-		var data = await DataFormater.parse(packet, isText, this.isGzip);
-		if (!data)
-			return;
-		if (!this.isOpen)
-			return console.warn('SER Conversation.handlePacket, connection close status');
-
-		switch (data.type) {
-			case T_BIND:
-				this._bind([data.service]).catch(console.warn);
-				break;
-			case T_PING: // ping Extension protocol 
-				this.handlePing(ZERO_BUFFER);
-				break;
-			case T_PONG: // pong Extension protocol 
-				this.handlePong(ZERO_BUFFER);
-				break;
-			default:
-				var handle = this.m_services[data.service || this.m_default_service];
-				if (handle) {
-					handle.receiveMessage(data).catch(e=>console.error(e));
-				} else {
-					console.error('Could not find the message handler, '+
-												'discarding the message, ' + data.service);
-				}
-		}
-	},
-
-	handlePing: function(data) {
-		this.m_last_packet_time = Date.now();
-		if (this.replyPong)
-			this.pong().catch(console.error);
-		this.onPing.trigger(data);
-	},
-
-	handlePong: function(data) {
-		this.m_last_packet_time = Date.now();
-		this.onPong.trigger(data);
-	},
-
-	/**
-	 * @func sendFormatData
-	 */
-	sendFormatData: async function(data) {
-		data = new DataFormater(data);
-		data = await data.toBuffer(this.isGzip);
-		await this.send(data);
-	},
-
-	/**
-	 * open Conversation
-	 */
-	initialize: function() {},
-
-	/**
-	 * send message to client
-	 * @arg {Object} data
-	 */
-	send: function(data) {},
-
-	/**
-	 * @func ping()
-	 */
-	ping: function() {},
-
-	/**
-	 * @func pong()
-	 */
-	pong: function() {},
-
-	/**
-	 * close the connection
-	 */
-	close: function () {},
-
-	// @end
-}
-
-/**
- * @class Hybi
- */
-export class Hybi extends Conversation {
-
-	constructor(req, upgradeHead, bind_services) {
-		super(req, bind_services);
 	}
 
-	/**
-	 * @func _handshakes()
-	 */
-	_handshakes() {
+	private __initialize() {
+		if (!this._handshakes()) {
+			return false;
+		}
+		var self = this;
+		var socket = this.socket;
+		var parser = new PacketParser();
+
+		socket.setNoDelay(true);
+		socket.setTimeout(0);
+		socket.setKeepAlive(true, KEEP_ALIVE_TIME);
+
+		socket.on('timeout', ()=>self.close());
+		socket.on('end', ()=>self.close());
+		socket.on('close', ()=>self.close());
+		socket.on('data', (e: Buffer)=>parser.add(e));
+		socket.on('error', e=>(console.error('web socket error:',e),self.close()));
+		socket.on('drain', ()=>(self.m_overflow = false,self.onDrain.trigger({})));
+
+		parser.onText.on(e=>self.handlePacket(e.data, true/*isText*/));
+		parser.onData.on(e=>self.handlePacket(e.data, false));
+		parser.onPing.on(e=>self.handlePing(e.data));
+		parser.onPong.on(e=>self.handlePong(e.data));
+		parser.onClose.on(e=>self.close());
+		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
+
+		return true;
+	}
+
+	private _handshakes() {
 		var req = this.request;
 		var key = req.headers['sec-websocket-key'];
-		var origin = req.headers['sec-websocket-origin'];
+		var origin = <string>req.headers['sec-websocket-origin'] || '';
 		// var location = (socket.encrypted ? 'wss' : 'ws') + '://' + req.headers.host + req.url;
 		var upgrade = req.headers.upgrade;
 
@@ -397,7 +194,7 @@ export class Hybi extends Conversation {
 		return true;
 	}
 
-	_upgrade() {
+	private _upgrade() {
 		// calc key
 		var key = this.request.headers['sec-websocket-key'];
 		var shasum = crypto.createHash('sha1');
@@ -414,69 +211,89 @@ export class Hybi extends Conversation {
 	}
 
 	/**
-	 * @overwrite
+	 * verifies the origin of a request.
+	 * @param  {String} origin
+	 * @return {Boolean}
 	 */
-	initialize() {
-		if (!this._handshakes()) {
-			return false;
+	verifyOrigin(origin: string) {
+		var origins = this.server.origins;
+		if (origin == 'null') {
+			origin = '*';
 		}
+		if (origins.indexOf('*:*') != -1) {
+			return true;
+		}
+		if (origin) {
+			try {
+				var parts = url.parse(origin);
+				var ok =
+					~origins.indexOf(parts.hostname + ':' + parts.port) ||
+					~origins.indexOf(parts.hostname + ':*') ||
+					~origins.indexOf('*:' + parts.port);
+				if (!ok) {
+					console.warn('illegal origin: ' + origin);
+				}
+				return ok;
+			}
+			catch (ex) {
+				console.warn('error parsing origin');
+			}
+		} else {
+			console.warn('origin missing from websocket call, yet required by config');
+		}
+		return false;
+	}
+
+	/** 
+	 * @func bindService() 绑定服务
+	*/
+	protected async bindServices(services: string[]) {
 		var self = this;
-		var socket = this.socket;
-		var parser = new PacketParser();
+		for (var name of services) {
+			var cls = service.get(name);
+			utils.assert(cls, name + ' not found');
+			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
+			utils.assert(!(name in self.m_handles), 'Service no need to repeat binding');
 
-		socket.setNoDelay(true);
-		socket.setTimeout(0);
-		socket.setKeepAlive(true, KEEP_ALIVE_TIME);
+			var ser = new cls(self);
+			ser.name = name;
+			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
+			self.m_isGzip = ser.headers['use-gzip'] == 'on';
 
-		socket.on('timeout', e=>self.close());
-		socket.on('end', e=>self.close());
-		socket.on('close', e=>self.close());
-		socket.on('data', e=>parser.add(e));
-		socket.on('error', e=>(console.error('web socket error:',e),self.close()));
-		socket.on('drain', e=>(self.m_overflow = false,self.onDrain.trigger()));
+			await ser.load(); // load
 
-		parser.onText.on(e=>self.handlePacket(e.data, 1/*isText*/));
-		parser.onData.on(e=>self.handlePacket(e.data, 0));
-		parser.onPing.on(e=>self.handlePing(e.data));
-		parser.onPong.on(e=>self.handlePong(e.data));
-		parser.onClose.on(e=>self.close());
-		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
+			if (!self.m_default_service)
+				self.m_default_service = name;
+			self.m_handles[name] = ser;
+			self.m_services_count++;
+			ser.m_loaded = true; // TODO ptinate visit
 
-		return true;
+			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
+			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
+			console.log('SER Load', this.request.url);
+		}
 	}
 
-	/**
-	 * @overwrite
-	 */
-	send(data) {
+	send(data: Buffer): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return _Conversation.write(this, sendDataPacket, [this.socket, data]);
+		return ConversationBasic.write(this, sendDataPacket, [this.socket, data]);
 	}
 
-	/**
-	 * @overwrite
-	 */
-	ping() {
+	ping(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		// return _Conversation.write(this, sendPingPacket, [this.socket]);
 		// TODO Browser does not support standard Ping and Pong API, So the extension protocol is used here
-		return _Conversation.write(this, sendDataPacket, [this.socket, PING_BUFFER]);
+		return ConversationBasic.write(this, sendDataPacket, [this.socket, PING_BUFFER]);
 	}
 
-	/**
-	 * @overwrite
-	 */
-	pong() {
+	pong(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		// return _Conversation.write(this, sendPongPacket, [this.socket]);
 		// TODO Browser does not support standard Ping and Pong API, So the extension protocol is used here
-		return _Conversation.write(this, sendDataPacket, [this.socket, PONG_BUFFER]);
+		return ConversationBasic.write(this, sendDataPacket, [this.socket, PONG_BUFFER]);
 	}
 
-	/**
-	 * @overwrite
-	 */
-	close () {
+	close() {
 		if (this.isOpen) {
 			var socket = this.socket;
 			socket.removeAllListeners('timeout');
@@ -491,15 +308,9 @@ export class Hybi extends Conversation {
 			} catch(err) {
 				console.error(err);
 			}
-			this.onClose.trigger();
+			this.onClose.trigger({});
 			console.log('Hybi Conversation Close');
 		}
 	}
 
 }
-
-// module.exports = {
-// 	PacketParser,
-// 	Conversation,
-// 	Hybi,
-// };

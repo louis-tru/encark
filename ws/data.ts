@@ -28,31 +28,47 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-const {List} = require('../event');
-const jsonb = require('../jsonb');
-const TYPES = {
-	T_BIND: 0xf1,
-	T_EVENT: 0xf2,
-	T_CALL: 0xf3,
-	T_CALLBACK: 0xf4,
-	T_PING: 0xf5,
-	T_PONG: 0xf6,
-};
+import utils from '../util';
+import jsonb from '../jsonb';
+import {List} from '../event';
+import Buffer from '../buffer';
 
-function gen_func(queue, api) {
-	return function(buffer) {
+export enum Types {
+	T_BIND = 0xf1,
+	T_EVENT = 0xf2,
+	T_CALL = 0xf3,
+	T_CALLBACK = 0xf4,
+	T_PING = 0xf5,
+	T_PONG = 0xf6,
+}
+
+interface QValue {
+	resolve(b: Buffer): void;
+	reject(b: any): void
+	result?: {
+		error?: Error | null;
+		data?: Buffer;
+	}
+}
+
+interface Api {
+	(buf: Buffer, callback: (error: Error | null, result: Buffer)=>void): void;
+}
+
+function gen_func(queue: List<QValue>, api: Api) {
+	return function(buffer: Buffer): Promise<Buffer> {
 		return new Promise((resolve, reject)=>{
 			var item = queue.push({ resolve, reject });
-			api(buffer, function (err, data) {
-				item.value.result = { err, data };
+			api(buffer, function (error, data) {
+				(<QValue>item.value).result = { error, data };
 				var first = queue.first;
 				while (first) {
-					var { result, resolve, reject } = first.value;
+					var { result, resolve, reject } = (<QValue>first.value);
 					if (result) {
-						if (result.err) {
-							reject(result.err);
+						if (result.error) {
+							reject(result.error);
 						} else {
-							resolve(result.data);
+							resolve(<Buffer>result.data);
 						}
 						queue.shift();
 						first = queue.first;
@@ -65,24 +81,27 @@ function gen_func(queue, api) {
 	};
 }
 
-if (require('../util').haveNode) {
+var _ungzip: (buffer: Buffer) => Promise<Buffer>;
+var _gzip: (buffer: Buffer) => Promise<Buffer>;
+
+if (utils.haveNode) {
 	var zlib = require('zlib');
-	var _ungzip = gen_func(new List(), zlib.inflateRaw);
-	var _gzip = gen_func(new List(), zlib.deflateRaw);
+	_ungzip = gen_func(new List(), zlib.inflateRaw);
+	_gzip = gen_func(new List(), zlib.deflateRaw);
 }
 
-function ungzip(buffer) {
+function ungzip(buffer: Buffer) {
 	return zlib ? _ungzip(buffer): buffer;
 }
 
-function gzip(buffer) {
+function gzip(buffer: Buffer) {
 	return zlib ? _gzip(buffer): buffer;
 }
 
-var PING_BUFFER = jsonb.binaryify(TYPES.T_PING);
-var PONG_BUFFER = jsonb.binaryify(TYPES.T_PONG);
+export const PING_BUFFER = jsonb.binaryify(Types.T_PING);
+export const PONG_BUFFER = jsonb.binaryify(Types.T_PONG);
 
-function toBuffer(data, isGzip) {
+function toBuffer(data: any, isGzip: boolean) {
 	data = jsonb.binaryify(data);
 	if (isGzip) {
 		return gzip(data);
@@ -90,25 +109,42 @@ function toBuffer(data, isGzip) {
 	return data;
 }
 
+export interface Data {
+	type?: Types;
+	service?: string;
+	name?: string;
+	data?: any;
+	error?: Error;
+	cb?: number;
+	sender?: string;
+}
+
 /**
  * @class DataFormater
  */
-class DataFormater {
+export class DataFormater {
+	type?: Types;
+	service?: string;
+	name?: string;
+	data?: any;
+	error?: Error;
+	cb?: number;
+	sender?: string;
 
-	constructor(data) {
-		Object.assign(this, data);
+	constructor(opts: Data) {
+		Object.assign(this, opts);
 	}
 
-	static async parse(packet, isText, isGzip = false) {
+	static async parse(packet: Buffer | string, isText: boolean, isGzip = false) {
 		try {
 			if (!isText && packet.length === 2) { // PING_BUFFER, PONG_BUFFER
-				var type = packet[1];
-				if (type == TYPES.T_PING || type == TYPES.T_PONG) {
+				let type = packet[1];
+				if (type == Types.T_PING || type == Types.T_PONG) {
 					return new DataFormater({type});
 				}
 			}
 			var [type,service,name,data,error,cb,sender] = isText ? 
-				JSON.parse(packet): jsonb.parse(isGzip ? await ungzip(packet): packet);
+				JSON.parse(<string>packet): jsonb.parse(isGzip ? await ungzip(<Buffer>packet): <Buffer>packet);
 			return new DataFormater({type,service,name,data,error,cb,sender});
 		} catch(err) {
 			console.warn('no parse EXT buffer data', err, packet.length);
@@ -130,29 +166,27 @@ class DataFormater {
 	}
 
 	isPing() {
-		return this.type == TYPES.T_OING;
+		return this.type == Types.T_PING;
 	}
 
 	isPong() {
-		return this.type == TYPES.T_PONG;
+		return this.type == Types.T_PONG;
 	}
 
 	isBind() {
-		return this.type == TYPES.T_BIND;
+		return this.type == Types.T_BIND;
 	}
 
 	isEvent() {
-		return this.type == TYPES.T_EVENT;
+		return this.type == Types.T_EVENT;
 	}
 
 	isCall() {
-		return this.type == TYPES.T_CALL;
+		return this.type == Types.T_CALL;
 	}
 
 	isCallback() {
-		return this.type == TYPES.T_CALLBACK;
+		return this.type == Types.T_CALLBACK;
 	}
 
 }
-
-module.exports = Object.assign({ DataFormater, PING_BUFFER, PONG_BUFFER }, TYPES);
