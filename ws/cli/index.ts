@@ -41,7 +41,7 @@ const print_log = false; // util.dev
 var _WSConversation: any;
 
 if (utils.haveWeb) {
-	_WSConversation = require('./conv_web');
+	_WSConversation = <typeof WSConversation>require('./conv_web');
 } else if (utils.haveNode) {
 	_WSConversation = require('./conv_node');
 } else {
