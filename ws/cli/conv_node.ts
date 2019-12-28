@@ -185,9 +185,9 @@ export default class NodeConversation extends WSConversation {
 	send(data: SendData): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		if (data instanceof ArrayBuffer) {
-			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, Buffer.from(data)]);
+			return WSConversation.write(this, sendDataPacket, [this.m_socket, Buffer.from(data)]);
 		} else { // send json string message or ibuffer
-			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
+			return WSConversation.write(this, sendDataPacket, [this.m_socket, data]);
 		}
 	}
 
@@ -196,7 +196,7 @@ export default class NodeConversation extends WSConversation {
 	 */
 	ping(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversationBasic.write(this, sendPingPacket, [this.m_socket]);
+		return WSConversation.write(this, sendPingPacket, [this.m_socket]);
 	}
 
 	/**
@@ -204,7 +204,7 @@ export default class NodeConversation extends WSConversation {
 	 */
 	pong(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversationBasic.write(this, sendPongPacket, [this.m_socket]);
+		return WSConversation.write(this, sendPongPacket, [this.m_socket]);
 	}
 
 }
