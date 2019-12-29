@@ -54,4 +54,4 @@ function reInterval () {
 	return new ReInterval(arguments[0], arguments[1], args);
 }
 
-module.exports = reInterval;
+export default reInterval;

@@ -36,6 +36,7 @@ import { ConversationBasic, KEEP_ALIVE_TIME } from '../_conv';
 export * from '../_conv';
 import { Signer } from '../../request';
 import { EventNoticer } from '../../event';
+import * as cli from './index';
 
 var USE_GZIP_DATA = false;
 
@@ -100,7 +101,7 @@ export abstract class WSConversationBasic extends ConversationBasic {
 	 * @fun bind # 绑定
 	 * @arg client {Client}
 	 */
-	bind(client: any) {
+	bind(client: cli.WSClient) {
 		var name = client.name;
 		if (name in this.m_handles) {
 			throw new Error('No need to repeat binding');

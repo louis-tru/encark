@@ -381,4 +381,4 @@ Parser.prototype._emitError = function (err) {
 	this.emit('error', err)
 }
 
-module.exports = Parser
+export default Parser

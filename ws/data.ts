@@ -31,7 +31,8 @@
 import utils from '../util';
 import jsonb from '../jsonb';
 import {List} from '../event';
-import {Buffer} from '../buffer';
+
+type Buffer = Uint8Array;
 
 export enum Types {
 	T_BIND = 0xf1,
@@ -94,19 +95,16 @@ function ungzip(buffer: Buffer) {
 	return zlib ? _ungzip(buffer): buffer;
 }
 
-function gzip(buffer: Buffer) {
-	return zlib ? _gzip(buffer): buffer;
-}
-
 export const PING_BUFFER = jsonb.binaryify(Types.T_PING);
 export const PONG_BUFFER = jsonb.binaryify(Types.T_PONG);
 
-function toBuffer(data: any, isGzip: boolean) {
-	data = jsonb.binaryify(data);
-	if (isGzip) {
-		return gzip(data);
+function toBuffer(data: any, isGzip: boolean): Promise<Uint8Array> {
+	var bf = jsonb.binaryify(data);
+	if (isGzip && _gzip) {
+		return _gzip(bf);
+	} else {
+		return new Promise((resolve)=>resolve(bf));
 	}
-	return data;
 }
 
 export interface Data {
@@ -117,13 +115,9 @@ export interface Data {
 	error?: Error;
 	cb?: number;
 	sender?: string;
-	[prop: string]: any;
 }
 
-/**
- * @class DataFormater
- */
-export class DataFormater {
+export class DataBuilder {
 	type?: Types;
 	service?: string;
 	name?: string;
@@ -141,18 +135,18 @@ export class DataFormater {
 			if (!isText && packet.length === 2) { // PING_BUFFER, PONG_BUFFER
 				let type = packet[1];
 				if (type == Types.T_PING || type == Types.T_PONG) {
-					return new DataFormater({type});
+					return new DataBuilder({type});
 				}
 			}
 			var [type,service,name,data,error,cb,sender] = isText ? 
 				JSON.parse(<string>packet): jsonb.parse(isGzip ? await ungzip(<Buffer>packet): <Buffer>packet);
-			return new DataFormater({type,service,name,data,error,cb,sender});
+			return new DataBuilder({type,service,name,data,error,cb,sender});
 		} catch(err) {
 			console.warn('no parse EXT buffer data', err, packet.length);
 		}
 	}
 
-	toBuffer(isGzip = false) {
+	builder(isGzip = false) {
 		return toBuffer([
 			this.type, this.service, this.name,
 			this.data, this.error, this.cb, this.sender

@@ -29,10 +29,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../../util';
-import buffer from '../../buffer';
+import buffer, {Buffer} from '../../buffer';
 import errno from '../../errno';
 import {PING_BUFFER,PONG_BUFFER} from '../data';
-import {WSConversationBasic, SendData} from './conv';
+import {WSConversationBasic} from './conv';
 
 const WebSocket = globalThis.WebSocket;
 
@@ -120,15 +120,9 @@ export default class WebConversation extends WSConversationBasic {
 	/**
 	 * @ovrewrite 
 	 */
-	async send(data: SendData) {
+	async send(data: Buffer) {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		if (data instanceof ArrayBuffer) {
-			this.m_req.send(data);
-		} else if (typeof data == 'string') {  // send json string message
-			this.m_req.send(data);
-		} else {
-			this.m_req.send(data.buffer);
-		}
+		this.m_req.send(data.buffer);
 	}
 
 	/**

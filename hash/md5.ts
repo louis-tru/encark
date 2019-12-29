@@ -64,7 +64,7 @@ var md5: (s: string | Bytes)=>Buffer;
 
 if (utils.haveNode) {
 	let crypto = require('crypto');
-	md5 = (s: string | Bytes)=><Buffer>crypto.createHash('md5').update(s).digest();
+	md5 = (s: string | Bytes)=>buffer.from(crypto.createHash('md5').update(s).digest());
 } else {
 	md5 = require('./_md5').default;
 }

@@ -250,7 +250,7 @@ export default {
 		return r;
 	},
 
-	set(name: string, cls: typeof Service) {
+	set(name: string, cls: any) {
 		util.assert(util.equalsClass(Service, cls), '"{0}" is not a "Service" type', name);
 		util.assert(!(name in all_service_cls), 'service repeat definition, "{0}"', name);
 		(<any>cls).prototype.name = name; // 设置服务名称

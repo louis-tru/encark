@@ -30,9 +30,9 @@
 
 import utils from '../../util'
 import errno from '../../errno';
-import { Notification, Event } from '../../event';
-import { Types } from '../data';
-import {WSConversationBasic} from './conv';
+import { Notification, Event, EventNoticer } from '../../event';
+import { Types, Data, DataBuilder } from '../data';
+import {WSConversationBasic, MessageHandle} from './conv';
 export * from './conv';
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
@@ -54,14 +54,21 @@ if (utils.haveWeb) {
 	throw new Error('Unimplementation');
 }
 
+interface CallData extends Data {
+	ok(e: any): void;
+	err(e: Error): void;
+	timeout?: number;
+	cancel?: boolean;
+}
+
 /**
  * @class WSClient
  */
-export class WSClient extends Notification {
+export class WSClient extends Notification implements MessageHandle {
 
-	private m_calls: Map<number, any> = new Map();
+	private m_calls: Map<number, CallData> = new Map();
 	private m_loaded = false;
-	private m_sends: any[] = [];
+	private m_sends: CallData[] = [];
 	private m_service_name: string;
 	private m_conv: WSConversation;
 	private m_Intervalid: any;
@@ -69,6 +76,8 @@ export class WSClient extends Notification {
 	get name() { return this.m_service_name }
 	get conv() { return this.m_conv }
 	get loaded() { return this.m_loaded }
+
+	readonly onLoad = new EventNoticer('Load', this);
 
 	/**
 	 * @constructor constructor(service_name, conv)
@@ -99,7 +108,7 @@ export class WSClient extends Notification {
 
 		this.addEventListener('Load', async e=>{
 			console.log('CLI Load', conv.url.href);
-			this.m_conv.m_token = e.data.token; // TODO private visit
+			(<any>this).m_conv.m_token = e.data.token; // TODO private visit
 			this.m_loaded = true;
 			var sends = this.m_sends;
 			this.m_sends = [];
@@ -115,19 +124,19 @@ export class WSClient extends Notification {
 		this.m_conv.bind(this);
 	}
 
-	_checkMethodName(method: string) {
+	private _checkMethodName(method: string) {
 		utils.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
 	}
 
 	/**
 	 * @func receiveMessage(msg)
 	 */
-	async receiveMessage(msg) {
+	async receiveMessage(msg: DataBuilder) {
 		var self = this;
-		var { data = {}, name, cb, sender } = msg;
+		var { data = {}, name = '', cb, sender } = msg;
 
 		if (msg.isCallback()) {
-			var handle = this.m_calls.get(cb);
+			var handle = this.m_calls.get(cb as number);
 			if (handle) {
 				if (msg.error) { // throw error
 					handle.err(Error.new(msg.error));
@@ -136,7 +145,7 @@ export class WSClient extends Notification {
 				}
 			}
 		} else {
-			var r = {};
+			var r: { data?: any, error?: Error } = {};
 			if (msg.isCall()) {
 				this._checkMethodName(name);
 				if (print_log) 
@@ -162,7 +171,7 @@ export class WSClient extends Notification {
 			if (cb) {
 				self.m_conv.sendFormatData(Object.assign(r, {
 					service: self.m_conv._service(self.name),
-					type: T_CALLBACK, 
+					type: Types.T_CALLBACK, 
 					cb: cb,
 				})).catch(console.warn); // callback
 			}
@@ -173,16 +182,16 @@ export class WSClient extends Notification {
 	/**
 	 * @class handleCall
 	 */
-	handleCall(method, data, sender) {
+	private handleCall(method: string, data: any, sender?: string) {
 		if (method in WSClient.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
-		var fn = this[method];
+		var fn = (<any>this)[method];
 		if (typeof fn != 'function')
-			throw Error.new('"{0}" no defined function'.format(method));
+			throw Error.new(String.format('"{0}" no defined function', method));
 		return fn.call(this, data, sender);
 	}
 
-	async _send(data) {
+	private async _send(data: CallData) {
 		if (this.m_loaded) {
 			await this.m_conv.sendFormatData(data);
 			delete data.data;
@@ -193,7 +202,7 @@ export class WSClient extends Notification {
 		return data;
 	}
 
-	_checkTimeout() {
+	private _checkTimeout() {
 		var now = Date.now();
 		for (var [,handle] of this.m_calls) {
 			if (handle.timeout) {
@@ -206,14 +215,14 @@ export class WSClient extends Notification {
 		}
 	}
 
-	_call(type, name, data, timeout, sender) {
-		return util.promise(async (resolve, reject)=>{
-			var id = util.id;
+	private _call<T = any>(type: Types, name: string, data?: any, timeout?: number, sender?: string) {
+		return utils.promise(async (resolve: (e?: T)=>void, reject)=>{
+			var id = utils.id;
 			var calls = this.m_calls;
-			calls.set(id, await this._send({
+			calls.set(id, <CallData>await this._send({
 				timeout: timeout ? timeout + Date.now(): 0,
-				ok: e=>(calls.delete(id),resolve(e)),
-				err: e=>(calls.delete(id),reject(e)),
+				ok: (e: any)=>(calls.delete(id),resolve(e)),
+				err: (e: Error)=>(calls.delete(id),reject(e)),
 				service: this.m_conv._service(this.name),
 				type: type,
 				name: name,
@@ -226,20 +235,20 @@ export class WSClient extends Notification {
 
 	/**
 	 * @func call(method, data, timeout)
-	 * @async
 	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._call(T_CALL, method, data, timeout, sender);
+	call<T = any>(method: string, data?: any, timeout = METHOD_CALL_TIMEOUT, sender?: string) {
+		return this._call<T>(Types.T_CALL, method, data, timeout, sender);
 	}
 
 	/**
 	 * @func send(method, data, sender) method call
-	 * @async
 	 */
-	async send(method, data, sender = null) {
+	async send(method: string, data?: any, sender?: string) {
 		await this._send({
+			ok: ()=>{},
+			err: ()=>{},
 			service: this.conv._service(this.name),
-			type: T_CALL,
+			type: Types.T_CALL,
 			name: method,
 			data: data,
 			sender: sender,

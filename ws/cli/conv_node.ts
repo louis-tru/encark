@@ -30,7 +30,7 @@
 
 import utils from '../../util';
 import request from '../../request';
-import buffer from '../../buffer';
+import buffer, {Buffer} from '../../buffer';
 import errno from '../../errno';
 import * as net from 'net';
 import * as http from 'http';
@@ -39,7 +39,7 @@ import * as crypto from 'crypto';
 import {
 	PacketParser, sendDataPacket,
 	sendPingPacket, sendPongPacket } from '../parser';
-import _conv, {WSConversationBasic,KEEP_ALIVE_TIME, SendData} from './conv';
+import _conv, {WSConversationBasic,KEEP_ALIVE_TIME} from './conv';
 
 // Node implementation
 export default class NodeConversation extends WSConversationBasic {
@@ -182,13 +182,9 @@ export default class NodeConversation extends WSConversationBasic {
 	/**
 	 * @ovrewrite
 	 */
-	send(data: SendData): Promise<void> {
+	send(data: Buffer): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		if (data instanceof ArrayBuffer) {
-			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, buffer.from(data)]);
-		} else { // send json string message or ibuffer
-			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
-		}
+		return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
 	}
 
 	/**

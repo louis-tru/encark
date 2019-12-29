@@ -32,7 +32,7 @@ import utils from '../util';
 import {Service} from '../service';
 import {Session} from '../session';
 import errno from '../errno';
-import {Types, DataFormater, Data} from './data';
+import {Types, DataBuilder, Data} from './data';
 import * as conv from './conv';
 import {Buffer} from '../buffer';
 
@@ -40,9 +40,10 @@ export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 const print_log = false; // util.dev
 
 interface CallData extends Data {
-	timeout: number;
 	ok(e: any): void;
 	err(e: Error): void;
+	timeout?: number;
+	cancel?: boolean;
 }
 
 /**
@@ -96,7 +97,7 @@ export class WSService extends Service implements conv.MessageHandle {
 	/**
 	 * @fun receiveMessage() # 消息处理器
 	 */
-	async receiveMessage(msg: DataFormater) {
+	async receiveMessage(msg: DataBuilder) {
 		if (!this.m_loaded) 
 			console.warn('Unable to process message WSService.receiveMessage, loaded=false');
 
@@ -155,7 +156,7 @@ export class WSService extends Service implements conv.MessageHandle {
 		return fn.call(this, data, sender);
 	}
 
-	async _send(data: Data) {
+	async _send(data: CallData) {
 		await this.m_conv.sendFormatData(data);
 		delete data.data;
 		return data;
@@ -195,6 +196,8 @@ export class WSService extends Service implements conv.MessageHandle {
 
 	async _trigger(event: string, data: any, sender?: string) {
 		await this._send({
+			ok: ()=>{},
+			err: ()=>{},
 			service: this.conv._service(this.name),
 			type: Types.T_EVENT,
 			name: event,
@@ -225,6 +228,8 @@ export class WSService extends Service implements conv.MessageHandle {
 	 */
 	async send(method: string, data: any, sender?: string) {
 		await this._send({
+			ok: ()=>{},
+			err: ()=>{},
 			service: this.conv._service(this.name),
 			type: Types.T_CALL,
 			name: method,

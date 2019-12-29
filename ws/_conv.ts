@@ -29,16 +29,14 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import { DataFormater, Types, Data } from './data';
-import { Zero, Buffer } from '../buffer';
+import { DataBuilder, Types, Data } from './data';
+import buffer, { Zero, Buffer } from '../buffer';
 import {EventNoticer} from '../event';
 
 export const KEEP_ALIVE_TIME = 5e4; // 50s
 
-export type SendData = string | Buffer | ArrayBuffer;
-
 export interface MessageHandle {
-	receiveMessage(data: DataFormater): Promise<void>;
+	receiveMessage(data: Data): Promise<void>;
 }
 
 export abstract class ConversationBasic {
@@ -109,9 +107,9 @@ export abstract class ConversationBasic {
 	 * @arg packet {String|Buffer}
 	 * @arg {Boolean} isText
 	 */
-	async handlePacket(packet: Buffer | string, isText: boolean) {
+	protected async handlePacket(packet: Buffer | string, isText: boolean) {
 		this.m_last_packet_time = Date.now();
-		var data = await DataFormater.parse(packet, isText, this.isGzip);
+		var data = await DataBuilder.parse(packet, isText, this.isGzip);
 		if (!data)
 			return;
 		if (!this.isOpen)
@@ -151,17 +149,17 @@ export abstract class ConversationBasic {
 	}
 
 	async sendFormatData(data: Data) {
-		var df = new DataFormater(data);
-		var bf = await df.toBuffer(this.isGzip);
-		await this.send(bf);
+		var df = new DataBuilder(data);
+		var bf = await df.builder(this.isGzip);
+		await this.send(buffer.from(bf));
 	}
 
-	abstract send(data: SendData): Promise<void>;
+	abstract send(data: Buffer): Promise<void>;
 	abstract ping(): Promise<void>;
 	abstract pong(): Promise<void>;
 	abstract close(): void;
 
-	static write<A extends any[], R>(self: ConversationBasic, api: (...args: any[])=>R, args: A): Promise<void> {
+	protected static write<A extends any[], R>(self: ConversationBasic, api: (...args: any[])=>R, args: A): Promise<void> {
 		return utils.promise(function(resolve, reject) {
 			var ok = api(...args, function(err?: Error) {
 				if (err) {

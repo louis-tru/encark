@@ -75,7 +75,7 @@ if (utils.haveNode) { // node
 	if (getRandomValues) {
 		// WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
 			// eslint-disable-line no-undef
-			_rng = function() {
+		_rng = function() {
 			return buffer.from(getRandomValues(rnds8));
 		};
 	}

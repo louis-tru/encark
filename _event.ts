@@ -176,7 +176,7 @@ export class Event<Data = any, Return = number, Sender = any> {
 	protected m_noticer: EventNoticer<Data, Return, Sender> | null = null;
 	private m_return_value: Return | null = null;
 	protected __has_event = true;
-	private m_origin = null;
+	private m_origin: any = null;
 
 	get name() {
 		return (<EventNoticer<Data, Return, Sender>>this.m_noticer).name;
@@ -194,7 +194,7 @@ export class Event<Data = any, Return = number, Sender = any> {
 		return this.m_origin;
 	}
 
-	set origin(value) {
+	set origin(value: any) {
 		this.m_origin = value;
 	}
 

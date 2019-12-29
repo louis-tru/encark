@@ -36,11 +36,10 @@ import {WriteStream} from 'fs';
 import * as querystring from 'querystring';
 import * as crypto from 'crypto';
 import {parseJSON} from './request';
-var xml = require('./xml');
+import Document from './xml';
 import {StaticService} from './static_service';
 import * as http from 'http';
 
-// var s = 0,
 export enum STATUS {
 	PARSER_UNINITIALIZED = 0,
 	START,
@@ -118,7 +117,7 @@ class QuerystringParser implements Parser {
 			}
 			this.onEnd(data);
 		} else if (this.type == 'xml') {
-			var doc = new xml.Document();
+			var doc = new Document();
 			var r = doc.load(buffer+'');
 			this.onEnd({ body: doc });
 		} else {
@@ -195,12 +194,12 @@ export class File {
 	end(cb: any) {
 		if (this._writeStream) {
 			this._writeStream.end(()=>{
-				this.onEnd.trigger();
+				this.onEnd.trigger({});
 				cb();
 			});
 		} else {
 			this._path = '';
-			this.onEnd.trigger();
+			this.onEnd.trigger({});
 			cb();
 		}
 	}
@@ -613,7 +612,7 @@ export class IncomingForm {
 		});
 		req.on('aborted', function () {
 			self._canceled();
-			self.onAborted.trigger();
+			self.onAborted.trigger({});
 		});
 		req.on('data', function (buffer) {
 			self.write(buffer);
@@ -860,7 +859,7 @@ export class IncomingForm {
 		};
 
 		(<any>parser).onPartEnd = function () {
-			part.onEnd.trigger();
+			part.onEnd.trigger({});
 		};
 
 		(<any>parser).onEnd = function () {
@@ -925,7 +924,7 @@ export class IncomingForm {
 	private _maybeEnd() {
 		if (!this._ended || this._flushing)
 			return;
-		this.onEnd.trigger();
+		this.onEnd.trigger({});
 	}
 
 }

@@ -28,12 +28,10 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-'use strict'
-
 /**
  * Module dependencies
  */
-var utils = require('../util');
+import utils from '../util';
 var events = require('events')
 var Store = require('./store')
 var eos = require('./end-of-stream')
@@ -42,9 +40,10 @@ var Parser = require('./parser');
 var Writable = require('stream').Writable
 var reInterval = require('./reinterval')
 var validations = require('./validations')
-var url = require('url');
-var net = require('net');
-var tls = require('tls');
+
+import * as url from 'url';
+import * as net from 'net';
+import * as tls from 'tls';
 
 function defaultId() {
 	return 'mqttjs_' + Math.random().toString(16).substr(2, 8);
@@ -231,7 +230,7 @@ function stream_builder(self) {
 /**
  * @class MqttClient
  */
-class MqttClient extends events.EventEmitter {
+export class MqttClient extends events.EventEmitter {
 
 	/**
 	 * MqttClient constructor
@@ -1229,5 +1228,3 @@ class MqttClient extends events.EventEmitter {
 	}
 
 }
-
-exports.MqttClient = MqttClient;

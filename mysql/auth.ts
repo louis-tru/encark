@@ -29,7 +29,9 @@
  * ***** END LICENSE BLOCK ***** */
 
 import * as crypto from 'crypto';
-import buffer, { Buffer, Bytes } from '../buffer';
+import buffer, { Buffer, Bytes as Bytes_ } from '../buffer';
+
+type Bytes = Bytes_ | number[];
 
 export function xor(a: string, b: string): Buffer {
 	var _a = buffer.from(a, 'binary');
