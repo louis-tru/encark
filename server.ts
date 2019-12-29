@@ -54,7 +54,7 @@ export class Server extends BaseServer {
 			var url = decodeURI(req.url || '');       // 解码
 			var info = this.router.find(url);   // 通过url查找目标服务信息
 			var name = info.service;
-			var cls = service.get(name);
+			var cls = service.get(name) as unknown as typeof StaticService;
 
 			if (this.printLog) {
 				console.log(url);
@@ -117,7 +117,7 @@ export class Server extends BaseServer {
 		server.on('close', ()=>{
 			clearInterval(this.m_checkIntervalId);
 			this.m_isRun = false;
-			this.trigger('Stop');
+			this.trigger('Stop', {});
 		});
 	}
 }

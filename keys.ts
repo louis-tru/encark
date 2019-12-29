@@ -30,16 +30,15 @@
 
 import util from './util';
 import _keys from './_keys';
-var { haveNgui, haveNode } = util;
 
 var readFile: (path: string)=>string;
 
-if (haveNgui) {
+if (util.haveNgui) {
 	let reader = __requireNgui__('_reader');
 	readFile = function(path: string) {
 		return reader.readFileSync(path, 'utf8');
 	};
-} else if (haveNode) {
+} else if (util.haveNode) {
 	let fs = require('fs');
 	readFile = function(path: string) {
 		return fs.readFileSync(path, 'utf8');
