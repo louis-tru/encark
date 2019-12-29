@@ -30,7 +30,8 @@
 
 import utils from './util';
 import errno from './errno';
-import {Bytes} from './_buffer';
+
+type ArrayNumber = ArrayLike<number>;
 
 var b64pad = '=';
 var hex_tab = '0123456789abcdef';
@@ -135,7 +136,7 @@ function encodeAsciiFrom(str: string): number[] {
 }
 
 // bytes => string
-function encodeHexFrom(bytes: Bytes, start: number, end: number): string {
+function encodeHexFrom(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++) {
@@ -145,7 +146,7 @@ function encodeHexFrom(bytes: Bytes, start: number, end: number): string {
 }
 
 // bytes => string
-function encodeBase64From(bytes: Bytes, start: number, end: number): string {
+function encodeBase64From(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var size = end - start;
 	var str = '';
@@ -163,7 +164,7 @@ function encodeBase64From(bytes: Bytes, start: number, end: number): string {
 
 // decode
 
-function checkOffset(bytes: Bytes, start: number, end: number): void {
+function checkOffset(bytes: ArrayNumber, start: number, end: number): void {
 	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
@@ -171,7 +172,7 @@ function checkOffset(bytes: Bytes, start: number, end: number): void {
 }
 
 // convert utf8 bytes to unicode
-function decodeUTF8Word(bytes: Bytes, offset: number) {
+function decodeUTF8Word(bytes: ArrayNumber, offset: number) {
 	var str = offset;
 	var c = bytes[str]; str++;
 	if ((c & 0x80) == 0) { // 小于 128 (c & 10000000) == 00000000
@@ -242,7 +243,7 @@ function decodeUTF8Word(bytes: Bytes, offset: number) {
 }
 
 // convert utf8 bytes to a str
-function decodeUTF8From(bytes: Bytes, start: number, end: number): string {
+function decodeUTF8From(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = [];
 	for(var i = start; i < end;) {
@@ -254,12 +255,12 @@ function decodeUTF8From(bytes: Bytes, start: number, end: number): string {
 }
 
 // bytes => string
-function decodeUTF8(bytes: Bytes): string {
+function decodeUTF8(bytes: ArrayNumber): string {
 	return decodeUTF8From(bytes, 0, bytes.length);
 }
 
 // bytes => string
-function decodeLatin1From(bytes: Bytes, start: number, end: number): string {
+function decodeLatin1From(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++)
@@ -268,7 +269,7 @@ function decodeLatin1From(bytes: Bytes, start: number, end: number): string {
 }
 
 // bytes => string
-function decodeAsciiFrom(bytes: Bytes, start: number, end: number): string {
+function decodeAsciiFrom(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = '';
 	for(var i = start; i < end; i++)
@@ -322,19 +323,17 @@ function decodeBase64(str: string): number[] {
 	return bytes;
 }
 
-// ext
-
 /*
  * Convert an array of bytes to a hex string.
  */
-function convertHexString(bytes: Bytes) {
+function convertHexString(bytes: ArrayNumber) {
 	return encodeHexFrom(bytes, 0, bytes.length);
 }
 
 /*
  * Convert an array of bytes to a base64 string.
  */
-function convertBase64String(bytes: Bytes) {
+function convertBase64String(bytes: ArrayNumber) {
 	return encodeBase64From(bytes, 0, bytes.length);
 }
 

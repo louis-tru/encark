@@ -30,12 +30,12 @@
 
 import utils from '../util';
 import { DataFormater, Types, Data } from './data';
-import Buffer, { Zero } from '../buffer';
+import { Zero, Buffer } from '../buffer';
 import {EventNoticer} from '../event';
 
 export const KEEP_ALIVE_TIME = 5e4; // 50s
 
-export type SendData = string | InterfaceBuffer | ArrayBuffer;
+export type SendData = string | Buffer | ArrayBuffer;
 
 export interface MessageHandle {
 	receiveMessage(data: DataFormater): Promise<void>;

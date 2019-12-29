@@ -30,7 +30,7 @@
 
 import utils from '../util';
 import util from './util';
-import {Buffer, Bytes} from '../buffer';
+import buffer, {Buffer, Bytes} from '../buffer';
 
 const {bin2str,bin2hex,bin2b64} = util;
 
@@ -51,7 +51,7 @@ function sha1_vm_test()
 	var sha1_ = crypto.createHash('sha1');
 	sha1_.update('abc');
 	console.log(sha1_.digest());
-	console.log(Buffer.from(sha1('abc')));
+	console.log(buffer.from(sha1('abc')));
 
 	var hash = sha1_hex("abc");
 	console.log(hash, '\na9993e364706816aba3e25717850c26c9cd0d89d');

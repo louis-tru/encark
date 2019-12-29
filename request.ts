@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import Buffer from './buffer';
+import buffer,{Buffer} from './buffer';
 import url from './path';
 import errno from './errno';
 
@@ -235,9 +235,9 @@ function requestWeb(
 			requestData: options.params,
 		};
 		if (data instanceof ArrayBuffer) {
-			resolve(Object.assign(r, { data: Buffer.from(data) }));
+			resolve(Object.assign(r, { data: buffer.from(data) }));
 		} else if (data instanceof Blob && (<any>data).arrayBuffer) {
-			(<any>data).arrayBuffer().then((e:any)=>resolve(Object.assign(r, { data: Buffer.from(e) })));
+			(<any>data).arrayBuffer().then((e:any)=>resolve(Object.assign(r, { data: buffer.from(e) })));
 		} else {
 			resolve(Object.assign(r, { data }))
 		}
@@ -268,7 +268,7 @@ function requestNode(	options: Any,
 	}
 
 	if (method == 'POST') {
-		soptions.headers['Content-Length'] = post_data ? Buffer.byteLength(post_data) : 0;
+		soptions.headers['Content-Length'] = post_data ? buffer.byteLength(post_data) : 0;
 	}
 
 	var req = lib.request(soptions, (res: any)=> {
@@ -284,7 +284,7 @@ function requestNode(	options: Any,
 			// console.log('No more data in response.');
 			// console.log('---requestNode', data + '');
 			resolve({
-				data: Buffer.concat(buffers),
+				data: buffer.concat(buffers),
 				headers: res.headers,
 				statusCode: res.statusCode,
 				httpVersion: res.httpVersion,

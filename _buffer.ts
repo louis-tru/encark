@@ -28,8 +28,6 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import utils from './util';
-
 // Temporary buffers to convert numbers.
 const float32Array = new Float32Array(1);
 const uInt8Float32Array = new Uint8Array(float32Array.buffer);
@@ -50,9 +48,9 @@ function writeBigIntLE(bytes: number[], bigint: bigint): number {
 
 if (!!globalThis.BigInt) {
 	(function(ok: any, ...args: any[]) {
-		if (utils.haveWeb) {
+		if (globalThis.document) { // web
 			import('./_bigint').then(ok); // bigint syntax, webpack delay load
-		} else {
+		} else { // node
 			ok(arguments[1]('./_bigint'));
 		}
 	})(function(bigint: any) {
@@ -69,26 +67,26 @@ float32Array[0] = -1; // 0xBF800000
 // check self with `os.endianness()` because that is determined at compile time.
 const bigEndian = uInt8Float32Array[3] === 0;
 
-function ERR_BUFFER_OUT_OF_BOUNDS(name?: string) {
+export function ERR_BUFFER_OUT_OF_BOUNDS(name?: string) {
 	if (name) {
 		return new RangeError(`"${name}" is outside of buffer bounds`);
 	}
 	return new RangeError('Attempt to access memory outside buffer bounds');
 }
 
-function ERR_OUT_OF_RANGE(str: string, range: string, input: number) {
+export function ERR_OUT_OF_RANGE(str: string, range: string, input: number) {
 	return new RangeError(`ERR_OUT_OF_RANGE ${str}, ${range}, ${input}`);
 }
 
-function invalidArgType(value: any, types: string | string[], arg: string = ''): TypeError {
+export function ERR_INVALID_ARG_TYPE(value: any, types: string | string[], arg: string = ''): TypeError {
 	if (!Array.isArray(types))
 		types = [types];
 	return new TypeError(`ERR_INVALID_ARG_TYPE ${arg} [${types.join('|')}] ${value}`);
 }
 
-function validateNumber(value: any, name?: string) {
+export function validateNumber(value: any, name?: string) {
 	if (typeof value !== 'number')
-		throw invalidArgType(value, 'number', name);
+		throw ERR_INVALID_ARG_TYPE(value, 'number', name);
 		// throw new TypeError(`ERR_INVALID_ARG_TYPE ${name} number ${value}`);
 }
 
@@ -275,7 +273,7 @@ function readUInt48BE(self: Uint8Array, offset = 0) {
 		last;
 }
 
-function readBigInt64BE(self: Uint8Array, offset = 0): bigint | number {
+function readBigInt64BE(self: Uint8Array, offset = 0): bigint {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -285,8 +283,32 @@ function readBigInt64BE(self: Uint8Array, offset = 0): bigint | number {
 	if (_bigint) {
 		return <bigint>_bigint._readBigInt64BE(self, offset);
 	}
+	throw new Error('Not support bigint');
+}
 
-	console.warn('Not support bigint');
+function readBigUInt64BE(self: Uint8Array, offset = 0): bigint {
+	validateNumber(offset, 'offset');
+	const first = self[offset];
+	const last = self[offset + 7];
+	if (first === undefined || last === undefined)
+		boundsError(offset, self.length - 8);
+
+	if (_bigint) {
+		return <bigint>_bigint._readBigUInt64BE(self, offset)
+	}
+	throw new Error('Not support bigint');
+}
+
+function readBigInt64BE_Compatible(self: Uint8Array, offset = 0): bigint | number {
+	validateNumber(offset, 'offset');
+	const first = self[offset];
+	const last = self[offset + 7];
+	if (first === undefined || last === undefined)
+		boundsError(offset, self.length - 8);
+
+	if (_bigint) {
+		return <bigint>_bigint._readBigInt64BE(self, offset);
+	}
 
 	const hi = 
 		(first << 24) + // Overflow
@@ -303,7 +325,7 @@ function readBigInt64BE(self: Uint8Array, offset = 0): bigint | number {
 	return hi * 2 ** 32 + lo;
 }
 
-function readBigUInt64BE(self: Uint8Array, offset = 0) {
+function readBigUInt64BE_Compatible(self: Uint8Array, offset = 0): bigint | number {
 	validateNumber(offset, 'offset');
 	const first = self[offset];
 	const last = self[offset + 7];
@@ -314,18 +336,15 @@ function readBigUInt64BE(self: Uint8Array, offset = 0) {
 		return <bigint>_bigint._readBigUInt64BE(self, offset)
 	}
 
-	console.warn('Not support bigint');
-
 	const hi = first * 2 ** 24 +
-		self[++offset] * 2 ** 16 +
-		self[++offset] * 2 ** 8 +
-		self[++offset];
+	self[++offset] * 2 ** 16 +
+	self[++offset] * 2 ** 8 +
+	self[++offset];
 
 	const lo = self[++offset] * 2 ** 24 +
 		self[++offset] * 2 ** 16 +
 		self[++offset] * 2 ** 8 +
 		last;
-
 	return hi * 2 ** 32 + lo;
 }
 
@@ -346,6 +365,8 @@ function readIntBE(self: Uint8Array, offset = 0, byteLength = 4) {
 		return readInt8(self, offset);
 
 	boundsError(byteLength, 6, 'byteLength');
+
+	return 0;
 }
 
 function readUIntBE(self: Uint8Array, offset = 0, byteLength = 4) {
@@ -365,6 +386,8 @@ function readUIntBE(self: Uint8Array, offset = 0, byteLength = 4) {
 		return readUInt8(self, offset);
 
 	boundsError(byteLength, 6, 'byteLength');
+
+	return 0;
 }
 
 // Read floats
@@ -546,11 +569,11 @@ function writeUInt48BE(self: Uint8Array, value: number, offset = 0) {
 	return writeU_Int48BE(self, value, offset, 0, 0xffffffffffffff);
 }
 
-function writeBigInt64BE(self: Uint8Array, value: number, offset = 0) {
+function writeBigInt64BE(self: Uint8Array, value: bigint, offset = 0) {
 	return _bigint._writeBigInt64BE(self, value, offset);
 }
 
-function writeBigUInt64BE(self: Uint8Array, value: number, offset = 0) {
+function writeBigUInt64BE(self: Uint8Array, value: bigint, offset = 0) {
 	return _bigint._writeBigUInt64BE(self, value, offset);
 }
 
@@ -569,6 +592,8 @@ function writeIntBE(self: Uint8Array, value: number, offset = 0, byteLength = 4)
 		return writeU_Int8(self, value, offset, -0x80, 0x7f);
 
 	boundsError(byteLength, 6, 'byteLength');
+
+	return 0;
 }
 
 function writeUIntBE(self: Uint8Array, value: number, offset = 0, byteLength = 4) {
@@ -586,6 +611,8 @@ function writeUIntBE(self: Uint8Array, value: number, offset = 0, byteLength = 4
 		return writeU_Int8(self, value, offset, 0, 0xff);
 
 	boundsError(byteLength, 6, 'byteLength');
+
+	return 0;
 }
 
 // Write floats.
@@ -650,87 +677,8 @@ var readDoubleBE = bigEndian ? readDoubleForwards : readDoubleBackwards;
 var writeFloatBE = bigEndian ? writeFloatForwards : writeFloatBackwards;
 var writeDoubleBE = bigEndian ? writeDoubleForwards : writeDoubleBackwards;
 
-const MathFloor = Math.floor;
-
-export const __TypedArray = (<any>Uint8Array).prototype.constructor.__proto__;
-
-function isTypedArray(arr: NodeJS.TypedArray) {
-	return arr instanceof __TypedArray;
-}
-
-function toInteger(n: number, defaultVal: number) {
-	n = +n;
-	if (!Number.isNaN(n) &&
-			n >= Number.MIN_SAFE_INTEGER &&
-			n <= Number.MAX_SAFE_INTEGER) {
-		return ((n % 1) === 0 ? n : MathFloor(n));
-	}
-	return defaultVal;
-}
-
-function copy(source: NodeJS.TypedArray, target: NodeJS.TypedArray, 
-	targetStart?: number, sourceStart?: number, sourceEnd?: number) 
-{
-	if (!isTypedArray(source))
-	  throw invalidArgType(source, ['Buffer', 'TypedArray'], 'source');
-	if (!isTypedArray(target))
-	  throw invalidArgType(target, ['Buffer', 'TypedArray'], 'target');
-
-	if (targetStart === undefined) {
-		targetStart = 0;
-	} else {
-		targetStart = toInteger(targetStart, 0);
-		if (targetStart < 0)
-			throw ERR_OUT_OF_RANGE('targetStart', '>= 0', targetStart);
-	}
-
-	if (sourceStart === undefined) {
-		sourceStart = 0;
-	} else {
-		sourceStart = toInteger(sourceStart, 0);
-		if (sourceStart < 0)
-			throw ERR_OUT_OF_RANGE('sourceStart', '>= 0', sourceStart);
-	}
-
-	if (sourceEnd === undefined) {
-		sourceEnd = source.byteLength;
-	} else {
-		sourceEnd = toInteger(sourceEnd, 0);
-		if (sourceEnd < 0)
-			throw ERR_OUT_OF_RANGE('sourceEnd', '>= 0', sourceEnd);
-	}
-
-	if (targetStart >= target.byteLength || sourceStart >= sourceEnd)
-		return 0;
-
-	if (sourceStart > source.byteLength) {
-		throw ERR_OUT_OF_RANGE('sourceStart',
-															 `<= ${source.byteLength}`,
-															 sourceStart);
-	}
-
-	if (sourceEnd - sourceStart > target.byteLength - targetStart)
-		sourceEnd = sourceStart + target.byteLength - targetStart;
-
-	let nb = sourceEnd - sourceStart;
-	const targetLen = target.byteLength - targetStart;
-	const sourceLen = source.byteLength - sourceStart;
-	if (nb > targetLen)
-		nb = targetLen;
-	if (nb > sourceLen)
-		nb = sourceLen;
-
-	var src: Uint8Array;
-	if (sourceStart !== 0 || sourceEnd !== source.byteLength)
-		src = new Uint8Array(source.buffer, source.byteOffset + sourceStart, nb);
-	else
-		src = new Uint8Array(source.buffer);
-	(new Uint8Array(target.buffer)).set(src, targetStart);
-	return nb;
-}
-
 export default {
-	get isBigInt() { return !!_bigint },
+	get isBigInt() { return !!globalThis.BigInt },
 	// read
 	readInt8, readUInt8,
 	readInt16BE, readUInt16BE,
@@ -738,10 +686,11 @@ export default {
 	readInt40BE, readUInt40BE,
 	readInt48BE, readUInt48BE,
 	readBigInt64BE, readBigUInt64BE,
+	readBigInt64BE_Compatible, readBigUInt64BE_Compatible,
 	readIntBE, readUIntBE,
 	readFloatBE, readDoubleBE,
 	readBigUIntBE,
-	// // write
+	// write
 	writeInt8, writeUInt8,
 	writeInt16BE, writeUInt16BE,
 	writeInt32BE, writeUInt32BE,
@@ -750,7 +699,4 @@ export default {
 	writeIntBE, writeUIntBE,
 	writeFloatBE, writeDoubleBE,
 	writeBigIntLE,
-	//
-	invalidArgType,
-	copy,
 };

@@ -30,9 +30,9 @@
 
 import utils from '../util';
 import service from '../service';
-import {WSService} from './service';
+import * as wsservice from './service';
 import errno from '../errno';
-import Buffer from '../buffer';
+import buffer, {Buffer} from '../buffer';
 import uuid from '../hash/uuid';
 import * as crypto from 'crypto';
 import * as http from 'http';
@@ -45,7 +45,7 @@ export * from './_conv';
 import { PacketParser, sendDataPacket } from './parser';
 import { PING_BUFFER, PONG_BUFFER } from './data';
 
-export class Hybi extends ConversationBasic  {
+export class WSConversation extends ConversationBasic  {
 
 	protected m_token = uuid();
 	readonly server: s.Server;
@@ -56,7 +56,7 @@ export class Hybi extends ConversationBasic  {
 	 * @param {http.ServerRequest}   req
 	 * @param {String}   bind_services
 	 */
-	constructor(req: http.IncomingMessage, upgradeHead: Buffer, bind_services: string) {
+	constructor(req: http.IncomingMessage, upgradeHead: any, bind_services: string) {
 		super();
 
 		var server = <http.Server>(<any>req.socket).server;
@@ -109,9 +109,9 @@ export class Hybi extends ConversationBasic  {
 			// self.onOpen.off();
 
 			try {
-				for (var s of Object.values(self.m_handles))
-					if (s.loaded) 
-						s.destroy();
+				for (var s of Object.values(self.m_handles)) {
+					(s as wsservice.WSService).destroy();
+				}
 				self.server.onWSConversationClose.trigger(self);
 			} catch(err) {
 				console.error(err);
@@ -148,7 +148,7 @@ export class Hybi extends ConversationBasic  {
 		socket.on('timeout', ()=>self.close());
 		socket.on('end', ()=>self.close());
 		socket.on('close', ()=>self.close());
-		socket.on('data', (e: Buffer)=>parser.add(e));
+		socket.on('data', (e)=>parser.add(buffer.from(e)));
 		socket.on('error', e=>(console.error('web socket error:',e),self.close()));
 		socket.on('drain', ()=>(self.m_overflow = false,self.onDrain.trigger({})));
 
@@ -250,14 +250,14 @@ export class Hybi extends ConversationBasic  {
 	protected async bindServices(services: string[]) {
 		var self = this;
 		for (var name of services) {
-			var cls = service.get(name);
+			var cls = service.get(name) as unknown as (typeof wsservice.WSService);
 			utils.assert(cls, name + ' not found');
-			utils.assert(utils.equalsClass(WSService, cls), name + ' Service type is not correct');
+			utils.assert(utils.equalsClass(wsservice.WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_handles), 'Service no need to repeat binding');
 
 			var ser = new cls(self);
-			ser.name = name;
-			utils.assert(await ser.requestAuth(null), errno.ERR_REQUEST_AUTH_FAIL);
+			var ok = await ser.requestAuth({ service: name, action: '' });
+			utils.assert(ok, errno.ERR_REQUEST_AUTH_FAIL);
 			self.m_isGzip = ser.headers['use-gzip'] == 'on';
 
 			await ser.load(); // load
@@ -266,7 +266,7 @@ export class Hybi extends ConversationBasic  {
 				self.m_default_service = name;
 			self.m_handles[name] = ser;
 			self.m_services_count++;
-			ser.m_loaded = true; // TODO ptinate visit
+			(<any>ser).m_loaded = true; // TODO ptinate visit
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));

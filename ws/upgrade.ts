@@ -28,22 +28,22 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import {Hybi} from './conv';
+import {WSConversation} from './conv';
 import * as querystring from 'querystring';
 import * as http from 'http';
 
 const protocol_versions: Any = {
-	'7': Hybi,
-	'8': Hybi,
-	'9': Hybi,
-	'10': Hybi,
-	'11': Hybi,
-	'12': Hybi,
-	'13': Hybi,
-	'14': Hybi,
-	'15': Hybi,
-	'16': Hybi,
-	'17': Hybi
+	'7': WSConversation,
+	'8': WSConversation,
+	'9': WSConversation,
+	'10': WSConversation,
+	'11': WSConversation,
+	'12': WSConversation,
+	'13': WSConversation,
+	'14': WSConversation,
+	'15': WSConversation,
+	'16': WSConversation,
+	'17': WSConversation,
 };
 
 /**

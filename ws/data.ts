@@ -31,7 +31,7 @@
 import utils from '../util';
 import jsonb from '../jsonb';
 import {List} from '../event';
-import Buffer from '../buffer';
+import {Buffer} from '../buffer';
 
 export enum Types {
 	T_BIND = 0xf1,
@@ -117,6 +117,7 @@ export interface Data {
 	error?: Error;
 	cb?: number;
 	sender?: string;
+	[prop: string]: any;
 }
 
 /**

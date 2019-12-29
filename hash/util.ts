@@ -9,7 +9,7 @@
  */
 
 import _codec from '../_codec';
-import {Buffer, Bytes} from '../buffer';
+import buffer, {Bytes} from '../buffer';
 
 /*
  * Configurable variables. You may need to tweak these to be compatible with
@@ -47,7 +47,7 @@ function binl2bin(binl: number[])
 	{
 		bin.push((binl[i>>2] >> ((i%4)*8)) & 0xFF);
 	}
-	return Buffer.from(bin);
+	return buffer.from(bin);
 }
 
 /*

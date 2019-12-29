@@ -29,9 +29,9 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import Buffer, { Bytes } from '../buffer';
+import buffer, {Buffer, Bytes } from '../buffer';
 
-const rnds8 = Buffer.alloc(16);
+const rnds8 = buffer.alloc(16);
 // Math.random()-based (RNG)
 //
 // If all else fails, use Math.random().  It's fast, but is of unspecified
@@ -48,7 +48,7 @@ if (utils.haveNode) { // node
 
 	import('crypto').then(crypto=>{
 		_rng = function() {
-			return crypto.randomBytes(16);
+			return buffer.from(crypto.randomBytes(16));
 		};
 	});
 
@@ -76,7 +76,7 @@ if (utils.haveNode) { // node
 		// WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
 			// eslint-disable-line no-undef
 			_rng = function() {
-			return Buffer.from(getRandomValues(rnds8));
+			return buffer.from(getRandomValues(rnds8));
 		};
 	}
 }

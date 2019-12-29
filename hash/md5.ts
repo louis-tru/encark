@@ -30,7 +30,7 @@
 
 import utils from '../util';
 import util from './util';
-import {Buffer, Bytes} from '../buffer';
+import buffer, {Buffer, Bytes} from '../buffer';
 
 const {bin2str,bin2hex,bin2b64} = util;
 
@@ -51,7 +51,7 @@ function md5_vm_test()
 	var md5_ = crypto.createHash('md5');
 	md5_.update('abc');
 	console.log(md5_.digest());
-	console.log(Buffer.from(md5('abc')));
+	console.log(buffer.from(md5('abc')));
 
 	var hash = md5_hex("abc");
 	console.log(hash, '\n900150983cd24fb0d6963f7d28e17f72');

@@ -30,7 +30,7 @@
 
 import utils from '../../util';
 import request from '../../request';
-import Buffer from '../../buffer';
+import buffer from '../../buffer';
 import errno from '../../errno';
 import * as net from 'net';
 import * as http from 'http';
@@ -126,7 +126,7 @@ export default class NodeConversation extends WSConversationBasic {
 			socket.on('timeout', ()=>self.close());
 			socket.on('end', ()=>self.close());
 			socket.on('close', ()=>self.close());
-			socket.on('data', d=>parser.add(Buffer.from(d.buffer)));
+			socket.on('data', d=>parser.add(buffer.from(d.buffer)));
 			socket.on('error', e=>(self._error(e),self.close()));
 			socket.on('drain', ()=>(self.m_overflow = false,self.onDrain.trigger({})));
 
@@ -185,7 +185,7 @@ export default class NodeConversation extends WSConversationBasic {
 	send(data: SendData): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		if (data instanceof ArrayBuffer) {
-			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, Buffer.from(data)]);
+			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, buffer.from(data)]);
 		} else { // send json string message or ibuffer
 			return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
 		}

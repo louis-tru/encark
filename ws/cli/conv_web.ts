@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../../util';
-import Buffer from '../../buffer';
+import buffer from '../../buffer';
 import errno from '../../errno';
 import {PING_BUFFER,PONG_BUFFER} from '../data';
 import {WSConversationBasic, SendData} from './conv';
@@ -75,9 +75,9 @@ export default class WebConversation extends WSConversationBasic {
 			req.onmessage = function(e) {
 				var data = e.data;
 				if (data instanceof ArrayBuffer) {
-					self.handlePacket(new Buffer(data), false);
+					self.handlePacket(buffer.from(data), false);
 				} else if (data instanceof Blob && (<any>data).arrayBuffer) { // Compatible with old browser
-					(<any>data).arrayBuffer().then((e: any)=>self.handlePacket(new Buffer(e), false));
+					(<any>data).arrayBuffer().then((e: any)=>self.handlePacket(buffer.from(e), false));
 				} else { // string
 					self.handlePacket(data, true);
 				}

@@ -36,7 +36,7 @@ import * as net from 'net';
 import {Server} from './_server';
 import {RuleResult} from './router';
 
-const all_service_cls: Any = {};
+const all_service_cls: Any<typeof Service> = {};
 
 /**
  * base service abstract class
@@ -204,7 +204,7 @@ export default {
 	/**
 	 * 通过名称获取服务class
 	 */
-	get(name: string) {
+	get(name: string): typeof Service {
 		return all_service_cls[name];
 	},
 
@@ -219,7 +219,7 @@ export default {
 				var type = 0;
 				var methods: string[] = [], events: string[] = [];
 				var item = { type: service.type, methods, events };
-				var self = service.prototype;
+				var self = <any>service.prototype;
 
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
 					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
@@ -250,10 +250,10 @@ export default {
 		return r;
 	},
 
-	set(name: string, cls: any) {
+	set(name: string, cls: typeof Service) {
 		util.assert(util.equalsClass(Service, cls), '"{0}" is not a "Service" type', name);
 		util.assert(!(name in all_service_cls), 'service repeat definition, "{0}"', name);
-		cls.prototype.name = name; // 设置服务名称
+		(<any>cls).prototype.name = name; // 设置服务名称
 		all_service_cls[name] = cls;
 	},
 

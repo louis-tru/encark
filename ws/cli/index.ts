@@ -58,13 +58,14 @@ if (utils.haveWeb) {
  * @class WSClient
  */
 export class WSClient extends Notification {
-	// @private:
-	// m_calls: null,
-	// m_sends: null,
-	// m_service_name: '',
-	// m_conv: null,   // conversation
 
-	// @public:
+	private m_calls: Map<number, any> = new Map();
+	private m_loaded = false;
+	private m_sends: any[] = [];
+	private m_service_name: string;
+	private m_conv: WSConversation;
+	private m_Intervalid: any;
+
 	get name() { return this.m_service_name }
 	get conv() { return this.m_conv }
 	get loaded() { return this.m_loaded }
@@ -72,17 +73,14 @@ export class WSClient extends Notification {
 	/**
 	 * @constructor constructor(service_name, conv)
 	 */
-	constructor(service_name, conv) {
+	constructor(service_name: string, conv: WSConversation) {
 		super();
 
-		this.m_calls = new Map();
 		this.m_service_name = service_name;
-		this.m_conv = conv || new WSConversation();
-		this.m_loaded = false;
-		this.m_sends = [];
+		this.m_conv = conv;
 
-		util.assert(service_name);
-		util.assert(this.m_conv);
+		utils.assert(service_name);
+		utils.assert(this.m_conv);
 
 		this.m_conv.onOpen.on(e=>{
 			this.m_Intervalid = setInterval(e=>this._checkTimeout(), 3e4); // 30s
@@ -117,8 +115,8 @@ export class WSClient extends Notification {
 		this.m_conv.bind(this);
 	}
 
-	_checkMethodName(method) {
-		util.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
+	_checkMethodName(method: string) {
+		utils.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
 	}
 
 	/**

@@ -30,9 +30,12 @@
 
 import errno from './errno';
 import utils from './util';
-import buffer from './_buffer';
-import codec, {Bytes} from './_codec';
+import _buffer from './_buffer';
+import codec from './_codec';
+
 const TypedArray = (<any>(Uint8Array.prototype)).__proto__.constructor;
+
+type Bytes = Uint8Array | Uint8ClampedArray | ArrayLike<number>;
 
 var // FLAGS
 	F_EOF = 0,
@@ -63,7 +66,7 @@ var // FLAGS
 	F_INFINITY_MIN = 25,
 	F_INFINITY_MAX = 26;
 
-if (buffer.isBigInt) {
+if (globalThis.BigInt) {
 	var BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 	var BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
 }
@@ -121,7 +124,7 @@ function write_buffer(data: Bytes, out: Out): number {
 
 function write_num(o: number, api: string, len: number, out: Out) {
 	var b = new Uint8Array(len);
-	(<any>buffer)[api](b, o);
+	(<any>_buffer)[api](b, o);
 	out.push(b);
 	return len;
 }
@@ -178,7 +181,7 @@ function write_bigint(o: bigint, out: Out) {
 		write_flag(F_BIGINT, out);
 	}
 	var bytes: number[] = [];
-	buffer.writeBigIntLE(bytes, o);
+	_buffer.writeBigIntLE(bytes, o);
 	return 1 + write_buffer(bytes.reverse(), out);
 }
 
@@ -353,7 +356,7 @@ function read_buffer(bin: Binary): Uint8Array {
 }
 
 function read_num(bin: Binary, api: string, len: number) {
-	var r = (<any>buffer)[api](bin.d, bin.index);
+	var r = (<any>_buffer)[api](bin.d, bin.index);
 	bin.index += len;
 	return r;
 }
@@ -361,8 +364,8 @@ function read_num(bin: Binary, api: string, len: number) {
 function read_bigint(bin: Binary): bigint | number {
 	assert(bin.length > bin.index + 8);
 	var bytes = read_buffer(bin);
-	if (buffer.isBigInt) {
-		return buffer.readBigUIntBE(bytes, 0, bytes.length);
+	if (  _buffer.isBigInt ) {
+		return _buffer.readBigUIntBE(bytes, 0, bytes.length);
 	} else { // not support bigint
 		console.warn('Not support bigint');
 		var num = 0;
@@ -393,9 +396,9 @@ function read_next(bin: Binary): any {
 		case F_UINT_32:
 			return read_num(bin, 'readUInt32BE', 4);
 		case F_INT_64:
-			return read_num(bin, 'readBigInt64BE', 8);
+			return read_num(bin, 'readBigInt64BE_Compatible', 8);
 		case F_UINT_64:
-			return read_num(bin, 'readBigUInt64BE', 8);
+			return read_num(bin, 'readBigUInt64BE_Compatible', 8);
 		case F_FLOAT_NUM_32:
 			return read_num(bin, 'readFloatBE', 4);
 		case F_FLOAT_NUM_64:

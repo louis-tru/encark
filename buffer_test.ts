@@ -1,7 +1,7 @@
 
-import {SimpleBuffer} from './buffer';
+import buffer from './buffer';
 
-var b = SimpleBuffer.from('你好a');
+var b = buffer.from('你好a');
 
 console.log(b);
 console.log(b.toString('utf8'));
@@ -12,12 +12,12 @@ console.log(b.toString('ascii'));
 
 console.log('---------------');
 
-console.log(SimpleBuffer.from(b.toString('hex'), 'hex'));
-console.log(SimpleBuffer.from(b.toString('base64'), 'base64'));
-console.log(SimpleBuffer.from(b.toString('binary'), 'binary'));
-console.log(SimpleBuffer.from(b.toString('ascii'), 'ascii'));
+console.log(buffer.from(b.toString('hex'), 'hex'));
+console.log(buffer.from(b.toString('base64'), 'base64'));
+console.log(buffer.from(b.toString('binary'), 'binary'));
+console.log(buffer.from(b.toString('ascii'), 'ascii'));
 
 
-console.log(SimpleBuffer.from([1,2,3,4,5]))
+console.log(buffer.from([1,2,3,4,5]))
 
-console.log(SimpleBuffer.concat([new SimpleBuffer(2), new SimpleBuffer(10)]));
+console.log(buffer.concat([buffer.alloc(2), buffer.alloc(10)]));

@@ -32,20 +32,27 @@ import utils from '../util';
 import {Service} from '../service';
 import {Session} from '../session';
 import errno from '../errno';
-import {Types, DataFormater} from './data';
+import {Types, DataFormater, Data} from './data';
 import * as conv from './conv';
+import {Buffer} from '../buffer';
 
-// T_CALLBACK,T_CALL,T_EVENT
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 const print_log = false; // util.dev
+
+interface CallData extends Data {
+	timeout: number;
+	ok(e: any): void;
+	err(e: Error): void;
+}
 
 /**
  * @class WSService
  */
-export class WSService extends Service {
-	private m_conv: conv.Conversation;
+export class WSService extends Service implements conv.MessageHandle {
+
+	private m_conv: conv.WSConversation;
 	private m_session: Session | null = null;
-	private m_calls = new Map();
+	private m_calls = new Map<number, CallData>();
 	private m_loaded = false;
 	private m_Intervalid: any;
 	
@@ -64,11 +71,7 @@ export class WSService extends Service {
 		return this.m_loaded;
 	}
 
-	/**
-	 * @arg conv {Conversation}
-	 * @constructor
-	 */
-	constructor(conv: conv.Conversation) {
+	constructor(conv: conv.WSConversation) {
 		super(conv.request);
 		this.m_conv = conv;
 		this.m_Intervalid = setInterval(()=>this._checkInterval(), 3e4); // 30s
@@ -83,10 +86,10 @@ export class WSService extends Service {
 		});
 	}
 
-	load() {}
-	destroy() {}
+	async load() {}
+	async destroy() {}
 
-	_checkMethodName(method: string) {
+	private _checkMethodName(method: string) {
 		utils.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);
 	}
 
@@ -101,7 +104,7 @@ export class WSService extends Service {
 		var { data = {}, name = '', cb, sender } = msg;
 
 		if (msg.isCallback()) {
-			var handle = this.m_calls.get(cb);
+			var handle = this.m_calls.get(<number>cb);
 			if (handle) {
 				if (msg.error) { // throw error
 					handle.err(Error.new(msg.error));
@@ -143,7 +146,7 @@ export class WSService extends Service {
 	/**
 	 * @func handleCall
 	 */
-	handleCall(method: string, data: any, sender: string) {
+	private handleCall(method: string, data: any, sender?: string) {
 		if (method in WSService.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		var fn: (data: any, sender?: string)=>any = (<any>this)[method];
@@ -152,13 +155,13 @@ export class WSService extends Service {
 		return fn.call(this, data, sender);
 	}
 
-	async _send(data) {
+	async _send(data: Data) {
 		await this.m_conv.sendFormatData(data);
 		delete data.data;
 		return data;
 	}
 
-	_checkInterval() {
+	private _checkInterval() {
 		var now = Date.now();
 		for (var [,handle] of this.m_calls) {
 			if (handle.timeout) {
@@ -171,14 +174,14 @@ export class WSService extends Service {
 		}
 	}
 
-	_call(type, name, data, timeout, sender) {
-		return util.promise(async (resolve, reject)=>{
-			var id = util.id;
+	private _call<T = any>(type: Types, name: string, data: any, timeout?: number, sender?: string) {
+		return utils.promise(async (resolve: (e?: T)=>void, reject)=>{
+			var id = utils.id;
 			var calls = this.m_calls;
-			calls.set(id, await this._send({
+			calls.set(id, <CallData>await this._send({
 				timeout: timeout ? timeout + Date.now(): 0,
-				ok: e=>(calls.delete(id),resolve(e)),
-				err: e=>(calls.delete(id),reject(e)),
+				ok: (e: any)=>(calls.delete(id),resolve(e)),
+				err: (e: Error)=>(calls.delete(id),reject(e)),
 				service: this.conv._service(this.name),
 				type: type,
 				name: name,
@@ -190,10 +193,10 @@ export class WSService extends Service {
 		});
 	}
 
-	async _trigger(event, data, sender) {
+	async _trigger(event: string, data: any, sender?: string) {
 		await this._send({
 			service: this.conv._service(this.name),
-			type: T_EVENT,
+			type: Types.T_EVENT,
 			name: event,
 			data: data,
 			sender: sender,
@@ -204,15 +207,15 @@ export class WSService extends Service {
 	 * @func call(method, data)
 	 * @async
 	 */
-	call(method, data, timeout = exports.METHOD_CALL_TIMEOUT, sender = null) {
-		return this._call(T_CALL, method, data, timeout, sender);
+	call<T = any>(method: string, data: any, timeout = METHOD_CALL_TIMEOUT, sender?: string) {
+		return this._call<T>(Types.T_CALL, method, data, timeout, sender);
 	}
 
 	/**
 	 * @func  trigger(event, data)
 	 * @async
 	 */
-	async trigger(event, data, sender = null) {
+	async trigger(event: string, data: string, sender?: string) {
 		return this._trigger(event, data, sender);
 	}
 
@@ -220,17 +223,15 @@ export class WSService extends Service {
 	 * @func send(method, data, sender) method call, No response
 	 * @async
 	 */
-	async send(method, data, sender = null) {
+	async send(method: string, data: any, sender?: string) {
 		await this._send({
 			service: this.conv._service(this.name),
-			type: T_CALL,
+			type: Types.T_CALL,
 			name: method,
 			data: data,
 			sender: sender,
 		});
 	}
-
-	// @end
 }
 
 WSService.type = 'event';

@@ -10,7 +10,7 @@
 // compatible code
 
 import util from './util';
-import Buffer, {Bytes} from '../buffer';
+import buffer, {Bytes} from '../buffer';
 
 const {chrsz,bin2binl,binl2bin} = util;
 
@@ -117,6 +117,6 @@ function rol(num: number, cnt: number)
 }
 
 export default function sha1(s: Bytes) {
-	var b = Buffer.from(s);
+	var b = buffer.from(s);
 	return binl2bin(core_sha1(bin2binl(b), b.length * chrsz));
 }

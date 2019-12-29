@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import {EventNoticer} from '../event';
-import Buffer from '../buffer';
+import buffer,{Buffer} from '../buffer';
 import * as net from 'net';
 
 /*
@@ -47,7 +47,7 @@ function _unpack(buffer: Buffer) {
 }
 
 function _concat(buffers: Buffer[]) {
-	return buffers.length == 1 ? buffers[0]: Buffer.concat(buffers);
+	return buffers.length == 1 ? buffers[0]: buffer.concat(buffers);
 }
 
 interface State {
@@ -209,7 +209,7 @@ export class PacketParser {
 		this.expectOffset += toRead;
 		if (toRead < data.length) {
 			// at this point the overflow buffer shouldn't at all exist
-			this.overflow = Buffer.alloc(data.length - toRead);
+			this.overflow = buffer.alloc(data.length - toRead);
 			data.copy(this.overflow, 0, toRead, toRead + this.overflow.length);
 		}
 		if (this.expectOffset == this.expectBuffer.length) {
@@ -229,7 +229,7 @@ export class PacketParser {
 		if (this.overflow == null) this.overflow = data;
 		else {
 			var prevOverflow = this.overflow;
-			this.overflow = Buffer.alloc(this.overflow.length + data.length);
+			this.overflow = buffer.alloc(this.overflow.length + data.length);
 			prevOverflow.copy(this.overflow, 0);
 			data.copy(this.overflow, prevOverflow.length);
 		}
@@ -241,7 +241,7 @@ export class PacketParser {
 	 * @api private
 	 */
 	expect(what: string, length: number, handler: ExpectHandler) {
-		this.expectBuffer = Buffer.alloc(length);
+		this.expectBuffer = buffer.alloc(length);
 		this.expectOffset = 0;
 		this.expectHandler = handler;
 		if (this.overflow != null) {
@@ -366,7 +366,7 @@ export function sendDataPacket(socket: net.Socket, data: Buffer | string, cb?: S
 		// data = Buffer.from(data.buffer);
 	} else { // send json string message
 		var s = JSON.stringify(data);
-		data = Buffer.from(s);
+		data = buffer.from(s);
 	}
 
 	var dataLength = data.length;
@@ -396,7 +396,7 @@ export function sendDataPacket(socket: net.Socket, data: Buffer | string, cb?: S
 		secondByte = 126;
 	}
 
-	var header = Buffer.alloc(headerLength);
+	var header = buffer.alloc(headerLength);
 
 	header[0] = opcode;
 	header[1] = secondByte;
@@ -414,14 +414,14 @@ export function sendDataPacket(socket: net.Socket, data: Buffer | string, cb?: S
 			}
 	}
 
-	return socket.write(Buffer.concat([header, data]), cb);
+	return socket.write(buffer.concat([header, data]), cb);
 }
 
 /**
  * @func sendPingPacket()
  */
 export function sendPingPacket(socket: net.Socket, cb?: SendCallback) {
-	var header = Buffer.alloc(2);
+	var header = buffer.alloc(2);
 	header[0] = 0x89;
 	header[1] = 0;
 	return socket.write(header, cb);
@@ -431,7 +431,7 @@ export function sendPingPacket(socket: net.Socket, cb?: SendCallback) {
  * @func sendPongPacket()
  */
 export function sendPongPacket(socket: net.Socket, cb?: SendCallback) {
-	var header = Buffer.alloc(2);
+	var header = buffer.alloc(2);
 	header[0] = 0x8a;
 	header[1] = 0;
 	return socket.write(header, cb);

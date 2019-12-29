@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import utils from './util';
 import * as fs from './fs';
 import * as path from 'path';
 import { options, helpInfo, defOpts } from './arguments';

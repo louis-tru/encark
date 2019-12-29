@@ -32,7 +32,7 @@ import './_ext';
 
 const haveNode: boolean = !!globalThis.process;
 const haveNgui: boolean = !!globalThis.__requireNgui__;
-const haveWeb: boolean = !!globalThis.location;
+const haveWeb: boolean = !!globalThis.document;
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
