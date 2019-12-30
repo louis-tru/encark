@@ -5,7 +5,7 @@
 		"noImplicitAny": true,
 		"moduleResolution": "node",
 		"sourceMap": true,
-		"outDir": "out",
+		"outDir": "out/nxkit",
 		"baseUrl": ".",
 		"declaration": true,
 		"alwaysStrict": true,

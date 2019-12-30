@@ -10,7 +10,7 @@
 		"url": "https://github.com/louis-tru/nxkit/"
 	},
 	"scripts": {
-		"build": "tsc && cp *.json *.md LICENSE out"
+		"build": "tsc && cp *.json *.md LICENSE out/nxkit"
 	},
 	"devDependencies": {
 		"@types/node": "~12.12.20"
