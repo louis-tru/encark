@@ -9,6 +9,12 @@
 		"email": "louistru@hotmail.com",
 		"url": "https://github.com/louis-tru/nxkit/"
 	},
+	"scripts": {
+		"build": "tsc && cp *.json *.md LICENSE out"
+	},
+	"devDependencies": {
+		"@types/node": "~12.12.20"
+	},
 	"keywords": [
 		"mysql",
 		"mqtt",
@@ -30,9 +36,6 @@
 		"shell",
 		"storage"
 	],
-	"devDependencies": {
-		"@types/node": "~12.12.20"
-	},
 	"license": "BSD-2-Clause",
 	"bugs": {
 		"url": "https://github.com/louis-tru/nxkit/issues",
