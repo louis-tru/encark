@@ -1,7 +1,8 @@
 {
 	"compilerOptions": {
 		"module": "commonjs",
-		"target": "ESNext",
+		// "target": "ESNext",
+		"target": "esnext.bigint",
 		"noImplicitAny": true,
 		"moduleResolution": "node",
 		"sourceMap": true,
@@ -9,7 +10,7 @@
 		"baseUrl": ".",
 		"declaration": true,
 		"alwaysStrict": true,
-		"allowJs": false,
+		"allowJs": true,
 		"strict": true,
 		"strictNullChecks": true,
 	},

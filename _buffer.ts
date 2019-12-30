@@ -54,10 +54,10 @@ if (!!globalThis.BigInt) {
 			ok(arguments[1]('./_bigint'));
 		}
 	})(function(bigint: any) {
-		_bigint = bigint;
+		_bigint = bigint.default;
 		_bigint._set(checkInt);
-		_readBigUIntBE = bigint._readBigUIntBE;
-		_writeBigIntLE = bigint._writeBigIntLE;
+		_readBigUIntBE = _bigint._readBigUIntBE;
+		_writeBigIntLE = _bigint._writeBigIntLE;
 	}, require);
 }
 
