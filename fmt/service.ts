@@ -118,7 +118,7 @@ export class FMTService extends wss.WSService {
 		if (this.hasSubscribe({event})) {
 			return super.trigger(event, data, sender);
 		} else {
-			return new Promise<void>((resolve)=>resolve());
+			return Promise.resolve();
 		}
 	}
 

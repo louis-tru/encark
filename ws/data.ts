@@ -103,7 +103,7 @@ function toBuffer(data: any, isGzip: boolean): Promise<Uint8Array> {
 	if (isGzip && _gzip) {
 		return _gzip(bf);
 	} else {
-		return new Promise((resolve)=>resolve(bf));
+		return Promise.resolve(bf);
 	}
 }
 
