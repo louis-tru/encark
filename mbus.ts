@@ -28,19 +28,17 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-/* 
- * Message Bus Based on "mqtt"
- */
-
-var utils = require('./util');
-var {MqttClient} = require('./mqtt');
-var {Notification} = require('./event');
-var {Buffer} = require('buffer');
+import utils from './util';
+import {MqttClient} from './mqtt';
+import {Notification} from './event';
 
 /**
  * @class NotificationCenter
  */
-class NotificationCenter extends Notification {
+export class NotificationCenter extends Notification {
+
+	private m_topic: string;
+	private m_mqtt: MqttClient;
 
 	get topic() {
 		return this.m_topic;
@@ -72,7 +70,7 @@ class NotificationCenter extends Notification {
 		this.m_mqtt = cli
 	}
 
-	afterNotificationHandle(event, data) {
+	afterNotificationHandle(event: string, data: any) {
 		return this.getNoticer(event).trigger(data);
 	}
 
@@ -81,7 +79,7 @@ class NotificationCenter extends Notification {
 	}
 
 	// @overwrite:
-	getNoticer(name) {
+	getNoticer(name: string) {
 		if (!this.hasNoticer(name)) {
 			this.m_mqtt.subscribe(this.m_topic + '/' + name); // subscribe message
 		}
@@ -89,11 +87,11 @@ class NotificationCenter extends Notification {
 	}
 
 	// @overwrite:
-	trigger(event, data) {
+	trigger(event: string, data: any) {
 		return this.publish(event, data);
 	}
 
-	publish(event, data) {
+	publish(event: string, data: any) {
 		data = Buffer.from(JSON.stringify(data) || '');
 		return this.m_mqtt.publish(this.m_topic + '/' + event, data);
 	}
@@ -101,9 +99,9 @@ class NotificationCenter extends Notification {
 }
 
 // default application notification center
-var default_notification_center = null;
+var default_notification_center: NotificationCenter | null = null;
 
-module.exports = {
+export default {
 
 	NotificationCenter,
 

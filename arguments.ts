@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-export var options: Any = {};
+export var options: Dict = {};
 export var helpInfo: string[] = [];
 
 export function defOpts(name: string, defaults: any, info: string) {

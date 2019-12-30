@@ -31,7 +31,7 @@
 import _keys from './_keys' ;
 import _util from './_util' ;
 
-export type Optopns = Any;
+export type Optopns = Dict;
 
 const {haveNode, haveNgui, haveWeb} = _util;
 const PREFIX = 'file:///';
@@ -39,9 +39,8 @@ const options: Optopns = {};  // start options
 
 var ignore_local_package, ignore_all_local_package;
 var config: Optopns | null = null;
-var _require = typeof require == 'function' ? require:
-	typeof __webpack_require__ == 'function' ? __webpack_require__: function(req: string) {
-	var e = new Error("Cannot find module \".\"");
+var _require = typeof require == 'function' ? require: function(req: string) {
+	var e = new Error(`Cannot find module \"${req}\"`);
 	e.code = 'MODULE_NOT_FOUND';
 	throw e;
 };
@@ -215,7 +214,8 @@ function isNetwork(path: string): boolean {
 
 if (haveNode && !haveNgui) {
 	var fs = _require('fs');
-	_require('module').Module._extensions['.keys'] = function(module: NodeModule, filename: string): any {
+	_require('module').Module._extensions['.keys'] = 
+		function(module: NodeModule, filename: string): any {
 		var content = fs.readFileSync(filename, 'utf8');
 		try {
 			module.exports = _keys(stripBOM(content));

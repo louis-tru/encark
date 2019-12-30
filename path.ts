@@ -112,7 +112,7 @@ function parse_params(self: any) {
 		return;
 	split_path(self);
 	
-	var params: Any = self._params = {};
+	var params: Dict = self._params = {};
 	
 	if (self._search[0] != '?') 
 		return;
@@ -130,7 +130,7 @@ function parse_hash_params(self: any) {
 		return;
 	split_path(self);
 	
-	var params: Any = self._hash_params = {};
+	var params: Dict = self._hash_params = {};
 	if (self._hash[0] != '#') 
 		return;
 		
@@ -142,7 +142,7 @@ function parse_hash_params(self: any) {
 	}
 }
 
-function stringify_params(prefix: string, params: Any) {
+function stringify_params(prefix: string, params: Dict) {
 	var rev = [];
 	for (var i in params) {
 		rev.push(i + '=' + params[i]);
@@ -252,12 +252,12 @@ export class URL {
 		return (<any>this)._protocol;
 	}
 
-	get params(): Any<string> {
+	get params(): Dict<string> {
 		parse_params(this);
 		return (<any>this)._params;
 	}
 	
-	get hashParams(): Any<string> {
+	get hashParams(): Dict<string> {
 		parse_hash_params(this);
 		return (<any>this)._hash_params;
 	}

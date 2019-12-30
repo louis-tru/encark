@@ -28,32 +28,44 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var fmtc = require('./fmtc');
-var service = require('../service');
-var wss = require('../ws/service');
-var cli = require('../ws/cli');
-var path = require('../path');
-var errno = require('../errno');
+import utils from '../util';
+import {URL} from '../path';
+import fmtc from './fmtc';
+import service from '../service';
+import * as wss from '../ws/service';
+import * as cli from '../ws/cli';
+import path from '../path';
+import errno from '../errno';
+import * as _center from './_center';
+import {ConversationBasic} from '../ws/_conv';
 
-/**
- * @class FNode
- */
-export class FNode {
-	get id() {return null}
-	get publishURL() {return null}
+type IMPL = _center.FastMessageTransferCenter_IMPL;
+
+export interface QueryResult {
+	time: Date;
+	uuid: string;
+}
+
+export abstract class FNode {
+	protected m_initTime = 0;
+	protected m_center: IMPL;
+	abstract get id(): string;
+	abstract get publishURL(): URL | null;
+	get initTime(): number { return this.m_initTime }
 	get center() {return this.m_center}
-	get initTime() {return 0}
-	constructor(center) { this.m_center = center}
-	initialize() { return this.m_center.addNode(this)}
-	destroy() { return this.m_center.deleteNode(this)}
-	publish(event, data) {}
-	broadcast(event, data, id) {}
-	triggerTo(id, event, data, sender) {}
-	callTo(id, name, data, timeout, sender) {}
-	sendTo(id, name, data, sender) {}
-	user(id) {}
-	query(id, more = 0) {}
+	constructor(center: IMPL) { this.m_center = center}
+	initialize(initTime = 0) {
+		this.m_initTime = initTime;
+		return this.m_center.addNode(this);
+	}
+	destroy() { return this.m_center.deleteNode(this) }
+	abstract publish(event: string, data: any): Promise<void>;
+	abstract broadcast(event: string, data: any, id: string): Promise<void>;
+	abstract triggerTo(id: string, event: string, data: any, sender: string): Promise<void>;
+	abstract callTo(id: string, method: string, data: any, timeout: number, sender: string): Promise<any>;
+	abstract sendTo(id: string, method: string, data: any, sender: string): Promise<void>;
+	abstract user(id: string): Promise<Dict<any>>;
+	abstract query(id: string, more?: boolean): Promise<QueryResult | boolean | null>;
 }
 
 /**
@@ -66,25 +78,25 @@ export class FNodeLocal extends FNode {
 	get publishURL() {
 		return this.m_center.publishURL;
 	}
-	async publish(event, data) {
+	async publish(event: string, data: any) {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
-	async broadcast(event, data, id) {
+	async broadcast(event: string, data: any, id: string) {
 		this.m_center.host.getNoticer(event).trigger(data);
 	}
-	triggerTo(id, event, data, sender) {
+	triggerTo(id: string, event: string, data: any, sender: string) {
 		return this.m_center.getFMTService(id).trigger(event, data, sender); // trigger event
 	}
-	callTo(id, method, data, timeout, sender) {
+	callTo(id: string, method: string, data: any, timeout: number, sender: string) {
 		return this.m_center.getFMTService(id).call(method, data, timeout, sender); // call method
 	}
-	sendTo(id, method, data, sender) {
+	sendTo(id: string, method: string, data: any, sender: string) {
 		return this.m_center.getFMTService(id).send(method, data, sender); // call method
 	}
-	user(id) {
+	async user(id: string) {
 		return this.m_center.getFMTService(id).user;
 	}
-	async query(id, more=0) {
+	async query(id: string, more = false) {
 		var s = this.m_center.getFMTServiceNoError(id);
 		if (more) {
 			return s ? {time:s.time,uuid:s.uuid}: null;
@@ -99,12 +111,14 @@ export class FNodeLocal extends FNode {
  */
 export class FNodeRemote extends FNode {
 
-	constructor(center, impl, id) {
+	private m_impl: FNodeRemoteIMPL;
+	private m_node_id: string;
+	private m_isInit = false;
+
+	constructor(center: IMPL, impl: FNodeRemoteIMPL, id: string) {
 		super(center);
 		this.m_impl = impl;
 		this.m_node_id = id;
-		this.m_initTime = 0;
-		this.m_isInit = 0;
 	}
 
 	async initialize(initTime = 0) {
@@ -146,30 +160,28 @@ export class FNodeRemote extends FNode {
 		return this.m_node_id;
 	}
 	get publishURL() {
-		return this.m_impl.getThatFnode();
+		return this.m_impl.thatFnode;
 	}
-	get initTime() {
-		return this.m_initTime;
-	}
-	publish(event, data) { // publish event to fnode
+
+	publish(event: string, data: any) { // publish event to fnode
 		return this.m_impl.send('publish', [event,data]);
 	}
-	broadcast(event, data, id) { // broadcast event to fnode
+	broadcast(event: string, data: any, id: string) { // broadcast event to fnode
 		return this.m_impl.send('broadcast', [event,data,id]);
 	}
-	triggerTo(id, event, data, sender) { // trigger event to client
+	triggerTo(id: string, event: string, data: any, sender: string) { // trigger event to client
 		return this.m_impl.call('triggerTo', [id, event, data, sender]); // trigger event
 	}
-	callTo(id, method, data, timeout, sender) { // call client
+	callTo(id: string, method: string, data: any, timeout: number, sender: string) { // call client
 		return this.m_impl.call('callTo', [id, method, data, timeout, sender], timeout); // call method
 	}
-	sendTo(id, method, data, sender) {
+	sendTo(id: string, method: string, data: any, sender: string) {
 		return this.m_impl.call('sendTo', [id, method, data, sender]); // call method
 	}
-	user(id) {
+	user(id: string) {
 		return this.m_impl.call('user', [id]); // call method
 	}
-	query(id, more = 0) { // query client
+	query(id: string, more = false) { // query client
 		return this.m_impl.call('query', [id, more?true:false]);
 	}
 }
@@ -177,30 +189,35 @@ export class FNodeRemote extends FNode {
 /**
  * @class FNodeRemoteIMPL
  */
-class FNodeRemoteIMPL {
-	getThatFnode() {
-		return this.m_that_fnode;
+export abstract class FNodeRemoteIMPL {
+
+	abstract get conv(): ConversationBasic;
+	abstract get center(): IMPL;
+	abstract get thatFnode(): URL | null;
+	abstract get fnode(): FNode;
+	abstract call(method: string, data?: any, timeout?: number, sender?: string): Promise<any>;
+	abstract send(method: string, data?: any, sender?: string): Promise<void>;
+
+	publish([event, data]: [string, any]) { // publish event to fnode
+		this.center.host.getNoticer(event).trigger(data);
 	}
-	publish([event, data]) { // publish event to fnode
-		this.m_center.host.getNoticer(event).trigger(data);
+	broadcast([event, data, id]: [string, any, string]) { // broadcast event to fnode
+		this.center._forwardBroadcast(event, data, id, this.fnode);
 	}
-	broadcast([event, data, id]) { // broadcast event to fnode
-		this.m_center._forwardBroadcast(event, data, id, this.m_fnode);
+	triggerTo([id, event, data, sender]: [string, string, any, string]) { // trigger event to client
+		return this.center.getFMTService(id).trigger(event, data, sender);
 	}
-	triggerTo([id, event, data, sender]) { // trigger event to client
-		return this.m_center.getFMTService(id).trigger(event, data, sender);
+	callTo([id, method, data, timeout, sender]: [string, string, any, number, string]) { // call client
+		return this.center.getFMTService(id).call(method, data, timeout, sender);
 	}
-	callTo([id, method, data, timeout, sender]) { // call client
-		return this.m_center.getFMTService(id).call(method, data, timeout, sender);
+	sendTo([id, method, data, sender]: [string, string, any, string]) { // call client
+		return this.center.getFMTService(id).send(method, data, sender);
 	}
-	sendTo([id, method, data, sender]) { // call client
-		return this.m_center.getFMTService(id).send(method, data, sender);
+	user([id]: [string]) {
+		return this.center.getFMTService(id).user;
 	}
-	user([id]) {
-		return this.m_center.getFMTService(id).user;
-	}
-	query([id,more]) { // query client
-		var s = this.m_center.getFMTServiceNoError(id);
+	query([id,more]: [string, boolean]) { // query client
+		var s = this.center.getFMTServiceNoError(id);
 		if (more) {
 			return s ? {time:s.time,uuid:s.uuid}: null;
 		} else {
@@ -214,8 +231,16 @@ class FNodeRemoteIMPL {
  */
 export class FNodeRemoteService extends wss.WSService {
 
+	private m_center: IMPL | null = null;
+	private m_that_fnode: URL | null = null;
+	private m_fnode: FNode | null = null;
+
+	get thatFnode() { return this.m_that_fnode }
+	get center(): IMPL { return this.m_center as IMPL; }
+	get fnode(): FNode { return this.m_fnode as FNode }
+
 	async requestAuth() {
-		var center = fmtc._fmtc(this.conv.server);
+		var center = fmtc._fmtc(this.conv.server) as IMPL;
 		utils.assert(center, 'FNodeRemoteService.requestAuth() fmt center No found');
 		utils.assert(this.params.id, 'FNodeRemoteService.loaded() node id param undefined');
 		utils.assert(this.params.id != center.id, 'Cannot connect to itself');
@@ -228,11 +253,11 @@ export class FNodeRemoteService extends wss.WSService {
 	async load() {
 		try {
 			var {id,publish} = this.params;
-			this.m_that_fnode = publish ? new path.URL(decodeURIComponent(publish)): null;
-			this.m_fnode = new FNodeRemote(this.m_center, this, id);
+			this.m_that_fnode = publish ? new URL(decodeURIComponent(publish)): null;
+			this.m_fnode = new FNodeRemote(this.center, this as unknown as FNodeRemoteIMPL, id);
 			await this.m_fnode.initialize();
 			await utils.sleep(200); // 在同一个node进程中同时开启多个节点时socket无法写入
-			this.trigger('InitComplete', { id: this.m_center.id, time: this.m_fnode.initTime });
+			this.trigger('InitComplete', { id: this.center.id, time: this.m_fnode.initTime });
 			console.log('FNodeRemoteService.load', id, this.m_that_fnode && this.m_that_fnode.href);
 		} catch(err) {
 			console.error('FNodeRemoteService.load, err', err);
@@ -257,7 +282,8 @@ export class FNodeRemoteService extends wss.WSService {
  * @class WSConv
  */
 class WSConv extends cli.WSConversation {
-	constructor(center, s) {
+	private m_center: IMPL;
+	constructor(center: IMPL, s: string) {
 		super(s);
 		this.m_center = center;
 	}
@@ -269,9 +295,17 @@ class WSConv extends cli.WSConversation {
 /**
  * @class FNodeRemoteClient
  */
-class FNodeRemoteClient extends cli.WSClient {
+export class FNodeRemoteClient extends cli.WSClient {
 
-	constructor(center, fnode = 'fnode://localhost/') {
+	private m_center: IMPL;
+	private m_that_fnode: URL;
+	private m_fnode: FNode | null;
+
+	get center(): IMPL { return this.m_center; }
+	get thatFnode() { return this.m_that_fnode }
+	get fnode(): FNode { return this.m_fnode as FNode }
+
+	constructor(center: IMPL, fnode = 'fnode://localhost/') {
 		var url = new path.URL(fnode);
 		url.setParam('id', center.id);
 		if (center.publishURL)
@@ -286,12 +320,12 @@ class FNodeRemoteClient extends cli.WSClient {
 
 	async _init() {
 		try {
-			var {id,time} = await Promise.race([new Promise((resolve)=>{
+			var {id,time}: {id: string, time: number} = await Promise.race([new Promise<any>((resolve)=>{
 				this.addEventListenerOnce('InitComplete', e=>resolve(e.data));
 			}), utils.sleep(5e3, {id:0})]);
 			utils.assert(id, errno.ERR_FNODE_CONNECT_TIMEOUT);
-			this.m_fnode = new FNodeRemote(this.m_center, this, id);
-			await this.m_fnode.initialize(time);
+			this.m_fnode = new FNodeRemote(this.m_center, this as unknown as FNodeRemoteIMPL, id);
+			await this.fnode.initialize(time);
 		} catch(err) {
 			this.conv.close();
 			throw err;
@@ -301,9 +335,5 @@ class FNodeRemoteClient extends cli.WSClient {
 
 utils.extendClass(FNodeRemoteService, FNodeRemoteIMPL);
 utils.extendClass(FNodeRemoteClient, FNodeRemoteIMPL);
-service.set('_fnode', FNodeRemoteService);
 
-module.exports = {
-	FNodeLocal,
-	FNodeRemoteClient,
-};
+service.set('_fnode', FNodeRemoteService);

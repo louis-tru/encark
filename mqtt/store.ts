@@ -28,16 +28,26 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+import {Readable} from 'stream';
+import * as parser from './parser';
+
 /**
  * Module dependencies
  */
-var xtend = (...args)=>Object.assign({}, ...args)
-
-var Readable = require('stream').Readable
-var streamsOpts = { objectMode: true }
-var defaultStoreOptions = {
-	clean: true
+function xtend<A extends any[]>(...args: A) {
+	return Object.assign({}, ...args);
 }
+
+interface StreamsOpts {
+	objectMode: boolean;
+}
+
+interface Options {
+	clean: boolean;
+}
+
+const streamsOpts: StreamsOpts = { objectMode: true }
+const defaultStoreOptions: Options = { clean: true }
 
 /**
  * es6-map can preserve insertion order even if ES version is older.
@@ -49,120 +59,118 @@ var defaultStoreOptions = {
  * ES, this may be random and not ordered.
  *
  */
-//var Map = require('es6-map')
 
-/**
- * In-memory implementation of the message store
- * This can actually be saved into files.
- *
- * @param {Object} [options] - store options
- */
-function Store (options) {
-	if (!(this instanceof Store)) {
-		return new Store(options)
-	}
-
-	this.options = options || {}
-
-	// Defaults
-	this.options = xtend(defaultStoreOptions, options)
-
-	this._inflights = new Map()
+interface Callback {
+	(e?: Error, d?: any): void;
 }
 
-/**
- * Adds a packet to the store, a packet is
- * anything that has a messageId property.
- *
- */
-Store.prototype.put = function (packet, cb) {
-	this._inflights.set(packet.messageId, packet)
+export default class Store {
 
-	if (cb) {
-		cb()
+	private _inflights = new Map();
+
+	readonly options: Options;
+
+	/**
+	 * In-memory implementation of the message store
+	 * This can actually be saved into files.
+	 *
+	 * @param {Object} [options] - store options
+	 */
+	constructor(options?: Options) {
+		this.options = xtend(defaultStoreOptions, options)
 	}
 
-	return this
-}
+	/**
+	 * Adds a packet to the store, a packet is
+	 * anything that has a messageId property.
+	 *
+	 */
+	put(packet: parser.Packet, cb: Callback) {
+		this._inflights.set(packet.messageId, packet)
 
-/**
- * Creates a stream with all the packets in the store
- *
- */
-Store.prototype.createStream = function () {
-	var stream = new Readable(streamsOpts)
-	var destroyed = false
-	var values = []
-	var i = 0
-
-	this._inflights.forEach(function (value, key) {
-		values.push(value)
-	})
-
-	stream._read = function () {
-		if (!destroyed && i < values.length) {
-			this.push(values[i++])
-		} else {
-			this.push(null)
+		if (cb) {
+			cb()
 		}
+
+		return this
 	}
 
-	stream.destroy = function () {
-		if (destroyed) {
-			return
-		}
+	/**
+	 * Creates a stream with all the packets in the store
+	 *
+	 */
+	createStream() {
+		var stream = new Readable(streamsOpts)
+		var destroyed = false
+		var values: any[] = []
+		var i = 0
 
-		var self = this
-
-		destroyed = true
-
-		process.nextTick(function () {
-			self.emit('close')
+		this._inflights.forEach(function (value, key) {
+			values.push(value)
 		})
+
+		stream._read = function () {
+			if (!destroyed && i < values.length) {
+				this.push(values[i++])
+			} else {
+				this.push(null)
+			}
+		}
+
+		stream.destroy = function () {
+			if (destroyed) {
+				return
+			}
+
+			var self = this
+
+			destroyed = true
+
+			process.nextTick(function () {
+				self.emit('close')
+			})
+		}
+
+		return stream
 	}
 
-	return stream
+	/**
+	 * deletes a packet from the store.
+	 */
+	del(packet: parser.Packet, cb: Callback) {
+		packet = this._inflights.get(packet.messageId)
+		if (packet) {
+			this._inflights.delete(packet.messageId)
+			cb(undefined, packet)
+		} else if (cb) {
+			cb(new Error('missing packet'))
+		}
+		return this
+	}
+
+	/**
+	 * get a packet from the store.
+	 */
+	get(packet: parser.Packet, cb: Callback) {
+		packet = this._inflights.get(packet.messageId)
+		if (packet) {
+			cb(undefined, packet)
+		} else/* if (cb)*/ {
+			cb(new Error('missing packet'))
+		}
+		return this
+	}
+
+	/**
+	 * Close the store
+	 */
+	close(cb?: Callback) {
+		if (this.options.clean) {
+			(<any>this)._inflights = null
+		}
+		if (cb) {
+			cb()
+		}
+	}
+
 }
-
-/**
- * deletes a packet from the store.
- */
-Store.prototype.del = function (packet, cb) {
-	packet = this._inflights.get(packet.messageId)
-	if (packet) {
-		this._inflights.delete(packet.messageId)
-		cb(null, packet)
-	} else if (cb) {
-		cb(new Error('missing packet'))
-	}
-
-	return this
-}
-
-/**
- * get a packet from the store.
- */
-Store.prototype.get = function (packet, cb) {
-	packet = this._inflights.get(packet.messageId)
-	if (packet) {
-		cb(null, packet)
-	} else if (cb) {
-		cb(new Error('missing packet'))
-	}
-
-	return this
-}
-
-/**
- * Close the store
- */
-Store.prototype.close = function (cb) {
-	if (this.options.clean) {
-		this._inflights = null
-	}
-	if (cb) {
-		cb()
-	}
-}
-
-export default Store

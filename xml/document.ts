@@ -208,7 +208,7 @@ export class Document extends Node {
 		var first = this.firstChild;
 		if (!first)
 			return null;
-		var result: Any<string> = {};
+		var result: Dict<string> = {};
 		var ns = <NodeList>first.childNodes;
 		if (!ns)
 			return null

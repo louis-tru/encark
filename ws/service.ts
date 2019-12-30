@@ -34,7 +34,6 @@ import {Session} from '../session';
 import errno from '../errno';
 import {Types, DataBuilder, Data} from './data';
 import * as conv from './conv';
-import {Buffer} from '../buffer';
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 const print_log = false; // util.dev
@@ -102,7 +101,7 @@ export class WSService extends Service implements conv.MessageHandle {
 			console.warn('Unable to process message WSService.receiveMessage, loaded=false');
 
 		var self = this;
-		var { data = {}, name = '', cb, sender } = msg;
+		var { data, name = '', cb, sender } = msg;
 
 		if (msg.isCallback()) {
 			var handle = this.m_calls.get(<number>cb);
@@ -120,7 +119,7 @@ export class WSService extends Service implements conv.MessageHandle {
 				if (print_log) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
-					r.data = await self.handleCall(name, data, sender);
+					r.data = await self.handleCall(name, data || {}, sender || '');
 				} catch(e) {
 					r.error = e;
 				}
@@ -194,7 +193,7 @@ export class WSService extends Service implements conv.MessageHandle {
 		});
 	}
 
-	async _trigger(event: string, data: any, sender?: string) {
+	async _trigger(event: string, data?: any, sender?: string) {
 		await this._send({
 			ok: ()=>{},
 			err: ()=>{},
@@ -210,7 +209,7 @@ export class WSService extends Service implements conv.MessageHandle {
 	 * @func call(method, data)
 	 * @async
 	 */
-	call<T = any>(method: string, data: any, timeout = METHOD_CALL_TIMEOUT, sender?: string) {
+	call<T = any>(method: string, data?: any, timeout = METHOD_CALL_TIMEOUT, sender?: string) {
 		return this._call<T>(Types.T_CALL, method, data, timeout, sender);
 	}
 
@@ -218,7 +217,7 @@ export class WSService extends Service implements conv.MessageHandle {
 	 * @func  trigger(event, data)
 	 * @async
 	 */
-	async trigger(event: string, data: string, sender?: string) {
+	trigger(event: string, data?: any, sender?: string) {
 		return this._trigger(event, data, sender);
 	}
 
@@ -226,7 +225,7 @@ export class WSService extends Service implements conv.MessageHandle {
 	 * @func send(method, data, sender) method call, No response
 	 * @async
 	 */
-	async send(method: string, data: any, sender?: string) {
+	async send(method: string, data?: any, sender?: string) {
 		await this._send({
 			ok: ()=>{},
 			err: ()=>{},

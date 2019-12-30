@@ -55,7 +55,7 @@ export class Element extends Node {
 	readonly childNodes = new NodeList();
 	readonly tagName: string;
 	readonly attributes = new NamedNodeMap(this);
-	readonly namespaceMap?: Any<string>;
+	readonly namespaceMap?: Dict<string>;
 
 	get nodeName() {
 		return this.tagName;

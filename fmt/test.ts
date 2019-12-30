@@ -1,10 +1,10 @@
 
-var server = require('../server');
-var fmt = require('.');
+import server from '../server';
+import * as fmt from '.';
 
 var error = console.error;
 
-console.error = function(...args) {
+console.error = function(...args: any[]) {
 	error(...args);
 }
 

@@ -28,10 +28,11 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var center = require('./center');
-var cli = require('./cli');
+import fmtc from './fmtc';
+export * from './center';
+export * from './cli';
 
- module.exports = {
-	 ...center,
-	 ...cli,
- };
+export default {
+	fmtc: fmtc.fmtc,
+	center: fmtc.fmtc,
+};

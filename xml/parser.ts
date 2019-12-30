@@ -33,7 +33,7 @@ import * as doc from './document';
 import {DocumentType,Node} from './node';
 import {Element} from './element';
 
-const ENTITY_MAP: Any<string> = { 'lt': '<', 'gt': '>', 'amp': '&', 'quot': '"', 'apos': "'", 'nbsp': '\u00a0' };
+const ENTITY_MAP: Dict<string> = { 'lt': '<', 'gt': '>', 'amp': '&', 'quot': '"', 'apos': "'", 'nbsp': '\u00a0' };
 
 interface Attribute { 
 	prefix: string | null, 
@@ -128,7 +128,7 @@ class XMLReader {
 		var qName = tokens[0][0];
 		var localName = qName.substr(qName.indexOf(':') + 1);
 		var end = <RegExpExecArray>tokens.pop();
-		var nsMap: Any<string> | null = null;
+		var nsMap: Dict<string> | null = null;
 		var uri: string | undefined;
 		var attrs = new Attributes();
 		var unsetURIs: Attribute[] = [];
@@ -192,7 +192,7 @@ class XMLReader {
 
 		var stack = self._stack;
 		var top = stack[stack.length - 1];
-		var config: Any = { qName: qName };
+		var config: Dict = { qName: qName };
 		var nsStack = top.nsStack;
 
 		//print(stack+'#'+nsStack)

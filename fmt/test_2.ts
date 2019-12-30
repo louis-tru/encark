@@ -1,6 +1,6 @@
 
-var server = require('../server');
-var fmt = require('.');
+import server from '../server';
+import * as fmt from '.';
 
 var s = new server.Server({port: 8094, printLog: true});
 s.start(); // start server

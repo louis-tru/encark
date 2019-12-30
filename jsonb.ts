@@ -302,7 +302,7 @@ function assert(cond: any) {
 }
 
 function read_object(bin: Binary) {
-	var rev: Any = {};
+	var rev: Dict = {};
 	do {
 		if (bin.has(F_OBJECT_END)) {
 			bin.next(); break;

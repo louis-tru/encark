@@ -102,7 +102,7 @@ export abstract class ModelBasic {
 /**
  * @class Model
  */
-export class Model<T = Any> extends ModelBasic {
+export class Model<T = Dict> extends ModelBasic {
 
 	get value(): T {
 		return <T>this.m_value;
@@ -123,7 +123,7 @@ export class Model<T = Any> extends ModelBasic {
 		var ds = <sql.DataSource>this.m_ds;
 		utils.assert(ds);
 		var {pkeyName,fetchKeyPath} = primaryKey(key || ds.primaryKey(this.m_table));
-		var collection = <Collection<Any>>await ds.dao[_table][method]({ [pkeyName]: pkeyValue(this,fetchKeyPath), limit: 0, ...param}, opts);
+		var collection = <Collection<Dict>>await ds.dao[_table][method]({ [pkeyName]: pkeyValue(this,fetchKeyPath), limit: 0, ...param}, opts);
 		// TODO private visit
 		(<any>collection).m_parent = this;
 		this.m_value[name] = collection;
@@ -137,7 +137,7 @@ export type ID = string | number;
 /**
  * @class Collection
  */
-export class Collection<T = Any> extends ModelBasic {
+export class Collection<T = Dict> extends ModelBasic {
 
 	private m_map: Map<ID, Model<T>> = new Map();
 	private m_ids: ID[] = [];

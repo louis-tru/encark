@@ -32,16 +32,22 @@ import utils from '../../util'
 import errno from '../../errno';
 import { Notification, Event, EventNoticer } from '../../event';
 import { Types, Data, DataBuilder } from '../data';
-import {WSConversationBasic, MessageHandle} from './conv';
+import * as conv from './conv';
 export * from './conv';
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
+
 const print_log = false; // util.dev
 
-export interface WSConversation extends WSConversationBasic {}
+class WSConversationIMPL extends conv.WSConversation {
+	initialize() {}
+	async send() {}
+	async ping() {}
+	async pong() {}
+}
 
 interface WSConversationConstructor {
-	new(path: string): WSConversation;
+	new(path: string): WSConversationIMPL;
 }
 
 export var WSConversation: WSConversationConstructor;
@@ -64,13 +70,13 @@ interface CallData extends Data {
 /**
  * @class WSClient
  */
-export class WSClient extends Notification implements MessageHandle {
+export class WSClient extends Notification implements conv.MessageHandle {
 
 	private m_calls: Map<number, CallData> = new Map();
 	private m_loaded = false;
 	private m_sends: CallData[] = [];
 	private m_service_name: string;
-	private m_conv: WSConversation;
+	private m_conv: conv.WSConversation;
 	private m_Intervalid: any;
 
 	get name() { return this.m_service_name }
@@ -82,7 +88,7 @@ export class WSClient extends Notification implements MessageHandle {
 	/**
 	 * @constructor constructor(service_name, conv)
 	 */
-	constructor(service_name: string, conv: WSConversation) {
+	constructor(service_name: string, conv: conv.WSConversation) {
 		super();
 
 		this.m_service_name = service_name;
@@ -133,7 +139,7 @@ export class WSClient extends Notification implements MessageHandle {
 	 */
 	async receiveMessage(msg: DataBuilder) {
 		var self = this;
-		var { data = {}, name = '', cb, sender } = msg;
+		var { data, name = '', cb, sender } = msg;
 
 		if (msg.isCallback()) {
 			var handle = this.m_calls.get(cb as number);
@@ -151,15 +157,15 @@ export class WSClient extends Notification implements MessageHandle {
 				if (print_log) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
-					r.data = await self.handleCall(name, data, sender);
+					r.data = await self.handleCall(name, data || {}, sender || '');
 				} catch(e) {
 					r.error = e;
 				}
 			} else if (msg.isEvent()) {
 				// console.log('CLI Event receive', name);
 				try {
-					var evt = new Event(data);
-					evt.origin = sender;
+					var evt = new Event(data||{});
+					evt.origin = sender || '';
 					this.triggerWithEvent(name, evt); // TODO
 				} catch(err) {
 					console.error(err);
@@ -182,7 +188,7 @@ export class WSClient extends Notification implements MessageHandle {
 	/**
 	 * @class handleCall
 	 */
-	private handleCall(method: string, data: any, sender?: string) {
+	protected handleCall(method: string, data: any, sender?: string) {
 		if (method in WSClient.prototype)
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		var fn = (<any>this)[method];

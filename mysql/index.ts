@@ -198,8 +198,8 @@ export class Mysql extends Database {
 
 		if (cb) {
 			var dataSet: Result[] = [];
-			var rows: Any[] = [];
-			var fields: Any<Field> = {};
+			var rows: Dict[] = [];
+			var fields: Dict<Field> = {};
 
 			query.onError.on(function (e) {
 				cb(e.data);

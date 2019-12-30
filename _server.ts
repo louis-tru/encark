@@ -39,7 +39,7 @@ import incoming_form from './incoming_form';
 import * as _conv from './ws/_conv';
 
 var shared: Server | null = null;
-var mimeTypes: Any = {};
+var mimeTypes: Dict = {};
 var default_root: string = process.cwd();
 var default_temp: string = incoming_form.temp_dir;
 
@@ -71,8 +71,8 @@ export interface ServerConfig {
 	host?: string;
 	printLog?: boolean;
 	autoIndex?: boolean;
-	mimeTypes?: Any<string>;
-	errorStatus?: Any<string>;
+	mimeTypes?: Dict<string>;
+	errorStatus?: Dict<string>;
 	agzip?: boolean;
 	origins?: string[];
 	allowOrigin?: string;
@@ -101,7 +101,7 @@ export interface ServerConfig {
 	*/
 export class Server extends Notification {
 
-	protected m_ws_conversations: Any<_conv.ConversationBasic> = {};
+	protected m_ws_conversations: Dict<_conv.ConversationBasic> = {};
 	private m_server: http.Server;
 	protected m_isRun: boolean = false;
 	private m_host: string = '';
@@ -232,14 +232,14 @@ export class Server extends Notification {
 	 * 错误状态页
 	 * @type {Object}
 	 */
-	readonly errorStatus: Any<string> = {};
+	readonly errorStatus: Dict<string> = {};
 
 	/**
 	 * 配置的文件mime
 	 * mime types
 	 * @type {Object}
 	 */
-	readonly mimeTypes: Any<string> = mimeTypes;
+	readonly mimeTypes: Dict<string> = mimeTypes;
 
 	/**
 	 * http请求路由器

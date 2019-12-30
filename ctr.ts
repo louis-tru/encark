@@ -32,15 +32,16 @@ import util from './util';
 import * as path from 'path';
 import * as fs from './fs';
 import {HttpService} from './http_service';
-import * as Module from 'module';
 import * as vm from 'vm';
 import template, {Options} from './template';
+// import * as Module from 'module';
+const Module = require('module');
 
 var FILE_CACHE_TIMEOUT = util.dev ? 0 : 1000 * 60 * 10; // 10分钟
-var FILE_CACHES: Any = {};
+var FILE_CACHES: Dict = {};
 var _require = require;
 
-function makeRequireFunction(mod: Module) {
+function makeRequireFunction(mod: any) {
 	function require(path: string) {
 		return mod.require(path);
 	}
@@ -115,7 +116,7 @@ function requireEjs(filename: string, options: Options, __mainfilename: string) 
  */
 export class ViewController extends HttpService {
 
-	view(name: string, data?: Any) {
+	view(name: string, data?: Dict) {
 		var dirname = util.config.viewDirname;
 		if (!dirname) {
 			var mainModule = process.mainModule;
@@ -139,5 +140,3 @@ export class ViewController extends HttpService {
 		}
 	}
 }
-
-exports.ViewController = ViewController;

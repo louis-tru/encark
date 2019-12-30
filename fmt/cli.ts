@@ -28,19 +28,20 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var path = require('../path');
-var event = require('../event');
-var cli = require('../ws/cli');
-var uuid = require('../hash/uuid');
-var errno = require('../errno');
-var utils = require('../util');
+import * as path from '../path';
+import {EventNoticer, Notification} from '../event';
+import * as cli from '../ws/cli';
+import uuid from '../hash/uuid';
+import errno from '../errno';
+import utils from '../util';
 
 /**
  * @class WSConv
  */
 class WSConv extends cli.WSConversation {
-	constructor(s, headers) {
-		super(s);
+	private m_headers: Dict;
+	constructor(path: string, headers?: Dict) {
+		super(path);
 		this.m_headers = headers || {};
 	}
 	getRequestHeaders() {
@@ -48,10 +49,20 @@ class WSConv extends cli.WSConversation {
 	}
 }
 
+function urlHref(url: path.URL) {
+	var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
+	s += '//' + url.host + url.path;
+	return s;
+}
+
 /**
  * @class WSClient
  */
 class WSClient extends cli.WSClient {
+
+	private m_host: FMTClient;
+	private m_autoConnect = true;
+	private m_active_close = false;
 
 	get autoConnect() {
 		return this.m_autoConnect;
@@ -61,20 +72,18 @@ class WSClient extends cli.WSClient {
 		this.m_autoConnect = !!value;
 	}
 
-	constructor(host, url, headers) {
-		var s = url.protocol == 'fmts:'? 'wss:': 'ws:';
-				s += '//' + url.host + url.path;
-		super('_fmt', new WSConv(s, headers));
+	constructor(host: FMTClient, url: path.URL, headers?: Dict) {
+		super('_fmt', new WSConv(urlHref(url), headers));
 		this.m_host = host;
-		this.m_autoConnect = true;
-		this.m_active_close = false;
+		// this.m_autoConnect = true;
+		// this.m_active_close = false;
 
 		this.conv.onOpen.on(e=>{
 			console.log('open ok', host.id);
 			this.m_active_close = false;
-			if (host.m_subscribe.size) {
+			if ((<any>host).m_subscribe.size) {
 				var events = [];
-				for (var i of host.m_subscribe)
+				for (var i of (<any>host).m_subscribe)
 					events.push(i);
 				this.call('subscribe', {events}).catch(console.error);
 			}
@@ -85,7 +94,7 @@ class WSClient extends cli.WSClient {
 				console.log('reconnect Clo..', host.id);
 				utils.sleep(50).then(e=>this.conv.connect());
 			}
-			this.trigger('Offline');
+			this.trigger('Offline', {});
 		});
 
 		this.conv.onError.on(e=>{
@@ -96,7 +105,7 @@ class WSClient extends cli.WSClient {
 		});
 
 		this.addEventListener('Load', e=>{
-			this.trigger('Online');
+			this.trigger('Online', {});
 		});
 
 		this.addEventListener('ForceLogout', e=>{
@@ -107,7 +116,7 @@ class WSClient extends cli.WSClient {
 	/**
 	 * @overwrite
 	 */
-	handleCall(method, data, sender) {
+	protected handleCall(method: string, data: any, sender?: string) {
 		return this.m_host.handleCall(method, data, sender);
 	}
 
@@ -124,7 +133,11 @@ class WSClient extends cli.WSClient {
 /**
  * @class FMTClient
  */
-class FMTClient extends event.Notification {
+export class FMTClient extends Notification {
+
+	private m_subscribe = new Set<string>();
+	private m_id: string;
+	private m_cli: WSClient;
 
 	get id() {
 		return this.m_id;
@@ -150,35 +163,38 @@ class FMTClient extends event.Notification {
 		this.m_cli.close();
 	}
 
-	constructor(id = uuid(), url = 'fmt://localhost/', headers = null) {
+	readonly onOnline = new EventNoticer('Online', this);
+	readonly onOffline = new EventNoticer('Offline', this);
+
+	constructor(id = uuid(), url = 'fmt://localhost/', headers?: Dict) {
 		super();
-		url = new path.URL(url);
-		url.setParam('id', id);
+		var u = new path.URL(url);
+		u.setParam('id', id);
 		this.m_id = String(id);
-		this.m_url = url;
-		this.m_subscribe = new Set();
-		this.m_cli = new WSClient(this, url, headers);
+		this.m_cli = new WSClient(this, u, headers);
+		this.m_cli.addEventForward('Online', this.onOnline);
+		this.m_cli.addEventForward('Offline', this.onOffline);
 	}
 
-	that(id) {
+	that(id: string): ThatClient {
 		utils.assert(id != this.id);
-		return new ThatClient(this, id);
+		return new ThatClientIMPL(this.m_cli, id);
 	}
 
-	user(id = this.id) {
+	user(id: string = this.id) {
 		return this.m_cli.call('getUser', [id]);
 	}
 
 	/**
 	 * @func handleCall()
 	 */
-	handleCall(method, data, sender) {
+	handleCall(method: string, data: any, sender?: string) {
 		if (method in FMTClient.prototype) {
 			throw Error.new(errno.ERR_FORBIDDEN_ACCESS);
 		}
-		var fn = this[method];
+		var fn = (<any>this)[method];
 		if (typeof fn != 'function') {
-			throw Error.new('"{0}" no defined function'.format(method));
+			throw Error.new(String.format('"{0}" no defined function', method));
 		}
 		return fn.call(this, data, sender);
 	}
@@ -186,7 +202,7 @@ class FMTClient extends event.Notification {
 	/**
 	 * @func subscribe()
 	 */
-	subscribe(events) {
+	subscribe(events: string[]) {
 		events.forEach(e=>this.m_subscribe.add(e));
 		return this.m_cli.call('subscribe', {events});
 	}
@@ -194,21 +210,19 @@ class FMTClient extends event.Notification {
 	/**
 	 * @func unsubscribe()
 	 */
-	unsubscribe(events) {
+	unsubscribe(events: string[]) {
 		events.forEach(e=>this.m_subscribe.delete(e));
 		return this.m_cli.call('unsubscribe', {events});
 	}
 
-	// @overwrite:
-	getNoticer(name) {
+	getNoticer(name: string) {
 		if (!this.hasNoticer(name)) {
-			this.m_cli.addEventListener(name, super.getNoticer(name)); // Forward event
+			this.m_cli.addEventForward(name, super.getNoticer(name)); // Forward event
 		}
 		return super.getNoticer(name);
 	}
 
-	// @overwrite:
-	triggerListenerChange(name, count, change) {
+	triggerListenerChange(name: string, count: number, change: number) {
 		if (change > 0) { // add
 			if (!this.m_subscribe.has(name)) {
 				this.m_subscribe.add(name);
@@ -224,38 +238,40 @@ class FMTClient extends event.Notification {
 
 }
 
-/**
- * @class ThatClient
- */
-class ThatClient {
-	get id() {
-		return this.m_id;
-	}
-	constructor(host, id) {
-		this.m_host = host;
+export interface ThatClient {
+	hasOnline(): Promise<boolean>;
+	trigger(event: string, data?: any): Promise<void>;
+	call<T = any>(method: string, data?: any, timeout?: number): Promise<T>;
+	send(method: string, data?: any): Promise<void>;
+	user(): Promise<Dict>;
+}
+
+class ThatClientIMPL implements ThatClient {
+	private m_id: string;
+	private m_cli: WSClient;
+	get id() { return this.m_id }
+
+	constructor(cli: WSClient, id: string) {
+		this.m_cli = cli;
 		this.m_id = String(id);
 	}
-	hasOnline() {
-		return this.m_host.m_cli.call('hasOnline', [this.m_id]);
+	hasOnline(): Promise<boolean> {
+		return this.m_cli.call('hasOnline', [this.m_id]);
 	}
-	trigger(event, data) {
-		return this.m_host.m_cli.send('triggerTo', [this.m_id, event, data]);
+	trigger(event: string, data?: any) {
+		return this.m_cli.send('triggerTo', [this.m_id, event, data]);
 	}
-	call(method, data, timeout = cli.METHOD_CALL_TIMEOUT) {
+	call<T = any>(method: string, data?: any, timeout = cli.METHOD_CALL_TIMEOUT): Promise<T> {
 		timeout = Number(timeout) || cli.METHOD_CALL_TIMEOUT;
 		var args = [this.m_id, method, data];
 		if (timeout != cli.METHOD_CALL_TIMEOUT)
 			args.push(timeout);
-		return this.m_host.m_cli.call('callTo', args, timeout);
+		return this.m_cli.call('callTo', args, timeout);
 	}
-	send(method, data) {
-		return this.m_host.m_cli.send('sendTo', [this.m_id, method, data]);
+	send(method: string, data?: any) {
+		return this.m_cli.send('sendTo', [this.m_id, method, data]);
 	}
-	user() {
-		return this.m_host.m_cli.call('getUser', [this.m_id]);
+	user(): Promise<Dict> {
+		return this.m_cli.call('getUser', [this.m_id]);
 	}
 }
-
-module.exports = {
-	FMTClient,
-};

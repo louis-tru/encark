@@ -33,7 +33,6 @@ interface RequireFunction {
 }
 
 declare var __requireNgui__: RequireFunction;
-declare var __webpack_require__: RequireFunction;
 
 interface ObjectConstructor {
 	hashCode(obj: any): number;
@@ -43,7 +42,8 @@ interface Object {
 	hashCode(): number;
 }
 
-interface Any<T = any> {
+// Dictionaries
+interface Dict<T = any> {
 	[key: string]: T;
 }
 

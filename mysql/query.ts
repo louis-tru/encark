@@ -74,12 +74,12 @@ export class Query {
 	private _eofs = 0;
 	private _fields: Field[] | null = null;
 	private _rowIndex: number = 0;
-	private _row?: Any;
+	private _row?: Dict;
 	readonly sql: string;
 	readonly onError = new EventNoticer<Error>('Error', this);
 	readonly onResolve = new EventNoticer<PacketData>('Resolve', this);
 	readonly onField = new EventNoticer<Field>('Field', this);
-	readonly onRow = new EventNoticer<Any>('Row', this);
+	readonly onRow = new EventNoticer<Dict>('Row', this);
 	readonly onEnd = new EventNoticer<void>('End', this);
 
 	constructor(sql: string) {
@@ -126,7 +126,7 @@ export class Query {
 				}
 				break;
 			case Constants.ROW_DATA_PACKET: {
-				let row: Any = {};
+				let row: Dict = {};
 				let field: Field | null = null;
 				let value: Buffer | null = null;
 				let fields = <Field[]>this._fields;

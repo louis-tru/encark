@@ -57,7 +57,7 @@ function xmlEncoder(c: string) {
 				 c == '"' && '&quot;' || '&#' + c.charCodeAt(0) + ';';
 }
 
-function findNSMap(self: Node): Any<string> {
+function findNSMap(self: Node): Dict<string> {
 	var e = self;
 	while (e && e.nodeType !== NODE_TYPE.ELEMENT_NODE) {
 		if (e.nodeType === NODE_TYPE.ATTRIBUTE_NODE) {

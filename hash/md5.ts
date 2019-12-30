@@ -30,7 +30,7 @@
 
 import utils from '../util';
 import util from './util';
-import buffer, {Buffer, Bytes} from '../buffer';
+import buffer, {IBuffer, Bytes} from '../buffer';
 
 const {bin2str,bin2hex,bin2b64} = util;
 
@@ -60,7 +60,7 @@ function md5_vm_test()
 
 // md5_vm_test();
 
-var md5: (s: string | Bytes)=>Buffer;
+var md5: (s: string | Bytes)=>IBuffer;
 
 if (utils.haveNode) {
 	let crypto = require('crypto');

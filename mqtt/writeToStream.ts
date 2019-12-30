@@ -28,20 +28,27 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var protocol = require('./constants')
-var Buffer = require('buffer').Buffer
-var empty = Buffer.allocUnsafe(0)
-var zeroBuf = Buffer.from([0])
-var numbers = require('./numbers')
-var nextTick = process.nextTick
+import protocol from './constants';
+import numbers from './numbers';
+import * as net from 'net';
+import * as parser from './parser';
 
-var numCache = numbers.cache
-var generateNumber = numbers.generateNumber
-var generateCache = numbers.generateCache
-var writeNumber = writeNumberCached
-var toGenerate = true
+const empty = Buffer.allocUnsafe(0);
+const zeroBuf = Buffer.from([0]);
+const nextTick = process.nextTick;
 
-function generate (packet, stream) {
+const numCache = numbers.cache;
+const generateNumber = numbers.generateNumber;
+const generateCache = numbers.generateCache;
+var writeNumber = writeNumberCached;
+var toGenerate = true;
+
+interface Generate {
+	(packet: parser.Packet, stream: net.Socket): boolean;
+	cacheNumbers: boolean;
+}
+
+const generate = <Generate>function(packet: parser.Packet, stream: net.Socket) {
 	if (stream.cork) {
 		stream.cork()
 		nextTick(uncork, stream)
@@ -79,16 +86,17 @@ function generate (packet, stream) {
 			stream.emit('error', new Error('Unknown command'))
 			return false
 	}
-}
+};
+
 /**
  * Controls numbers cache.
  * Set to "false" to allocate buffers on-the-flight instead of pre-generated cache
  */
 Object.defineProperty(generate, 'cacheNumbers', {
-	get: function () {
-		return writeNumber === writeNumberCached
+	get() {
+		return writeNumber === writeNumberCached;
 	},
-	set: function (value) {
+	set(value: boolean) {
 		if (value) {
 			if (!numCache || Object.keys(numCache).length === 0) toGenerate = true
 			writeNumber = writeNumberCached
@@ -97,22 +105,23 @@ Object.defineProperty(generate, 'cacheNumbers', {
 			writeNumber = writeNumberGenerated
 		}
 	}
-})
+});
 
-function uncork (stream) {
+export default generate;
+
+function uncork (stream: net.Socket) {
 	stream.uncork()
 }
 
-function connect (opts, stream) {
-	var settings = opts || {}
-	var protocolId = settings.protocolId || 'MQTT'
-	var protocolVersion = settings.protocolVersion || 4
-	var will = settings.will
-	var clean = settings.clean
-	var keepalive = settings.keepalive || 0
-	var clientId = settings.clientId || ''
-	var username = settings.username
-	var password = settings.password
+function connect (opts: parser.Packet, stream: net.Socket) {
+	var protocolId = opts.protocolId || 'MQTT'
+	var protocolVersion = opts.protocolVersion || 4
+	var will = opts.will
+	var clean = opts.clean
+	var keepalive = opts.keepalive || 0
+	var clientId = opts.clientId || ''
+	var username = opts.username
+	var password = opts.password
 
 	if (clean === undefined) clean = true
 
@@ -120,10 +129,13 @@ function connect (opts, stream) {
 
 	// Must be a string and non-falsy
 	if (!protocolId ||
-		 (typeof protocolId !== 'string' && !Buffer.isBuffer(protocolId))) {
+		 (typeof protocolId !== 'string' && !Buffer.isBuffer(protocolId))
+	) {
 		stream.emit('error', new Error('Invalid protocolId'))
 		return false
-	} else length += protocolId.length + 2
+	} else {
+		length += protocolId.length + 2
+	}
 
 	// Must be 3 or 4
 	if (protocolVersion !== 3 && protocolVersion !== 4) {
@@ -140,7 +152,7 @@ function connect (opts, stream) {
 			stream.emit('error', new Error('clientId must be supplied before 3.1.1'))
 			return false
 		}
-		if ((clean * 1) === 0) {
+		if (!clean) {
 			stream.emit('error', new Error('clientId must be given if cleanSession set to 0'))
 			return false
 		}
@@ -264,9 +276,8 @@ function connect (opts, stream) {
 	return true
 }
 
-function connack (opts, stream) {
-	var settings = opts || {}
-	var rc = settings.returnCode
+function connack (opts: parser.Packet, stream: net.Socket) {
+	var rc = opts.returnCode
 
 	// Check return code
 	if (typeof rc !== 'number') {
@@ -281,19 +292,21 @@ function connack (opts, stream) {
 	return stream.write(Buffer.from([rc]))
 }
 
-function publish (opts, stream) {
-	var settings = opts || {}
-	var qos = settings.qos || 0
-	var retain = settings.retain ? protocol.RETAIN_MASK : 0
-	var topic = settings.topic
-	var payload = settings.payload || empty
-	var id = settings.messageId
+function publish (opts: parser.Packet, stream: net.Socket) {
+
+	var qos = opts.qos || 0
+	var retain = opts.retain ? protocol.RETAIN_MASK : 0
+	var topic = opts.topic
+	var payload = opts.payload || empty
+	var id = opts.messageId || 0;
 
 	var length = 0
 
 	// Topic must be a non-empty string or Buffer
-	if (typeof topic === 'string') length += Buffer.byteLength(topic) + 2
-	else if (Buffer.isBuffer(topic)) length += topic.length + 2
+	if (typeof topic === 'string')
+		length += Buffer.byteLength(topic) + 2
+	else if (Buffer.isBuffer(topic))
+		length += topic.length + 2
 	else {
 		stream.emit('error', new Error('Invalid topic'))
 		return false
@@ -327,14 +340,15 @@ function publish (opts, stream) {
 }
 
 /* Puback, pubrec, pubrel and pubcomp */
-function confirmation (opts, stream) {
-	var settings = opts || {}
-	var type = settings.cmd || 'puback'
-	var id = settings.messageId
-	var dup = (settings.dup && type === 'pubrel') ? protocol.DUP_MASK : 0
+function confirmation (opts: parser.Packet, stream: net.Socket) {
+	type T = 'unsuback' | 'puback' | 'pubcomp' | 'pubrel' | 'pubrec';
+	var type = <T>opts.cmd || 'puback';
+	var id = opts.messageId
+	var dup = (opts.dup && type === 'pubrel') ? protocol.DUP_MASK : 0;
 	var qos = 0
 
-	if (type === 'pubrel') qos = 1
+	if (type === 'pubrel')
+		qos = 1;
 
 	// Check message ID
 	if (typeof id !== 'number') {
@@ -352,11 +366,10 @@ function confirmation (opts, stream) {
 	return writeNumber(stream, id)
 }
 
-function subscribe (opts, stream) {
-	var settings = opts || {}
-	var dup = settings.dup ? protocol.DUP_MASK : 0
-	var id = settings.messageId
-	var subs = settings.subscriptions
+function subscribe (opts: parser.Packet, stream: net.Socket) {
+	var dup = opts.dup ? protocol.DUP_MASK : 0
+	var id = opts.messageId
+	var subs = opts.subscriptions
 
 	var length = 0
 
@@ -415,10 +428,9 @@ function subscribe (opts, stream) {
 	return result
 }
 
-function suback (opts, stream) {
-	var settings = opts || {}
-	var id = settings.messageId
-	var granted = settings.granted
+function suback(opts: parser.Packet, stream: net.Socket) {
+	var id = opts.messageId
+	var granted = opts.granted
 
 	var length = 0
 
@@ -454,12 +466,10 @@ function suback (opts, stream) {
 	return stream.write(Buffer.from(granted))
 }
 
-function unsubscribe (opts, stream) {
-	var settings = opts || {}
-	var id = settings.messageId
-	var dup = settings.dup ? protocol.DUP_MASK : 0
-	var unsubs = settings.unsubscriptions
-
+function unsubscribe(opts: parser.Packet, stream: net.Socket) {
+	var id = opts.messageId
+	var dup = opts.dup ? protocol.DUP_MASK : 0
+	var unsubs = opts.unsubscriptions;
 	var length = 0
 
 	// Check message ID
@@ -495,14 +505,17 @@ function unsubscribe (opts, stream) {
 	// Unsubs
 	var result = true
 	for (var j = 0; j < unsubs.length; j++) {
-		result = writeString(stream, unsubs[j])
+		writeString(stream, unsubs[j]);
+		result = false;
 	}
 
 	return result
 }
 
-function emptyPacket (opts, stream) {
-	return stream.write(protocol.EMPTY[opts.cmd])
+function emptyPacket(opts: parser.Packet, stream: net.Socket) {
+	type T = 'pingreq' | 'pingresp' | 'disconnect';
+	var cmd = <T>opts.cmd;
+	return stream.write(protocol.EMPTY[cmd])
 }
 
 /**
@@ -511,7 +524,7 @@ function emptyPacket (opts, stream) {
  *
  * @api private
  */
-function calcLengthLength (length) {
+function calcLengthLength (length: number) {
 	if (length >= 0 && length < 128) return 1
 	else if (length >= 128 && length < 16384) return 2
 	else if (length >= 16384 && length < 2097152) return 3
@@ -519,7 +532,7 @@ function calcLengthLength (length) {
 	else return 0
 }
 
-function genBufLength (length) {
+function genBufLength (length: number) {
 	var digit = 0
 	var pos = 0
 	var buffer = Buffer.allocUnsafe(calcLengthLength(length))
@@ -545,14 +558,14 @@ function genBufLength (length) {
  *
  * @api private
  */
-
-var lengthCache = {}
-function writeLength (stream, length) {
+const lengthCache: { [prop: number]: Buffer } = {};
+function writeLength (stream: net.Socket, length: number) {
 	var buffer = lengthCache[length]
 
 	if (!buffer) {
 		buffer = genBufLength(length)
-		if (length < 16384) lengthCache[length] = buffer
+		if (length < 16384)
+			lengthCache[length] = buffer
 	}
 
 	stream.write(buffer)
@@ -569,7 +582,7 @@ function writeLength (stream, length) {
  * @api private
  */
 
-function writeString (stream, string) {
+function writeString(stream: net.Socket, string: string) {
 	var strlen = Buffer.byteLength(string)
 	writeNumber(stream, strlen)
 
@@ -586,10 +599,11 @@ function writeString (stream, string) {
  *
  * @api private
  */
-function writeNumberCached (stream, number) {
+function writeNumberCached(stream: net.Socket, number: number) {
 	return stream.write(numCache[number])
 }
-function writeNumberGenerated (stream, number) {
+
+function writeNumberGenerated(stream: net.Socket, number: number) {
 	return stream.write(generateNumber(number))
 }
 
@@ -601,7 +615,7 @@ function writeNumberGenerated (stream, number) {
  * @param <String> toWrite - String or Buffer
  * @return <Number> number of bytes written
  */
-function writeStringOrBuffer (stream, toWrite) {
+function writeStringOrBuffer (stream: net.Socket, toWrite: string | Buffer) {
 	if (typeof toWrite === 'string') {
 		writeString(stream, toWrite)
 	} else if (toWrite) {
@@ -610,14 +624,15 @@ function writeStringOrBuffer (stream, toWrite) {
 	} else writeNumber(stream, 0)
 }
 
-function byteLength (bufOrString) {
-	if (!bufOrString) return 0
-	else if (bufOrString instanceof Buffer) return bufOrString.length
-	else return Buffer.byteLength(bufOrString)
+function byteLength(bufOrString: Buffer | string) {
+	if (!bufOrString)
+		return 0
+	else if (bufOrString instanceof Buffer) 
+		return bufOrString.length
+	else
+		return Buffer.byteLength(bufOrString)
 }
 
-function isStringOrBuffer (field) {
+function isStringOrBuffer (field: string | Buffer) {
 	return typeof field === 'string' || field instanceof Buffer
 }
-
-export default generate

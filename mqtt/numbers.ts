@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 var max = 65536
-var cache: Any<Buffer> = {};
+var cache: Dict<Buffer> = {};
 
 function generateBuffer(i: number) {
 	var buffer = Buffer.allocUnsafe(2)

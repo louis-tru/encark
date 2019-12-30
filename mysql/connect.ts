@@ -42,7 +42,7 @@ import {Socket} from 'net';
 import {Options, defaultOptions} from '../db';
 
 const CONNECT_TIMEOUT = 1e4;
-const connect_pool: Any<Connect[]> = {};
+const connect_pool: Dict<Connect[]> = {};
 const require_connect: Request[] = [];
 
 /**

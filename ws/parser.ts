@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import {EventNoticer} from '../event';
-import buffer,{Buffer} from '../buffer';
+import buffer,{IBuffer} from '../buffer';
 import * as net from 'net';
 
 /*
@@ -38,7 +38,7 @@ import * as net from 'net';
  * @api public
  */
 
-function _unpack(buffer: Buffer) {
+function _unpack(buffer: IBuffer) {
 	var n = 0;
 	for (var i = 0; i < buffer.length; i++) {
 		n = i ? (n * 256) + buffer[i]: buffer[i];
@@ -46,7 +46,7 @@ function _unpack(buffer: Buffer) {
 	return n;
 }
 
-function _concat(buffers: Buffer[]) {
+function _concat(buffers: IBuffer[]) {
 	return buffers.length == 1 ? buffers[0]: buffer.concat(buffers);
 }
 
@@ -58,11 +58,11 @@ interface State {
 }
 
 interface Finish {
-	(mask: null | ArrayLike<number>, data: Buffer): void;
+	(mask: null | ArrayLike<number>, data: IBuffer): void;
 }
 
 interface ExpectHandler {
-	(buffer: Buffer): void;
+	(buffer: IBuffer): void;
 }
 
 /**
@@ -76,21 +76,21 @@ export class PacketParser {
 		masked: false,
 		opcode: 0
 	}
-	private overflow: Buffer | null = null;
+	private overflow: IBuffer | null = null;
 	private expectOffset = 0;
-	private expectBuffer: Buffer | null = null;
+	private expectBuffer: IBuffer | null = null;
 	private expectHandler: ExpectHandler | null = null;
-	private currentMessage: Buffer[] | string | null = null;
+	private currentMessage: IBuffer[] | string | null = null;
 
 	readonly onClose = new EventNoticer('Close', this);
 	readonly onText = new EventNoticer<string>('Text', this);
-	readonly onData = new EventNoticer<Buffer>('Data', this);
+	readonly onData = new EventNoticer<IBuffer>('Data', this);
 	readonly onError = new EventNoticer<Error>('Error', this);
 	readonly onPing = new EventNoticer('Ping', this);
 	readonly onPong = new EventNoticer('Pong', this);
 
-	private opcodeHandlers: { [opcode: string]: (data: Buffer)=>void } = {
-		'1': (data: Buffer)=>{ // text
+	private opcodeHandlers: { [opcode: string]: (data: IBuffer)=>void } = {
+		'1': (data: IBuffer)=>{ // text
 			this._decode(data, (mask, data)=>{
 				if (this.currentMessage) {
 					this.currentMessage += this.unmask(mask, data).toString('utf8');
@@ -104,26 +104,26 @@ export class PacketParser {
 				this.endPacket();
 			});
 		},
-		'2': (data: Buffer)=>{ // binary
+		'2': (data: IBuffer)=>{ // binary
 			this._decode(data, (mask, data)=>{
 				if (this.currentMessage) {
-					(<Buffer[]>this.currentMessage).push(this.unmask(mask, data));
+					(<IBuffer[]>this.currentMessage).push(this.unmask(mask, data));
 				} else {
 					this.currentMessage = [this.unmask(mask, data)];
 				}
 				if (this.state.lastFragment) {
-					this.onData.trigger(_concat(<Buffer[]>this.currentMessage));
+					this.onData.trigger(_concat(<IBuffer[]>this.currentMessage));
 					this.currentMessage = null;
 				}
 				this.endPacket();
 			});
 		},
 		// 0x3 - 0x7: Retain, for non-control frame
-		'8': (data: Buffer)=>{ // close
+		'8': (data: IBuffer)=>{ // close
 			this.onClose.trigger({});
 			this.reset();
 		},
-		'9': (data: Buffer)=>{ // ping
+		'9': (data: IBuffer)=>{ // ping
 			if (this.state.lastFragment == false) {
 				this.error('fragmented ping is not supported');
 				return;
@@ -133,7 +133,7 @@ export class PacketParser {
 				this.endPacket();
 			});
 		},
-		'10': (data: Buffer)=>{ // pong
+		'10': (data: IBuffer)=>{ // pong
 			if (this.state.lastFragment == false) {
 				this.error('fragmented pong is not supported');
 				return;
@@ -148,21 +148,21 @@ export class PacketParser {
 	private _expectData(length: number, finish: Finish) {
 		var self = this;
 		if (self.state.masked) {
-			self.expect('Mask', 4, function(data: Buffer) {
+			self.expect('Mask', 4, function(data: IBuffer) {
 				var mask = data;
-				self.expect('Data', length, function (data: Buffer) {
+				self.expect('Data', length, function (data: IBuffer) {
 					finish(mask, data);
 				});
 			});
 		}
 		else {
-			self.expect('Data', length, function(data: Buffer) {
+			self.expect('Data', length, function(data: IBuffer) {
 				finish(null, data);
 			});
 		}
 	}
 
-	private _decode(data: Buffer, finish: Finish) {
+	private _decode(data: IBuffer, finish: Finish) {
 		var self = this;
 		// decode length
 		var firstLength = data[1] & 0x7f;
@@ -170,12 +170,12 @@ export class PacketParser {
 			self._expectData(firstLength, finish);
 		}
 		else if (firstLength == 126) {
-			self.expect('Length', 2, function (data: Buffer) {
+			self.expect('Length', 2, function (data: IBuffer) {
 				self._expectData(_unpack(data), finish);
 			});
 		}
 		else if (firstLength == 127) {
-			self.expect('Length', 8, function (data: Buffer) {
+			self.expect('Length', 8, function (data: IBuffer) {
 				if (_unpack(data.slice(0, 4)) != 0) {
 					self.error('packets with length spanning more than 32 bit is currently not supported');
 					return;
@@ -199,7 +199,7 @@ export class PacketParser {
 	 *
 	 * @api public
 	 */
-	add(data: Buffer) {
+	add(data: IBuffer) {
 		if (this.expectBuffer == null) {
 			this.addToOverflow(data);
 			return;
@@ -225,7 +225,7 @@ export class PacketParser {
 	 *
 	 * @api private
 	 */
-	addToOverflow(data: Buffer) {
+	addToOverflow(data: IBuffer) {
 		if (this.overflow == null) this.overflow = data;
 		else {
 			var prevOverflow = this.overflow;
@@ -256,7 +256,7 @@ export class PacketParser {
 	 *
 	 * @api private
 	 */
-	processPacket(data: Buffer) {
+	processPacket(data: IBuffer) {
 		if ((data[0] & 0x70) != 0) {
 			this.error('reserved fields must be empty');
 		}
@@ -329,7 +329,7 @@ export class PacketParser {
 	 *
 	 * @api private
 	 */
-	unmask(mask: ArrayLike<number> | null, buf: Buffer) {
+	unmask(mask: ArrayLike<number> | null, buf: IBuffer) {
 		if (mask != null) {
 			for (var i = 0, ll = buf.length; i < ll; i++) {
 				buf[i] ^= mask[i % 4];
@@ -358,12 +358,12 @@ export interface SendCallback {
  * @func sendDataPacket() Frame server-to-client output as a text packet.
  * @static
  */
-export function sendDataPacket(socket: net.Socket, data: Buffer | string, cb?: SendCallback) {
+export function sendDataPacket(socket: net.Socket, data: IBuffer | string, cb?: SendCallback) {
 	var opcode = 0x81; // text 0x81 | buffer 0x82 | close 0x88 | ping 0x89
 
 	if (data instanceof Uint8Array) {
 		opcode = 0x82;
-		// data = Buffer.from(data.buffer);
+		// data = buffer.from(data.buffer);
 	} else { // send json string message
 		var s = JSON.stringify(data);
 		data = buffer.from(s);

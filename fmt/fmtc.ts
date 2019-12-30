@@ -30,23 +30,24 @@
 
 import utils from '../util';
 import errno from '../errno';
-import {Server} from '../server';
+import * as s from '../_server';
 import * as center from './center';
+import * as _center from './_center';
 
-var _centers = new WeakMap<Server, any>();
+var _centers = new WeakMap<s.Server, _center.FastMessageTransferCenter_IMPL>();
 
 export default {
-	_register(server: Server, center: any) {
+	_register(server: s.Server, center: _center.FastMessageTransferCenter_IMPL) {
 		utils.assert(!_centers.has(server), 'Repeat FastMessageTransferCenter instance in Server');
-		utils.assert(server instanceof Server, errno.ERR_PARAM_TYPE_MISMATCH);
+		utils.assert(server instanceof s.Server, errno.ERR_PARAM_TYPE_MISMATCH);
 		_centers.set(server, center);
 		center.run(); // run watch
 	},
-	_fmtc(server: Server) {
+	_fmtc(server: s.Server): _center.FastMessageTransferCenter_IMPL | undefined {
 		return _centers.get(server);
 	},
-	fmtc(server: Server) {
+	fmtc(server: s.Server): center.FastMessageTransferCenter | null {
 		var c = _centers.get(server);
-		return c && c.host;
+		return c ? c.host : null;
 	},
 };

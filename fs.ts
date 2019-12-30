@@ -79,8 +79,8 @@ function inl_copy_file(path: string, target: string, options: any, cb: any) {
 	});
 
 	function cp() {
-		var read = exports.createReadStream(path);
-		var write = exports.createWriteStream(target);
+		var read = fs.createReadStream(path);
+		var write = fs.createWriteStream(target);
 
 		function error(e:any) {
 			read.destroy();
@@ -489,7 +489,7 @@ export function copy(path: string, target: string, options?: CopyOptions | Cance
 		if (err) {
 			return cb2(err);
 		}
-		exports.mkdir_p(Path.dirname(target), function() {
+		mkdirp(Path.dirname(target), function() {
 			if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
 				inl_copy_symlink(path, target, options, cb2);
 			} else if (stat.isFile()) {
@@ -535,7 +535,7 @@ export function copySync(path: string, target: string, options?: CopyOptions) {
 		
 	var stat = fs.lstatSync(path);
 	
-	exports.mkdir_p_sync(Path.dirname(target));
+	mkdirpSync(Path.dirname(target));
 
 	if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
 		inl_copy_symlink_sync(path, target, options, check);

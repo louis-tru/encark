@@ -98,7 +98,7 @@ export class HttpService extends StaticService {
 	 * post form data
 	 * @type {Object}
 	 */
-	readonly data: Any;
+	readonly data: Dict;
 
 	/**
 	 * @constructor
@@ -338,13 +338,10 @@ export class HttpService extends StaticService {
 /** 
  * @class HttpService
  */
-class Descriptors extends HttpService {
+export class Descriptors extends HttpService {
 	descriptors() {
 		return service.getServiceDescriptors();
 	}
 }
 
 service.set('descriptors', Descriptors);
-
-exports.Descriptors = Descriptors;
-exports.HttpService = HttpService;

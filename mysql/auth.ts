@@ -29,14 +29,14 @@
  * ***** END LICENSE BLOCK ***** */
 
 import * as crypto from 'crypto';
-import buffer, { Buffer, Bytes as Bytes_ } from '../buffer';
+import * as bf from '../buffer';
 
-type Bytes = Bytes_ | number[];
+type Bytes = bf.Bytes | number[];
 
 export function xor(a: string, b: string): Buffer {
-	var _a = buffer.from(a, 'binary');
-	var _b = buffer.from(b, 'binary');
-	var result = buffer.allocUnsafe(a.length);
+	var _a = Buffer.from(a, 'binary');
+	var _b = Buffer.from(b, 'binary');
+	var result = Buffer.allocUnsafe(a.length);
 	for (var i = 0; i < a.length; i++) {
 		result[i] = (_a[i] ^ _b[i]);
 	}
@@ -55,12 +55,12 @@ export function hashPassword(pwd: string | Buffer) {
 	var nr = [0x5030, 0x5735],
 		add = 7,
 		nr2 = [0x1234, 0x5671],
-		result = buffer.alloc(8);
+		result = Buffer.alloc(8);
 
 	var password: Buffer = <Buffer>pwd;
 
 	if (typeof pwd == 'string') {
-		password = buffer.from(pwd);
+		password = Buffer.from(pwd);
 	}
 
 	for (var i = 0; i < password.length; i++) {
@@ -98,10 +98,10 @@ export function int31Write(buffer: Bytes, number: number[], offset: number) {
 
 export function token(password: string, scramble: Buffer) {
 	if (!password) {
-		return buffer.alloc(0);
+		return Buffer.alloc(0);
 	}
 	// password must be in binary format, not utf8
-	var stage1 = sha1((buffer.from(password, 'utf8')).toString('binary'));
+	var stage1 = sha1((Buffer.from(password, 'utf8')).toString('binary'));
 	var stage2 = sha1(stage1);
 	var stage3 = sha1(scramble.toString('binary') + stage2);
 	return xor(stage3, stage1);
@@ -131,7 +131,7 @@ export function myRnd(r: NumberLimit) {
 }
 
 export function scramble323(message: string, password: string) {
-	var to = buffer.alloc(8),
+	var to = Buffer.alloc(8),
 		hashPass = hashPassword(password),
 		hashMessage = hashPassword(message.slice(0, 8)),
 		seed1 = int32Read(hashPass, 0) ^ int32Read(hashMessage, 0),

@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import buffer,{Buffer} from './buffer';
+import buffer,{IBuffer} from './buffer';
 import url from './path';
 import errno from './errno';
 
@@ -57,10 +57,10 @@ var shared: any = null;
 var __id = 1;
 
 export interface Options {
-	params?: Any | null;
+	params?: Dict | null;
 	method?: string,
 	timeout?: number;
-	headers?: Any<string>;
+	headers?: Dict<string>;
 	dataType?: string,
 	signer?: Signer;
 	urlencoded?: boolean;
@@ -141,19 +141,19 @@ export function stringifyXml(obj: any) {
 
 export interface Result {
 	data: any,
-	headers: Any<string>,
+	headers: Dict<string>,
 	statusCode: number,
 	httpVersion: string,
-	requestHeaders: Any<string>,
-	requestData: Any,
+	requestHeaders: Dict<string>,
+	requestData: Dict,
 }
 
 class PromiseResult extends Promise<Result> {}
 
 // Ngui implementation
 function requestNgui(
-	options: Any,
-	soptions: Any, 
+	options: Dict,
+	soptions: Dict, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -188,8 +188,8 @@ function requestNgui(
 }
 
 function requestWeb(
-	options: Any,
-	soptions: Any, 
+	options: Dict,
+	soptions: Dict, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -214,8 +214,8 @@ function requestWeb(
 		xhr.setRequestHeader(key, soptions.headers[key]);
 	}
 
-	function parseResponseHeaders(str: string): Any<string> {
-		var r: Any<string> = {};
+	function parseResponseHeaders(str: string): Dict<string> {
+		var r: Dict<string> = {};
 		for (var s of str.split(/\r?\n/)) {
 			var index = s.indexOf(':');
 			if (index != -1)
@@ -226,8 +226,7 @@ function requestWeb(
 
 	xhr.onload = async ()=>{
 		var data = xhr.response;
-		var r: Result = {
-			data: null,
+		var r = {
 			headers: parseResponseHeaders(xhr.getAllResponseHeaders()),
 			statusCode: xhr.status,
 			httpVersion: '1.1',
@@ -252,8 +251,8 @@ function requestWeb(
 }
 
 // Node implementation
-function requestNode(	options: Any,
-	soptions: Any, 
+function requestNode(	options: Dict,
+	soptions: Dict, 
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -275,10 +274,10 @@ function requestNode(	options: Any,
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
-		var buffers: Buffer[] = [];
+		var buffers: IBuffer[] = [];
 		res.on('data', (chunk: Buffer)=> {
 			// console.log(`BODY: ${chunk}`);
-			buffers.push(chunk);
+			buffers.push(buffer.from(chunk));
 		});
 		res.on('end', ()=> {
 			// console.log('No more data in response.');
@@ -365,7 +364,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		var raw_path = uri.path;
 		var path = raw_path;
 
-		var headers: Any<string> = {
+		var headers: Dict<string> = {
 			'User-Agent': <string>options.userAgent,
 			'Accept': 'application/json',
 		};
@@ -446,7 +445,7 @@ interface CacheValue {
  * @class Cache
  */
 class Cache {
-	private m_getscache: Any<CacheValue> = {};
+	private m_getscache: Dict<CacheValue> = {};
 
 	has(key: string) {
 		return key in this.m_getscache;
@@ -496,15 +495,15 @@ export function parseJSON(json: string): any {
 export class Request {
 	private m_user_agent: string;
 	private m_server_url: string;
-	private m_mock: Any;
-	private m_mock_switch: Any | null;
+	private m_mock: Dict;
+	private m_mock_switch: Dict | null;
 	private m_data_type: string = 'urlencoded';
 	private m_enable_strict_response_data: boolean = true;
 	private m_cache = new Cache();
 	private m_timeout = defaultOptions.timeout;
 	private m_signer: Signer | null = null;
 
-	constructor(serverURL: string, mock?: Any, mockSwitch?: Any) {
+	constructor(serverURL: string, mock?: Dict, mockSwitch?: Dict) {
 		this.m_user_agent = user_agent;
 		this.m_server_url = serverURL || utils.config.web_service;
 		this.m_mock = mock || {};
@@ -554,7 +553,7 @@ export class Request {
 		return null;
 	}
 
-	parseResponseData(buf: Buffer) {
+	parseResponseData(buf: IBuffer) {
 		var json = buf.toString('utf8');
 		var res = parseJSON(json);
 		if (this.m_enable_strict_response_data) {
@@ -568,7 +567,7 @@ export class Request {
 		}
 	}
 
-	async request(name: string, method: string = 'GET', params: Any | null = null, options: Options = {}) {
+	async request(name: string, method: string = 'GET', params: Dict | null = null, options: Options = {}) {
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
 			return { data: Object.create(this.m_mock[name]) };
 		} else {
@@ -613,7 +612,7 @@ export class Request {
 		}
 	}
 
-	async get(name: string, params: Any | null = null, options: Options = {}) {
+	async get(name: string, params: Dict | null = null, options: Options = {}) {
 		var { cacheTime } = options || {};
 		var key = Cache.hash({ name: name, params: params });
 		var cache = this.m_cache.get(key);
@@ -633,11 +632,11 @@ export class Request {
 		}
 	}
 
-	post(name: string, params: Any | null = null, options: Options = {}) {
+	post(name: string, params: Dict | null = null, options: Options = {}) {
 		return this.request(name, 'POST', params, options);
 	}
 
-	call(name: string, params: Any | null = null, options: Options = {}) {
+	call(name: string, params: Dict | null = null, options: Options = {}) {
 		if (params) {
 			return this.post(name, params, options);
 		} else {

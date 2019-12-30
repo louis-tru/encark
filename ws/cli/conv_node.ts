@@ -30,7 +30,7 @@
 
 import utils from '../../util';
 import request from '../../request';
-import buffer, {Buffer} from '../../buffer';
+import buffer, {IBuffer} from '../../buffer';
 import errno from '../../errno';
 import * as net from 'net';
 import * as http from 'http';
@@ -39,10 +39,10 @@ import * as crypto from 'crypto';
 import {
 	PacketParser, sendDataPacket,
 	sendPingPacket, sendPongPacket } from '../parser';
-import _conv, {WSConversationBasic,KEEP_ALIVE_TIME} from './conv';
+import _conv, {WSConversation,KEEP_ALIVE_TIME} from './conv';
 
 // Node implementation
-export default class NodeConversation extends WSConversationBasic {
+export default class NodeConversation extends WSConversation {
 
 	private m_req: http.ClientRequest | null = null;
 	private m_socket: net.Socket | null = null; // web socket connection
@@ -182,9 +182,9 @@ export default class NodeConversation extends WSConversationBasic {
 	/**
 	 * @ovrewrite
 	 */
-	send(data: Buffer): Promise<void> {
+	send(data: IBuffer): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversationBasic.write(this, sendDataPacket, [this.m_socket, data]);
+		return WSConversation.write(this, sendDataPacket, [this.m_socket, data]);
 	}
 
 	/**
@@ -192,7 +192,7 @@ export default class NodeConversation extends WSConversationBasic {
 	 */
 	ping(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversationBasic.write(this, sendPingPacket, [this.m_socket]);
+		return WSConversation.write(this, sendPingPacket, [this.m_socket]);
 	}
 
 	/**
@@ -200,7 +200,7 @@ export default class NodeConversation extends WSConversationBasic {
 	 */
 	pong(): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
-		return WSConversationBasic.write(this, sendPongPacket, [this.m_socket]);
+		return WSConversation.write(this, sendPongPacket, [this.m_socket]);
 	}
 
 }

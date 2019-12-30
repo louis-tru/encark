@@ -41,9 +41,9 @@ import * as cli from './index';
 var USE_GZIP_DATA = false;
 
 /**
- * @class WSConversationBasic
+ * @class WSConversation
  */
-export abstract class WSConversationBasic extends ConversationBasic {
+export abstract class WSConversation extends ConversationBasic {
 
 	protected m_connect = false; // 是否尝试连接中
 	protected m_signer: Signer | null = null;
@@ -151,7 +151,7 @@ export abstract class WSConversationBasic extends ConversationBasic {
 	 * @rewrite
 	 * @func getRequestHeaders
 	 */
-	getRequestHeaders(): Any | null {
+	getRequestHeaders(): Dict | null {
 		return null;
 	}
 

@@ -51,6 +51,8 @@ export enum types {
 
 class CONSTANTS {
 
+	readonly types = types;
+
 /* Header */
 	readonly CMD_SHIFT = 4;
 	readonly CMD_MASK = 0xF0;

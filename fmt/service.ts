@@ -28,21 +28,33 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-var utils = require('../util');
-var uuid = require('../hash/uuid');
-var fmtc = require('./fmtc');
-var service = require('../service');
-var wss = require('../ws/service');
-var errno = require('../errno');
+import utils from '../util';
+import uuid from '../hash/uuid';
+import fmtc from './fmtc';
+import service from '../service';
+import * as wss from '../ws/service';
+import errno from '../errno';
+import * as _center from './_center';
+import {WSConversation} from '../ws/conv';
+
+type IMPL = _center.FastMessageTransferCenter_IMPL;
 
 /**
  * @class FMTService
  */
 export class FMTService extends wss.WSService {
 
-	/**
-	 * @get id client
-	 */
+	private m_id: string;
+	private m_uuid: string = uuid();
+	private m_time: Date = new Date();
+	private m_user: Dict = {};
+	private m_center: IMPL | null = null;
+	private m_subscribe = new Set<string>();
+
+	private get _center(): IMPL {
+		return this.m_center as IMPL;
+	}
+
 	get id() {
 		return this.m_id;
 	}
@@ -59,30 +71,24 @@ export class FMTService extends wss.WSService {
 		return this.m_user;
 	}
 
-	constructor(conv) {
+	constructor(conv: WSConversation) {
 		super(conv);
-		this.m_center = null;
 		this.m_id = String(this.params.id);
-		this.m_subscribe = new Set();
-		this.m_uuid = uuid();
-		this.m_user = null;
 	}
 
 	async requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
 		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
-		var user = await center.delegate.auth(this);
+		var user = await (center as IMPL).delegate.auth(this);
 		if (user) {
 			this.m_user = { ...user, id: this.m_id };
 			return true;
 		}
+		return false;
 	}
 
-	/**
-	 * @overwrite
-	 */
 	async load() {
-		var center = fmtc._fmtc(this.conv.server);
+		var center = fmtc._fmtc(this.conv.server) as IMPL;
 		utils.assert(center, 'FMTService.load() FMTC No found');
 		await utils.sleep(utils.random(0, 200));
 		this.m_time = new Date();
@@ -91,7 +97,7 @@ export class FMTService extends wss.WSService {
 			await center.loginFrom(this);
 		} catch(err) {
 			if (err.code == errno.ERR_REPEAT_LOGIN_FMTC[0])
-				await this._repeatForceLogout(err.id);
+				await this._repeatForceLogout();
 			throw err;
 		}
 		this.m_center = center;
@@ -101,20 +107,22 @@ export class FMTService extends wss.WSService {
 	 * @overwrite
 	 */
 	async destroy() {
-		await this.m_center.logoutFrom(this);
+		await this.m_center?.logoutFrom(this);
 		this.m_center = null;
 	}
 
 	/**
 	 * @overwrite
 	 */
-	trigger(event, data, timeout = 0, sender = '') {
+	trigger(event: string, data?: any, sender?: string) {
 		if (this.hasSubscribe({event})) {
-			return super.trigger(event, data, timeout, sender);
+			return super.trigger(event, data, sender);
+		} else {
+			return new Promise<void>((resolve)=>resolve());
 		}
 	}
 
-	reportState(event, id, data) {
+	reportState(event: string, id: string, data?: any) {
 		this.trigger(`${event}-${id}`, data);
 	}
 
@@ -133,22 +141,22 @@ export class FMTService extends wss.WSService {
 
 	// ------------ api ------------
 
-	subscribe({ events }) {
+	subscribe({ events }: { events: string[]}) {
 		for (var event of events)
 			this.m_subscribe.add(event);
 	}
 
-	unsubscribe({ events }) {
+	unsubscribe({ events }: { events: string[]}) {
 		for (var event of events)
 			this.m_subscribe.delete(event);
 	}
 
-	hasSubscribe({ event }) {
+	hasSubscribe({ event }: { event: string }) {
 		return this.m_subscribe.has(event);
 	}
 
-	hasOnline([id]) {
-		return this.m_center.hasOnline(id);
+	hasOnline([id]: [string]) {
+		return this._center.hasOnline(id);
 	}
 
 	// /**
@@ -159,55 +167,55 @@ export class FMTService extends wss.WSService {
 	/**
 	 * @func triggerTo() event message
 	 */
-	triggerTo([id, event, data]) {
-		return this.m_center.delegate.triggerTo(id, event, data, this.m_id);
+	triggerTo([id, event, data]: [string, string, any]) {
+		return this._center.delegate.triggerTo(id, event, data, this.m_id);
 	}
 
 	/**
 	 * @func callTo()
 	 */
-	callTo([id, method, data, timeout]) {
+	callTo([id, method, data, timeout]: [string, string, any, number?]) {
 		timeout = Number(timeout) || wss.METHOD_CALL_TIMEOUT; // disable not timeout
-		return this.m_center.delegate.callTo(id, method, data, timeout, this.m_id);
+		return this._center.delegate.callTo(id, method, data, timeout, this.m_id);
 	}
 
 	/**
 	 * @func sendTo()
 	 */
-	sendTo([id, method, data]) {
-		return this.m_center.delegate.sendTo(id, method, data, this.m_id);
+	sendTo([id, method, data]: [string, string, any]) {
+		return this._center.delegate.sendTo(id, method, data, this.m_id);
 	}
 
-	getUser([id]) {
-		return this.m_center.user(id);
+	getUser([id]: [string]) {
+		return this._center.user(id);
 	}
 
 }
 
-/**
- * @class FMTServerClient
- */
 export class FMTServerClient {
+
+	private m_id: string;
+	private m_center: IMPL;
 
 	get id() {
 		return this.m_id;
 	}
 
-	constructor(center, id) {
+	constructor(center: IMPL, id: string) {
 		this.m_id = id;
 		this.m_center = center;
 	}
 
-	trigger(event, data, sender = null) {
+	trigger(event: string, data?: any, sender = '') {
 		return this.m_center.delegate.triggerTo(this.m_id, event, data, sender);
 	}
 
-	call(method, data, timeout = wss.METHOD_CALL_TIMEOUT, sender = null) {
+	call(method: string, data?: any, timeout = wss.METHOD_CALL_TIMEOUT, sender = '') {
 		timeout = Number(timeout) || wss.METHOD_CALL_TIMEOUT; // disable not timeout
 		return this.m_center.delegate.callTo(this.m_id, method, data, timeout, sender);
 	}
 
-	send(method, data, sender = null) {
+	send(method: string, data?: any, sender = '') {
 		return this.m_center.delegate.sendTo(this.m_id, method, data, sender);
 	}
 

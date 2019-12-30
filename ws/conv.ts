@@ -32,7 +32,7 @@ import utils from '../util';
 import service from '../service';
 import * as wsservice from './service';
 import errno from '../errno';
-import buffer, {Buffer} from '../buffer';
+import buffer, {IBuffer} from '../buffer';
 import uuid from '../hash/uuid';
 import * as crypto from 'crypto';
 import * as http from 'http';
@@ -274,7 +274,7 @@ export class WSConversation extends ConversationBasic  {
 		}
 	}
 
-	send(data: Buffer): Promise<void> {
+	send(data: IBuffer): Promise<void> {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		return ConversationBasic.write(this, sendDataPacket, [this.socket, data]);
 	}

@@ -133,7 +133,7 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 		var empty = Buffer.alloc(0);
 		var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null;
 
-		var data_tmp: Any<Buffer> = {
+		var data_tmp: Dict<Buffer> = {
 			stdout: empty,
 			stderr: empty,
 		};

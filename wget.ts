@@ -60,7 +60,12 @@ class PromiseResult extends Promise<Result> {
 	}
 }
 
-export default function wget(www: string, save: string, options?: Options): PromiseResult { // 206
+interface Wget {
+	(www: string, save: string, options?: Options): PromiseResult;
+	LIMIT: number;
+}
+
+const wget: Wget = function wget(www: string, save: string, options?: Options): PromiseResult { // 206
 	var { renewal = false,
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
@@ -291,4 +296,4 @@ export default function wget(www: string, save: string, options?: Options): Prom
 
 wget.LIMIT = 0;
 
-module.exports = wget;
+export default wget;

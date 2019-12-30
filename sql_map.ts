@@ -42,13 +42,13 @@ import * as fs from './fs';
 import {Model,Collection, FetchOptions, ModelBasic, ID} from './model';
 import {Mysql} from './mysql';
 
-const original_handles: Any<_MethodInfo> = {};
-const original_files: Any<Date> = {};
+const original_handles: Dict<_MethodInfo> = {};
+const original_files: Dict<Date> = {};
 const REG = /\{(.+?)\}/g;
 
 export interface Config {
 	type?: string;
-	redis?: Any;
+	redis?: Dict;
 	original?: string;
 	db?: MysqlOptions;
 }
@@ -67,8 +67,8 @@ export interface Options {
 
 export interface QueryParams {
 	limit?: number | number[];
-	group?: string | string[] | Any<string>;
-	order?: string | string[] | Any<string>;
+	group?: string | string[] | Dict<string>;
+	order?: string | string[] | Dict<string>;
 	[prop: string]: any;
 };
 
@@ -117,11 +117,11 @@ interface TablesInfo {
 	[table: string]: MethodsInfo;
 }
 
-export class DataAccessShortcuts extends Proxy<Any<DataAccessMethod>> {
+export class DataAccessShortcuts extends Proxy<Dict<DataAccessMethod>> {
 	constructor(ds: DataSource, table: string, info: MethodsInfo) { // handles
-		var target: Any<DataAccessMethod> = {};
+		var target: Dict<DataAccessMethod> = {};
 		super(target, {
-			get(target: Any<DataAccessMethod>, methodName: string, receiver: any): any {
+			get(target: Dict<DataAccessMethod>, methodName: string, receiver: any): any {
 				var method: DataAccessMethod = target[methodName];
 				if (!method) {
 					var type = info[methodName];
@@ -141,11 +141,11 @@ export class DataAccessShortcuts extends Proxy<Any<DataAccessMethod>> {
 	[method: string]: DataAccessMethod;
 }
 
-export class DataAccessObject extends Proxy<Any<DataAccessShortcuts>> {
+export class DataAccessObject extends Proxy<Dict<DataAccessShortcuts>> {
 	constructor(ds: DataSource, info: TablesInfo) {
-		var target: Any<DataAccessShortcuts> = {};
+		var target: Dict<DataAccessShortcuts> = {};
 		super(target, {
-			get(target: Any<DataAccessShortcuts>, tableName: string, receiver: any): any {
+			get(target: Dict<DataAccessShortcuts>, tableName: string, receiver: any): any {
 				var shortcuts = target[tableName];
 				if (!shortcuts) {
 					var methodsInfo = info[tableName];
@@ -303,8 +303,8 @@ function read_original_mapinfo(self: SqlMap, original_path: string, table: strin
 	if (!map /*|| map.nodeType != NODE_TYPE.ELEMENT_NODE*/)
 		throw new Error('map cannot empty');
 
-	var attrs: Any<string> = {};
-	var infos: Any<_MethodInfo> = {};
+	var attrs: Dict<string> = {};
+	var infos: Dict<_MethodInfo> = {};
 	var map_attrs = map.attributes;
 
 	for (var i = 0; i < map_attrs.length; i++) {
@@ -812,7 +812,7 @@ async function execAfterFetch(self: SqlMap, model: ModelBasic, afterFetch?: Fetc
 
 const funcs = {
 
-	get: async function<T = Any>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Model<T> | null> {
+	get: async function<T = Dict>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Model<T> | null> {
 		var { afterFetch, fetchTotal, onlyFetchTotal, ..._param } = <Params>(param || {});
 
 		var model = await new Promise((resolve: (r: Model<T> | null)=>void, reject)=>{
@@ -833,7 +833,7 @@ const funcs = {
 		return model;
 	},
 
-	gets: async function<T = Any>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Collection<T>> {
+	gets: async function<T = Dict>(self: SqlMap, db: Database, is_t: boolean, name: string, param?: Params, opts?: Options): Promise<Collection<T>> {
 		var {afterFetch, fetchTotal, onlyFetchTotal, ..._param} = param || {};
 		var total, table;
 
@@ -914,8 +914,8 @@ const funcs = {
 
 export class SqlMap implements DataSource {
 
-	private m_original_mapinfo: Any<_MethodInfo> = {};
-	private m_tables: Any = {};
+	private m_original_mapinfo: Dict<_MethodInfo> = {};
+	private m_tables: Dict = {};
 	private m_cache: Cache;
 	readonly config: Config;
 	readonly tablesInfo: TablesInfo;

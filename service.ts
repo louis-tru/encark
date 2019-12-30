@@ -36,7 +36,7 @@ import * as net from 'net';
 import {Server} from './_server';
 import {RuleResult} from './router';
 
-const all_service_cls: Any<typeof Service> = {};
+const all_service_cls: Dict<typeof Service> = {};
 
 /**
  * base service abstract class
@@ -47,7 +47,7 @@ export class Service {
 	private m_pathname: string | undefined;
 	private m_dirname: string | undefined;
 	private m_extname: string | null = null;
-	private m_params: Any | undefined;
+	private m_params: Dict | undefined;
 	private m_headers: http.IncomingHttpHeaders | undefined;
 
 	static type: string = 'service';
@@ -212,7 +212,7 @@ export default {
 	 * @func getServiceDescriptors()
 	 */
 	getServiceDescriptors() {
-		var r: Any = {};
+		var r: Dict = {};
 		Object.entries(all_service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
 

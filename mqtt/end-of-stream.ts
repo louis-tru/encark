@@ -61,8 +61,6 @@ interface Callback {
 }
 
 export default function eos(stream: net.Socket, opts?: Options, callback?: Callback): ()=>void {
-	if (typeof opts === 'function') 
-		return eos(stream, undefined, opts);
 
 	var cb = once(callback || noop);
 	var ws = (<any>stream)._writableState;

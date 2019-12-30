@@ -28,57 +28,82 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-/**
- * Module dependencies
- */
-import utils from '../util';
-var events = require('events')
-var Store = require('./store')
-var eos = require('./end-of-stream')
-var writeToStream = require('./writeToStream');
-var Parser = require('./parser');
-var Writable = require('stream').Writable
-var reInterval = require('./reinterval')
-var validations = require('./validations')
-
+import * as events from 'events';
+import Store from './store';
+import eos from './end-of-stream';
+import writeToStream from './writeToStream';
+import Parser, {Packet} from './parser';
+import {Writable} from 'stream';
+import reInterval, {ReInterval} from './reinterval';
+import validations from './validations';
 import * as url from 'url';
 import * as net from 'net';
 import * as tls from 'tls';
+import {Readable} from 'stream';
+
+var protocols = {
+	mqtt: stream_builder_tcp,
+	tcp: stream_builder_tcp,
+	mqtts: stream_builder_ssl,
+	ssl: stream_builder_ssl,
+	tls: stream_builder_ssl,
+};
+
+export type Protocol = 'mqtt' | 'tcp' | 'mqtts' | 'ssl' | 'tls'
+
+export interface CreateOptions {
+	url?: string;
+	keepalive?: number;
+	reschedulePings?: boolean;
+	protocolId?: string;
+	protocolVersion?: number;
+	reconnectPeriod?: number;
+	connectTimeout?: number;
+	clean?: boolean;
+	resubscribe?: boolean;
+	clientId?: string;
+	outgoingStore?: Store;
+	incomingStore?: Store;
+	queueQoSZero?: boolean;
+	protocol?: Protocol;
+	port?: number;
+	query?: any;
+	auth?: string;
+	username?: string;
+	password?: string;
+	cert?: string;
+	key?: string;
+	servers?: { host: string; port: number; protocol: Protocol }[];
+	host?: string;
+	hostname?: string;
+	rejectUnauthorized?: boolean;
+}
+
+export interface Options {
+	qos?: number;
+	dup?: false;
+	retain?: boolean;
+}
+
+export interface SubscribeOptions extends Options {
+	resubscribe?: any;
+}
+
+interface QueueItem {
+	packet: Packet;
+	cb?: Callback;
+}
+
+interface Callback {
+	(e?: Error, data?: any): void;
+}
+
+interface Done {
+	(): void;
+}
 
 function defaultId() {
 	return 'mqttjs_' + Math.random().toString(16).substr(2, 8);
-}
-
-function sendPacket(self, packet, cb) {
-	self.emit('packetsend', packet);
-
-	var result = writeToStream(packet, self.stream);
-
-	if (!result && cb) {
-		self.stream.once('drain', cb);
-	} else if (cb) {
-		cb();
-	}
-}
-
-function flush(queue) {
-	if (queue) {
-		Object.keys(queue).forEach(function (messageId) {
-			if (typeof queue[messageId] === 'function') {
-				queue[messageId](new Error('Connection closed'));
-				delete queue[messageId];
-			}
-		})
-	}
-}
-
-function storeAndSend(self, packet, cb) {
-	self.outgoingStore.put(packet, function storedPacket (err) {
-		if (err) {
-			return cb && cb(err);
-		}
-		sendPacket(self, packet, cb);
-	})
 }
 
 function nop() {}
@@ -87,18 +112,18 @@ function nop() {}
 	variables port and host can be removed since
 	you have all required information in opts object
 */
-function stream_builder_tcp(client, opts) {
+function stream_builder_tcp(mqttClient: MqttClient, opts: CreateOptions) {
 	opts.port = opts.port || 1883;
 	opts.hostname = opts.hostname || opts.host || '127.0.0.1';
 	return net.createConnection(opts.port, opts.hostname);
 }
 
-function stream_builder_ssl(mqttClient, opts) {
+function stream_builder_ssl(mqttClient: MqttClient, opts: CreateOptions) {
 	opts.port = opts.port || 8883;
 	opts.host = opts.hostname || opts.host || '127.0.0.1';
 	opts.rejectUnauthorized = opts.rejectUnauthorized !== false;
 
-	delete opts.path;
+	// delete opts.path;
 
 	var stream = tls.connect(opts);
 
@@ -111,7 +136,7 @@ function stream_builder_ssl(mqttClient, opts) {
 		}
 	});
 
-	function handleTLSerrors(err) {
+	function handleTLSerrors(err: Error) {
 		// How can I get verify this error is a tls error?
 		if (opts.rejectUnauthorized) {
 			mqttClient.emit('error', err);
@@ -130,20 +155,12 @@ function stream_builder_ssl(mqttClient, opts) {
 	return stream;
 }
 
-var protocols = {
-	mqtt: stream_builder_tcp,
-	tcp: stream_builder_tcp,
-	mqtts: stream_builder_ssl,
-	ssl: stream_builder_ssl,
-	tls: stream_builder_ssl,
-};
-
 /**
  * Parse the auth attribute and merge username and password in the options object.
  *
  * @param {Object} [opts] option object
  */
-function parseAuthOptions(opts) {
+function parseAuthOptions(opts: CreateOptions) {
 	if (opts.auth) {
 		var matches = opts.auth.match(/^(.+):(.+)$/);
 		if (matches) {
@@ -158,14 +175,15 @@ function parseAuthOptions(opts) {
 /**
  * @param {Object} opts
  */
-function resolve_options(opts) {
+function resolveOptions(opts?: CreateOptions) {
 	// Default options
-	opts = utils.assign({
+	var options = Object.assign({
 		url: 'mqtt://127.0.0.1:1883',
 		keepalive: 60,
 		reschedulePings: true,
 		protocolId: 'MQTT',
 		protocolVersion: 4,
+		protocol: 'mqtt',
 		reconnectPeriod: 1000,
 		connectTimeout: 30 * 1000,
 		clean: true,
@@ -176,55 +194,36 @@ function resolve_options(opts) {
 		queueQoSZero: true,
 	}, typeof opts == 'string' ? {url: opts}: opts);
 
-	if (opts.url) {
-		opts = Object.assign(url.parse(opts.url, true), opts);
-		if (opts.protocol === null) {
+	if (options.url) {
+		opts = Object.assign(url.parse(options.url, true), opts);
+		if (!options.protocol) {
 			throw new Error('Missing protocol');
 		}
-		opts.protocol = opts.protocol.replace(/:$/, '');
+		options.protocol = <Protocol>options.protocol.replace(/:$/, '');
 	}
 
-	opts.port = Number(opts.port) || 1883;
+	options.port = Number(options.port) || 1883;
 
 	// merge in the auth options if supplied
-	parseAuthOptions(opts);
+	parseAuthOptions(options);
 
 	// support clientId passed in the query string of the url
-	if (opts.query && typeof opts.query.clientId === 'string') {
-		opts.clientId = opts.query.clientId;
+	if (options.query && typeof options.query.clientId === 'string') {
+		options.clientId = <any>options.query.clientId;
 	}
 
-	if (opts.cert && opts.key) {
-		opts.protocol = 'mqtts';
+	if (options.cert && options.key) {
+		options.protocol = 'mqtts';
 	}
-	if (!protocols[opts.protocol]) {
-		opts.protocol = 'mqtt';
+	if (!protocols[options.protocol]) {
+		options.protocol = 'mqtt';
 	}
 
-	if (opts.clean === false && !opts.clientId) {
+	if (options.clean === false && !options.clientId) {
 		throw new Error('Missing clientId for unclean clients');
 	}
 
-	return opts;
-}
-
-/**
- * @func stream_builder()
- */
-function stream_builder(self) {
-	var opts = self.options;
-	if (opts.servers) {
-		if (!self._reconnectCount || 
-			self._reconnectCount === opts.servers.length) {
-			self._reconnectCount = 0;
-		}
-		opts.host = opts.servers[self._reconnectCount].host;
-		opts.port = opts.servers[self._reconnectCount].port;
-		opts.protocol = opts.servers[self._reconnectCount].protocol || opts._protocol;
-		opts.hostname = opts.host;
-		self._reconnectCount++;
-	}
-	return protocols[opts.protocol](self, opts);
+	return options;
 }
 
 /**
@@ -232,67 +231,100 @@ function stream_builder(self) {
  */
 export class MqttClient extends events.EventEmitter {
 
+	readonly options: CreateOptions;
+
+	private _reconnectCount = 0;
+
+	// Inflight message storages
+	private _outgoingStore: Store;
+	private _incomingStore: Store;
+
+	// Should QoS zero messages be queued when the connection is broken?
+	private _queueQoSZero: boolean;
+
+	// map of subscribed topics to support reconnection
+	private _resubscribeTopics: Dict<number> = {};
+
+	// map of a subscribe messageId and a topic
+	private _messageIdToTopic: Dict<number[]> = {};
+
+	// Ping timer, setup in _setupPingTimer
+	private _pingTimer: ReInterval<[]> | null = null;
+
+	// Packet queue
+	private _queue: QueueItem[] = [];
+	// connack timer
+	private _connackTimer: any;
+	// Reconnect timer
+	private _reconnectTimer: any;
+
+	private _protocol: Protocol;
+
+	/**
+	 * MessageIDs starting with 1
+	 * ensure that nextId is min. 1, see https://github.com/mqttjs/MQTT.js/issues/810
+	 */
+	private _nextId = Math.max(1, Math.floor(Math.random() * 65535));
+
+	// Inflight callbacks
+	private _outgoing: Map<string | number, Callback> = new Map();
+
+	private _stream: net.Socket | null = null;
+
+	private _deferredReconnect: (()=>void) | null = null;
+	private _pingResp = false;
+
+	private _connected = false;	
+	private _disconnecting = false;
+	private _disconnected = false;
+	private _reconnecting = false;
+
+	// Is the client connected?
+	get connected() { return this._connected }
+	// Are we disconnecting?
+	get disconnecting() { return this._disconnecting }
+	get disconnected() { return this._disconnected }
+	get reconnecting() { return this._reconnecting }
+
+	get nextId() {
+		return this._nextId;
+	}
+
 	/**
 	 * MqttClient constructor
 	 *
 	 * @param {Object} [options] - connection options
 	 * (see Connection#connect)
 	 */
-	constructor(options) {
+	constructor(options?: CreateOptions) {
 		super();
 
 		// resolve options
-		options = resolve_options(options);
-		options._protocol = options.protocol;
+		options = resolveOptions(options);
+		this._protocol = options.protocol as Protocol;
 
 		this.options = options;
 
 		// Inflight message storages
-		this.outgoingStore = this.options.outgoingStore;
-		this.incomingStore = this.options.incomingStore;
+		this._outgoingStore = this.options.outgoingStore as Store;
+		this._incomingStore = this.options.incomingStore as Store;
 
 		// Should QoS zero messages be queued when the connection is broken?
-		this.queueQoSZero = this.options.queueQoSZero;
-
-		// map of subscribed topics to support reconnection
-		this._resubscribeTopics = {};
-
-		// map of a subscribe messageId and a topic
-		this.messageIdToTopic = {};
-
-		// Ping timer, setup in _setupPingTimer
-		this.pingTimer = null;
-		// Is the client connected?
-		this.connected = false;
-		// Are we disconnecting?
-		this.disconnecting = false;
-		// Packet queue
-		this.queue = [];
-		// connack timer
-		this.connackTimer = null;
-		// Reconnect timer
-		this.reconnectTimer = null;
-		/**
-		 * MessageIDs starting with 1
-		 * ensure that nextId is min. 1, see https://github.com/mqttjs/MQTT.js/issues/810
-		 */
-		this.nextId = Math.max(1, Math.floor(Math.random() * 65535));
-
-		// Inflight callbacks
-		this.outgoing = {};
+		this._queueQoSZero = this.options.queueQoSZero as boolean;
 
 		var that = this;
 
 		// Mark connected on connect
-		this.on('connect', function () {
+		this.on('connect', ()=>{
 			if (this.disconnected) {
 				return;
 			}
 
-			this.connected = true;
-			var outStore = this.outgoingStore.createStream();
+			this._connected = true;
+			var outStore: Readable | null = this._outgoingStore.createStream();
 
 			this.once('close', remove);
+
 			outStore.on('end', function () {
 				that.removeListener('close', remove);
 			});
@@ -302,7 +334,7 @@ export class MqttClient extends events.EventEmitter {
 			});
 
 			function remove () {
-				outStore.destroy();
+				outStore?.destroy();
 				outStore = null;
 			}
 
@@ -313,7 +345,7 @@ export class MqttClient extends events.EventEmitter {
 				}
 
 				var packet = outStore.read(1);
-				var cb;
+				var cb: Callback | undefined;
 
 				if (!packet) {
 					// read when data is available in the future
@@ -322,16 +354,16 @@ export class MqttClient extends events.EventEmitter {
 				}
 
 				// Avoid unnecessary stream read operations when disconnected
-				if (!that.disconnecting && !that.reconnectTimer) {
-					cb = that.outgoing[packet.messageId];
-					that.outgoing[packet.messageId] = function (err, status) {
+				if (!that.disconnecting && !that._reconnectTimer) {
+					cb = that._outgoing.get(packet.messageId);
+					that._outgoing.set(packet.messageId, function (err, status) {
 						// Ensure that the original callback passed in to publish gets invoked
 						if (cb) {
 							cb(err, status);
 						}
 
 						storeDeliver();
-					}
+					})
 					that._sendPacket(packet);
 				} else if (outStore.destroy) {
 					outStore.destroy();
@@ -343,30 +375,29 @@ export class MqttClient extends events.EventEmitter {
 		});
 
 		// Mark disconnected on stream close
-		this.on('close', function () {
-			this.connected = false;
-			clearTimeout(this.connackTimer);
+		this.on('close', ()=>{
+			this._connected = false;
+			clearTimeout(this._connackTimer);
 		})
 
 		// Setup ping timer
 		this.on('connect', this._setupPingTimer)
 
 		// Send queued packets
-		this.on('connect', function () {
-			var queue = this.queue;
+		this.on('connect', ()=>{
+			var queue = this._queue;
 
-			function deliver () {
+			function deliver() {
 				var entry = queue.shift();
 				var packet = null;
 
-				if (!entry) {
+				if (!entry)
 					return;
-				}
 
 				packet = entry.packet;
 
 				that._sendPacket(packet, function (err) {
-					if (entry.cb) {
+					if (entry?.cb) {
 						entry.cb(err);
 					}
 					deliver();
@@ -392,10 +423,10 @@ export class MqttClient extends events.EventEmitter {
 		});
 
 		// Clear ping timer
-		this.on('close', function () {
-			if (that.pingTimer !== null) {
-				that.pingTimer.clear();
-				that.pingTimer = null;
+		this.on('close', ()=>{
+			if (that._pingTimer) {
+				that._pingTimer.clear();
+				that._pingTimer = null;
 			}
 		});
 
@@ -405,22 +436,81 @@ export class MqttClient extends events.EventEmitter {
 		this._setupStream();
 	}
 
+	private _flush() {
+		var self: MqttClient = this;
+		var queue = self._outgoing;
+		if (queue) {
+			for (var [key,value] of queue) {
+				if (typeof value === 'function') {
+					value(new Error('Connection closed'));
+					queue.delete(key);
+				}
+			}
+		}
+	}
+	
+	private __sendPacket(packet: Packet, cb?: Callback) {
+		var self: MqttClient = this;
+		self.emit('packetsend', packet);
+	
+		var stream = self._stream as net.Socket;
+	
+		var result = writeToStream(packet, stream);
+	
+		if (!result && cb) {
+			stream.once('drain', cb);
+		} else if (cb) {
+			cb();
+		}
+	}
+	
+	private _storeAndSend(packet: Packet, cb?: Callback) {
+		var self: MqttClient = this;
+		self._outgoingStore.put(packet, (err)=>{
+			if (err) {
+				return cb && cb(err);
+			}
+			this.__sendPacket(packet, cb);
+		})
+	}
+	
+	/**
+	 * @func stream_builder()
+	 */
+	private stream_builder() {
+		var self: MqttClient = this;
+		var opts = self.options;
+		if (opts.servers) {
+			if (!self._reconnectCount || 
+				self._reconnectCount === opts.servers.length) {
+				self._reconnectCount = 0;
+			}
+			opts.host = opts.servers[self._reconnectCount].host;
+			opts.port = opts.servers[self._reconnectCount].port;
+			opts.protocol = opts.servers[self._reconnectCount].protocol || this._protocol;
+			opts.hostname = opts.host;
+			self._reconnectCount++;
+		}
+		return protocols[<Protocol>opts.protocol](self, opts);
+	}
+
 	/**
 	 * setup the event handlers in the inner stream.
 	 *
 	 * @api private
 	 */
-	_setupStream() {
+	private _setupStream() {
+
 		var connectPacket;
 		var that = this;
 		var writable = new Writable();
-		var parser = new Parser(this.options);
-		var completeParse = null;
-		var packets = [];
+		var parser = new Parser(/*this.options*/);
+		var completeParse: Callback | null = null;
+		var packets: Packet[] = [];
 
 		this._clearReconnect();
 
-		this.stream = stream_builder(this);
+		this._stream = this.stream_builder();
 
 		parser.on('packet', function (packet) {
 			packets.push(packet);
@@ -430,9 +520,9 @@ export class MqttClient extends events.EventEmitter {
 			process.nextTick(work);
 		}
 
-		function work () {
+		function work() {
 			var packet = packets.shift();
-			var done = completeParse;
+			var done = completeParse as Callback;
 
 			if (packet) {
 				that._handlePacket(packet, nextTickWork);
@@ -448,34 +538,34 @@ export class MqttClient extends events.EventEmitter {
 			work();
 		};
 
-		this.stream.pipe(writable);
+		this._stream.pipe(writable);
 
 		// Suppress connection errors
-		this.stream.on('error', nop);
+		this._stream.on('error', nop);
 
 		// Echo stream close
-		eos(this.stream, this.emit.bind(this, 'close'));
+		eos(this._stream, {}, this.emit.bind(this, 'close'));
 
 		// Send a connect packet
 		connectPacket = Object.create(this.options);
 		connectPacket.cmd = 'connect';
 		// avoid message queue
-		sendPacket(this, connectPacket);
+		this._sendPacket(connectPacket);
 
 		// Echo connection errors
 		parser.on('error', this.emit.bind(this, 'error'));
 
 		// many drain listeners are needed for qos 1 callbacks if the connection is intermittent
-		this.stream.setMaxListeners(1000);
+		this._stream.setMaxListeners(1000);
 
-		clearTimeout(this.connackTimer);
+		clearTimeout(this._connackTimer);
 
-		this.connackTimer = setTimeout(function () {
+		this._connackTimer = setTimeout(()=>{
 			that._cleanUp(true);
 		}, this.options.connectTimeout);
 	}
 
-	_handlePacket(packet, done) {
+	private _handlePacket(packet: Packet, done: Done) {
 		this.emit('packetreceive', packet);
 
 		switch (packet.cmd) {
@@ -498,7 +588,7 @@ export class MqttClient extends events.EventEmitter {
 				done();
 				break
 			case 'pingresp':
-				this._handlePingresp(packet);
+				this._handlePingresp();
 				done();
 				break
 			default:
@@ -509,7 +599,7 @@ export class MqttClient extends events.EventEmitter {
 		}
 	}
 
-	_checkDisconnecting(callback) {
+	private _checkDisconnecting(callback?: Callback) {
 		if (this.disconnecting) {
 			if (callback) {
 				callback(new Error('client disconnecting'));
@@ -539,17 +629,17 @@ export class MqttClient extends events.EventEmitter {
 	 *     client.publish('topic', 'message', {qos: 1, retain: true, dup: true});
 	 * @example client.publish('topic', 'message', console.log);
 	 */
-	publish(topic, message, opts, callback) {
-		var packet;
+	publish(topic: string, message?: string | Buffer, opts?: Options, callback?: Callback) {
+		var packet: Packet;
 
 		// .publish(topic, payload, cb);
 		if (typeof opts === 'function') {
 			callback = opts;
-			opts = null;
+			opts = {};
 		}
 
 		// default opts
-		opts = utils.assign({qos: 0, retain: false, dup: false}, opts);
+		var options = Object.assign({qos: 0, retain: false, dup: false}, opts);
 
 		if (this._checkDisconnecting(callback)) {
 			return this;
@@ -559,17 +649,18 @@ export class MqttClient extends events.EventEmitter {
 			cmd: 'publish',
 			topic: topic,
 			payload: message,
-			qos: opts.qos,
-			retain: opts.retain,
-			messageId: this._nextId(),
-			dup: opts.dup,
+			qos: options.qos,
+			retain: options.retain,
+			messageId: this.__nextId(),
+			dup: options.dup,
+			length: 0
 		};
 
-		switch (opts.qos) {
+		switch (options.qos) {
 			case 1:
 			case 2:
 				// Add to callbacks
-				this.outgoing[packet.messageId] = callback || nop;
+				this._outgoing.set(packet.messageId as number, callback || nop);
 				this._sendPacket(packet);
 				break;
 			default:
@@ -596,8 +687,7 @@ export class MqttClient extends events.EventEmitter {
 	 * @example client.subscribe({'topic': 0, 'topic2': 1}, console.log);
 	 * @example client.subscribe('topic', console.log);
 	 */
-	subscribe(topics, opts = {}, callback = nop) {
-		var that = this;
+	subscribe(topics: string | string[] | Dict<number>, opts: SubscribeOptions | Callback = {}, callback: Callback = nop) {
 
 		if (typeof topics === 'string') {
 			topics = [topics];
@@ -610,10 +700,11 @@ export class MqttClient extends events.EventEmitter {
 
 		var qos = opts.qos || 0;
 
-		topics = (Array.isArray(topics) ? 
-			topics.map(e=>[e,qos]): Object.entries(topics));
+		type Topic = [string, number];
 
-		var invalidTopic = validations.validateTopics(topics);
+		var _topics: Topic[] = Array.isArray(topics) ? topics.map(e=>[e,qos]): Object.entries(topics);
+
+		var invalidTopic = validations.validateTopics(_topics);
 		if (invalidTopic) {
 			setImmediate(callback, new Error('Invalid topic ' + invalidTopic));
 			return this;
@@ -623,13 +714,13 @@ export class MqttClient extends events.EventEmitter {
 			return this;
 		}
 
-		var subs = [];
+		var subs: { topic: string, qos: number }[] = [];
 		var resubscribe = opts.resubscribe;
 
-		for (var [k,qos] of topics) {
+		for (var [k, _qos] of _topics) {
 			if (!this._resubscribeTopics.hasOwnProperty(k) ||
-					this._resubscribeTopics[k] < qos || resubscribe) {
-				subs.push({ topic: k, qos: qos, });
+					this._resubscribeTopics[k] < _qos || resubscribe) {
+				subs.push({ topic: k, qos: _qos, });
 			}
 		}
 
@@ -639,35 +730,34 @@ export class MqttClient extends events.EventEmitter {
 			qos: 1,
 			retain: false,
 			dup: false,
-			messageId: this._nextId(),
+			messageId: this.__nextId(),
 		};
 
 		if (!subs.length) {
-			callback(null, []);
+			callback(undefined, []);
 			return;
 		}
 
 		// subscriptions to resubscribe to in case of disconnect
 		if (this.options.resubscribe) {
-			this.messageIdToTopic[packet.messageId] = topics = [];
+			this._messageIdToTopic[packet.messageId] = topics = [];
 			for (var sub of subs) {
-				if (this.options.reconnectPeriod > 0) {
+				if (this.options.reconnectPeriod as number > 0) {
 					this._resubscribeTopics[sub.topic] = sub.qos;
 					topics.push(sub.topic);
 				}
 			}
 		}
 
-		this.outgoing[packet.messageId] = function(err, packet) {
+		this._outgoing.set(packet.messageId, function(err, packet) {
 			if (!err) {
 				var granted = packet.granted;
 				for (var i = 0; i < granted.length; i++) {
 					subs[i].qos = granted[i];
 				}
 			}
-
 			callback(err, subs);
-		}
+		})
 
 		this._sendPacket(packet);
 
@@ -684,11 +774,11 @@ export class MqttClient extends events.EventEmitter {
 	 * @example client.unsubscribe('topic');
 	 * @example client.unsubscribe('topic', console.log);
 	 */
-	unsubscribe(topic, callback = nop) {
-		var packet = {
+	unsubscribe(topic: string | string[], callback = nop) {
+		var packet: Packet = {
 			cmd: 'unsubscribe',
 			qos: 1,
-			messageId: this._nextId(),
+			messageId: this.__nextId(),
 		};
 
 		if (this._checkDisconnecting(callback)) {
@@ -702,10 +792,10 @@ export class MqttClient extends events.EventEmitter {
 		}
 
 		if (this.options.resubscribe) {
-			packet.unsubscriptions.forEach(topic=>delete this._resubscribeTopics[topic]);
+			(packet.unsubscriptions as string[]).forEach(topic=>delete this._resubscribeTopics[topic]);
 		}
 
-		this.outgoing[packet.messageId] = callback;
+		this._outgoing.set(packet.messageId as number, callback);
 
 		this._sendPacket(packet);
 
@@ -721,7 +811,7 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api public
 	 */
-	end(force, cb) {
+	end(force?: boolean | Callback, cb?: Callback) {
 		var that = this;
 
 		if (typeof force === 'function') {
@@ -730,15 +820,15 @@ export class MqttClient extends events.EventEmitter {
 		}
 
 		function closeStores() {
-			that.disconnected = true;
-			that.incomingStore.close(function() {
-				that.outgoingStore.close(function() {
+			that._disconnected = true;
+			that._incomingStore.close(function() {
+				that._outgoingStore.close(function(...args: any[]) {
 					if (cb) {
-						cb.apply(null, arguments);
+						cb(...args);
 					}
 					that.emit('end');
 				})
-			})
+			});
 			if (that._deferredReconnect) {
 				that._deferredReconnect();
 			}
@@ -748,7 +838,7 @@ export class MqttClient extends events.EventEmitter {
 			// defer closesStores of an I/O cycle,
 			// just to make sure things are
 			// ok for websockets
-			that._cleanUp(force, setImmediate.bind(null, closeStores));
+			that._cleanUp(force as boolean, setImmediate.bind(null, closeStores));
 		}
 
 		if (this.disconnecting) {
@@ -757,9 +847,9 @@ export class MqttClient extends events.EventEmitter {
 
 		this._clearReconnect();
 
-		this.disconnecting = true;
+		this._disconnecting = true;
 
-		if (!force && Object.keys(this.outgoing).length > 0) {
+		if (!force && Object.keys(this._outgoing).length > 0) {
 			// wait 10ms, just to be sure we received all of it
 			this.once('outgoingEmpty', setTimeout.bind(null, finish, 10));
 		} else {
@@ -779,12 +869,14 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @example client.removeOutgoingMessage(client.getLastMessageId());
 	 */
-	removeOutgoingMessage(mid) {
-		var cb = this.outgoing[mid];
-		delete this.outgoing[mid];
-		this.outgoingStore.del({messageId: mid}, function() {
-			cb(new Error('Message removed'));
-		});
+	removeOutgoingMessage(mid: number) {
+		var cb = this._outgoing.get(mid);
+		if (cb) {
+			this._outgoing.delete(mid);
+			this._outgoingStore.del({messageId: mid}, function() {
+				(cb as Callback)(new Error('Message removed'));
+			});
+		}
 		return this;
 	}
 
@@ -799,20 +891,20 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api public
 	 */
-	reconnect(opts) {
+	reconnect(opts: CreateOptions = {}) {
 		var that = this;
 		var f = function() {
 			if (opts) {
 				that.options.incomingStore = opts.incomingStore;
 				that.options.outgoingStore = opts.outgoingStore;
 			} else {
-				that.options.incomingStore = null;
-				that.options.outgoingStore = null;
+				that.options.incomingStore = undefined;
+				that.options.outgoingStore = undefined;
 			}
-			that.incomingStore = that.options.incomingStore || new Store();
-			that.outgoingStore = that.options.outgoingStore || new Store();
-			that.disconnecting = false;
-			that.disconnected = false;
+			that._incomingStore = that.options.incomingStore || new Store();
+			that._outgoingStore = that.options.outgoingStore || new Store();
+			that._disconnecting = false;
+			that._disconnected = false;
 			that._deferredReconnect = null;
 			that._reconnect();
 		};
@@ -829,7 +921,7 @@ export class MqttClient extends events.EventEmitter {
 	 * _reconnect - implement reconnection
 	 * @api privateish
 	 */
-	_reconnect() {
+	private _reconnect() {
 		this.emit('reconnect');
 		this._setupStream();
 	}
@@ -837,17 +929,17 @@ export class MqttClient extends events.EventEmitter {
 	/**
 	 * _setupReconnect - setup reconnect timer
 	 */
-	_setupReconnect() {
+	private _setupReconnect() {
 		var that = this;
 
-		if (!that.disconnecting && !that.reconnectTimer && 
-				(that.options.reconnectPeriod > 0)
+		if (!that.disconnecting && !that._reconnectTimer && 
+				((that.options.reconnectPeriod as number) > 0)
 		) {
 			if (!this.reconnecting) {
 				this.emit('offline');
-				this.reconnecting = true;
+				this._reconnecting = true;
 			}
-			that.reconnectTimer = setInterval(function() {
+			that._reconnectTimer = setInterval(function() {
 				that._reconnect();
 			}, that.options.reconnectPeriod);
 		}
@@ -856,10 +948,10 @@ export class MqttClient extends events.EventEmitter {
 	/**
 	 * _clearReconnect - clear the reconnect timer
 	 */
-	_clearReconnect() {
-		if (this.reconnectTimer) {
-			clearInterval(this.reconnectTimer);
-			this.reconnectTimer = null;
+	private _clearReconnect() {
+		if (this._reconnectTimer) {
+			clearInterval(this._reconnectTimer);
+			this._reconnectTimer = null;
 		}
 	}
 
@@ -867,19 +959,19 @@ export class MqttClient extends events.EventEmitter {
 	 * _cleanUp - clean up on connection end
 	 * @api private
 	 */
-	_cleanUp(forced, done) {
+	private _cleanUp(forced?: boolean, done?: ()=>void) {
 		if (done) {
-			this.stream.on('close', done);
+			(this._stream as net.Socket).on('close', done);
 		}
 
 		if (forced) {
 			if ((this.options.reconnectPeriod === 0) && this.options.clean) {
-				flush(this.outgoing);
+				this._flush();
 			}
-			this.stream.destroy();
+			this._stream?.destroy();
 		} else {
 			this._sendPacket({ cmd: 'disconnect' }, e=>{
-				setImmediate(e=>this.stream.end());
+				setImmediate(e=>this._stream?.end());
 			});
 		}
 
@@ -888,13 +980,13 @@ export class MqttClient extends events.EventEmitter {
 			this._setupReconnect();
 		}
 
-		if (this.pingTimer !== null) {
-			this.pingTimer.clear();
-			this.pingTimer = null;
+		if (this._pingTimer !== null) {
+			this._pingTimer?.clear();
+			this._pingTimer = null;
 		}
 
 		if (done && !this.connected) {
-			this.stream.removeListener('close', done);
+			this._stream?.removeListener('close', done);
 			done();
 		}
 	}
@@ -906,15 +998,15 @@ export class MqttClient extends events.EventEmitter {
 	 * @param {Function} cb - callback when the packet is sent
 	 * @api private
 	 */
-	_sendPacket(packet, cb) {
+	private _sendPacket(packet: Packet, cb?: Callback) {
 
 		if (!this.connected) {
 			var qos = packet.qos;
-			if ((qos === 0 && this.queueQoSZero) || packet.cmd !== 'publish') {
-				this.queue.push({ packet: packet, cb: cb });
-			} else if (qos > 0) {
-				cb = this.outgoing[packet.messageId];
-				this.outgoingStore.put(packet, function (err) {
+			if ((qos === 0 && this._queueQoSZero) || packet.cmd !== 'publish') {
+				this._queue.push({ packet: packet, cb: cb });
+			} else if (qos as number > 0) {
+				cb = this._outgoing.get(packet.messageId as number);
+				this._outgoingStore.put(packet, function (err) {
 					if (err) {
 						return cb && cb(err);
 					}
@@ -932,17 +1024,17 @@ export class MqttClient extends events.EventEmitter {
 			case 'publish':
 				break;
 			case 'pubrel':
-				storeAndSend(this, packet, cb);
+				this._storeAndSend(packet, cb);
 				return;
 			default:
-				sendPacket(this, packet, cb);
+				this._sendPacket(packet, cb);
 				return;
 		}
 
 		switch (packet.qos) {
 			case 2:
 			case 1:
-				storeAndSend(this, packet, cb);
+				this._storeAndSend(packet, cb);
 				break;
 			/**
 			 * no need of case here since it will be caught by default
@@ -952,7 +1044,7 @@ export class MqttClient extends events.EventEmitter {
 			case 0:
 				/* falls through */
 			default:
-				sendPacket(this, packet, cb);
+				this._sendPacket(packet, cb);
 				break;
 		}
 	}
@@ -962,11 +1054,11 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api private
 	 */
-	_setupPingTimer() {
+	private _setupPingTimer() {
 		var that = this;
-		if (!this.pingTimer && this.options.keepalive) {
-			this.pingResp = true;
-			this.pingTimer = reInterval(function() {
+		if (!this._pingTimer && this.options.keepalive) {
+			this._pingResp = true;
+			this._pingTimer = reInterval(function() {
 				that._checkPing();
 			}, this.options.keepalive * 1000);
 		}
@@ -977,10 +1069,10 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api private
 	 */
-	_shiftPingInterval() {
-		if (this.pingTimer && this.options.keepalive && 
+	private _shiftPingInterval() {
+		if (this._pingTimer && this.options.keepalive && 
 			this.options.reschedulePings) {
-			this.pingTimer.reschedule(this.options.keepalive * 1000);
+			this._pingTimer.reschedule(this.options.keepalive * 1000);
 		}
 	}
 
@@ -989,9 +1081,9 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api private
 	 */
-	_checkPing() {
-		if (this.pingResp) {
-			this.pingResp = false;
+	private _checkPing() {
+		if (this._pingResp) {
+			this._pingResp = false;
 			this._sendPacket({ cmd: 'pingreq' });
 		} else {
 			// do a forced cleanup since socket will be in bad shape
@@ -1004,8 +1096,8 @@ export class MqttClient extends events.EventEmitter {
 	 *
 	 * @api private
 	 */
-	_handlePingresp() {
-		this.pingResp = true;
+	private _handlePingresp() {
+		this._pingResp = true;
 	}
 
 	/**
@@ -1014,8 +1106,8 @@ export class MqttClient extends events.EventEmitter {
 	 * @param {Object} packet
 	 * @api private
 	 */
-	_handleConnack(packet) {
-		var rc = packet.returnCode;
+	private _handleConnack(packet: Packet) {
+		var rc = packet.returnCode as number;
 		var errors = [
 			'',
 			'Unacceptable protocol version',
@@ -1025,10 +1117,10 @@ export class MqttClient extends events.EventEmitter {
 			'Not authorized',
 		];
 
-		clearTimeout(this.connackTimer);
+		clearTimeout(this._connackTimer);
 
 		if (rc === 0) {
-			this.reconnecting = false;
+			this._reconnecting = false;
 			this.emit('connect', packet);
 		} else if (rc > 0) {
 			var err = new Error('Connection refused: ' + errors[rc]);
@@ -1067,9 +1159,8 @@ export class MqttClient extends events.EventEmitter {
 
 	for now i just suppressed the warnings
 	*/
-	_handlePublish(packet, done) {
-		done = typeof done !== 'undefined' ? done : nop;
-		var topic = packet.topic.toString();
+	private _handlePublish(packet: Packet, done: Callback = nop) {
+		var topic = packet.topic?.toString();
 		var message = packet.payload;
 		var qos = packet.qos;
 		var mid = packet.messageId;
@@ -1077,7 +1168,7 @@ export class MqttClient extends events.EventEmitter {
 
 		switch (qos) {
 			case 2:
-				this.incomingStore.put(packet, function (err) {
+				this._incomingStore.put(packet, function (err) {
 					if (err) {
 						return done(err);
 					}
@@ -1116,8 +1207,8 @@ export class MqttClient extends events.EventEmitter {
 	 * @param Function callback call when finished
 	 * @api public
 	 */
-	handleMessage(packet, callback) {
-		callback();
+	handleMessage(packet: Packet, callback?: Callback) {
+		callback && callback();
 	}
 
 	/**
@@ -1126,10 +1217,10 @@ export class MqttClient extends events.EventEmitter {
 	 * @param {Object} packet
 	 * @api private
 	 */
-	_handleAck(packet) {
+	private _handleAck(packet: Packet) {
 		/* eslint no-fallthrough: "off" */
-		var mid = packet.messageId;
-		var cb = this.outgoing[mid];
+		var mid = packet.messageId as number;
+		var cb = this._outgoing.get(mid);
 
 		if (!cb) {
 			// Server sent an ack in error, ignore it.
@@ -1142,32 +1233,32 @@ export class MqttClient extends events.EventEmitter {
 				// same thing as puback for QoS 2
 			case 'puback':
 				// Callback - we're done
-				delete this.outgoing[mid];
-				this.outgoingStore.del(packet, cb);
+				this._outgoing.delete(mid);
+				this._outgoingStore.del(packet, cb);
 				break;
 			case 'pubrec':
 				this._sendPacket({ cmd: 'pubrel', qos: 2, messageId: mid });
 				break;
 			case 'suback':
-				delete this.outgoing[mid];
-				if (packet.granted.length === 1 && (packet.granted[0] & 0x80) !== 0) {
+				this._outgoing.delete(mid);
+				if (packet.granted?.length === 1 && (packet.granted[0] & 0x80) !== 0) {
 					// suback with Failure status
-					var topics = this.messageIdToTopic[mid];
+					var topics = this._messageIdToTopic[mid];
 					if (topics) {
 						topics.forEach(topic=>delete this._resubscribeTopics[topic]);
 					}
 				}
-				cb(null, packet);
+				cb(undefined, packet);
 				break;
 			case 'unsuback':
-				delete this.outgoing[mid];
-				cb(null);
+				this._outgoing.delete(mid);
+				cb(undefined);
 				break;
 			default:
 				this.emit('error', new Error('unrecognized packet type'));
 		}
 
-		if (this.disconnecting && Object.keys(this.outgoing).length === 0) {
+		if (this.disconnecting && Object.keys(this._outgoing).length === 0) {
 			this.emit('outgoingEmpty');
 		}
 	}
@@ -1178,21 +1269,21 @@ export class MqttClient extends events.EventEmitter {
 	 * @param {Object} packet
 	 * @api private
 	 */
-	_handlePubrel(packet, callback) {
+	private _handlePubrel(packet: Packet, callback: Callback) {
 		callback = typeof callback !== 'undefined' ? callback : nop;
 		var mid = packet.messageId;
 		var that = this;
 
 		var comp = {cmd: 'pubcomp', messageId: mid};
 
-		that.incomingStore.get(packet, function (err, pub) {
+		that._incomingStore.get(packet, function (err, pub) {
 			if (!err && pub.cmd !== 'pubrel') {
 				that.emit('message', pub.topic, pub.payload, pub);
-				that.incomingStore.put(packet, function (err) {
+				that._incomingStore.put(packet, function (err) {
 					if (err) {
 						return callback(err);
 					}
-					that.handleMessage(pub, function (err) {
+					that.handleMessage(pub, function (err?: Error) {
 						if (err) {
 							return callback(err);
 						}
@@ -1209,12 +1300,12 @@ export class MqttClient extends events.EventEmitter {
 	 * _nextId
 	 * @return unsigned int
 	 */
-	_nextId() {
+	private __nextId() {
 		// id becomes current state of this.nextId and increments afterwards
-		var id = this.nextId++;
+		var id = this._nextId++;
 		// Ensure 16 bit unsigned int (max 65535, nextId got one higher)
 		if (this.nextId === 65536) {
-			this.nextId = 1;
+			this._nextId = 1;
 		}
 		return id;
 	}

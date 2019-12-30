@@ -47,7 +47,7 @@ interface ClientCookie {
 	 * @return {Object} 返回cookie值
 	 * @static
 	 */
-	getAll(): Any;
+	getAll(): Dict;
 
 	/**
 	 * 设置cookie值
@@ -97,7 +97,7 @@ ImplCookie = class implements ClientCookie {
 	}
 
 	getAll() {
-		var cookie: Any = {};
+		var cookie: Dict = {};
 		for (var item of document.cookie.split(';')) {
 			if (item) {
 				var sp = item.split('=');

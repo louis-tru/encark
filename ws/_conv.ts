@@ -30,7 +30,7 @@
 
 import utils from '../util';
 import { DataBuilder, Types, Data } from './data';
-import buffer, { Zero, Buffer } from '../buffer';
+import buffer, { Zero, IBuffer } from '../buffer';
 import {EventNoticer} from '../event';
 
 export const KEEP_ALIVE_TIME = 5e4; // 50s
@@ -46,7 +46,7 @@ export abstract class ConversationBasic {
 	protected m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
 	protected m_isGzip = false;
 	protected m_replyPong = true;
-	protected m_handles: Any<MessageHandle> = {};
+	protected m_handles: Dict<MessageHandle> = {};
 	protected m_services_count = 0;
 	protected m_token = '';
 	protected m_isOpen = false;
@@ -54,8 +54,8 @@ export abstract class ConversationBasic {
 
 	readonly onClose = new EventNoticer('Close', this);
 	readonly onOpen = new EventNoticer('Open', this);
-	readonly onPing = new EventNoticer<Buffer>('Ping', this);
-	readonly onPong = new EventNoticer<Buffer>('Pong', this);
+	readonly onPing = new EventNoticer<IBuffer>('Ping', this);
+	readonly onPong = new EventNoticer<IBuffer>('Pong', this);
 	readonly onDrain = new EventNoticer('Drain', this);
 	readonly onOverflow = new EventNoticer('Overflow', this);
 
@@ -107,7 +107,7 @@ export abstract class ConversationBasic {
 	 * @arg packet {String|Buffer}
 	 * @arg {Boolean} isText
 	 */
-	protected async handlePacket(packet: Buffer | string, isText: boolean) {
+	protected async handlePacket(packet: IBuffer | string, isText: boolean) {
 		this.m_last_packet_time = Date.now();
 		var data = await DataBuilder.parse(packet, isText, this.isGzip);
 		if (!data)
@@ -136,14 +136,14 @@ export abstract class ConversationBasic {
 		}
 	}
 
-	handlePing(data: Buffer) {
+	handlePing(data: IBuffer) {
 		this.m_last_packet_time = Date.now();
 		if (this.replyPong)
 			this.pong().catch(console.error);
 		this.onPing.trigger(data);
 	}
 
-	handlePong(data: Buffer) {
+	handlePong(data: IBuffer) {
 		this.m_last_packet_time = Date.now();
 		this.onPong.trigger(data);
 	}
@@ -154,7 +154,7 @@ export abstract class ConversationBasic {
 		await this.send(buffer.from(bf));
 	}
 
-	abstract send(data: Buffer): Promise<void>;
+	abstract send(data: IBuffer): Promise<void>;
 	abstract ping(): Promise<void>;
 	abstract pong(): Promise<void>;
 	abstract close(): void;

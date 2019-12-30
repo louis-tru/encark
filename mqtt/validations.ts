@@ -58,12 +58,14 @@ function validateTopic (topic: string) {
 	return true
 }
 
+type Topic = [string, number];
+
 /**
  * Validate an array of topics to see if any of them is valid or not
 	* @param {Array} topics - Array of topics
  * @returns {String} If the topics is valid, returns null. Otherwise, returns the invalid one
  */
-function validateTopics (topics: string[]) {
+function validateTopics (topics: Topic[]) {
 	if (topics.length === 0) {
 		return 'empty_topic_list';
 	}

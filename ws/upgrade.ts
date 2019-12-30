@@ -32,7 +32,7 @@ import {WSConversation} from './conv';
 import * as querystring from 'querystring';
 import * as http from 'http';
 
-const protocol_versions: Any = {
+const protocol_versions: Dict = {
 	'7': WSConversation,
 	'8': WSConversation,
 	'9': WSConversation,

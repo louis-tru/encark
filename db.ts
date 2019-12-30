@@ -33,8 +33,8 @@ import {PacketData} from './mysql/parser';
 import {Field} from './mysql/query';
 
 export interface Result extends PacketData {
-	rows?: Any[];
-	fields?: Any<Field>;
+	rows?: Dict[];
+	fields?: Dict<Field>;
 }
 
 export interface Callback {

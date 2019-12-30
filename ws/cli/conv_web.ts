@@ -29,15 +29,15 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../../util';
-import buffer, {Buffer} from '../../buffer';
+import buffer, {IBuffer} from '../../buffer';
 import errno from '../../errno';
 import {PING_BUFFER,PONG_BUFFER} from '../data';
-import {WSConversationBasic} from './conv';
+import {WSConversation} from './conv';
 
 const WebSocket = globalThis.WebSocket;
 
 // Web implementation
-export default class WebConversation extends WSConversationBasic {
+export default class WebConversation extends WSConversation {
 
 	private m_req: any;
 
@@ -120,7 +120,7 @@ export default class WebConversation extends WSConversationBasic {
 	/**
 	 * @ovrewrite 
 	 */
-	async send(data: Buffer) {
+	async send(data: IBuffer) {
 		utils.assert(this.isOpen, errno.ERR_CONNECTION_CLOSE_STATUS);
 		this.m_req.send(data.buffer);
 	}

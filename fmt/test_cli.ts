@@ -1,7 +1,7 @@
 
-var utils = require('../util');
-var cli = require('./cli');
-var log = require('../log');
+import utils from '../util';
+import * as cli from './cli';
+import '../log';
 
 // require('../ws/cli/conv').USE_GZIP_DATA = false;
 // log.defaultConsole.makeDefault();
@@ -22,9 +22,9 @@ async function test() {
 	var e = new cli.FMTClient('e', `fmt://${host}:8094/`);
 
 	var st = Date.now();
-	var _resolve;
+	var _resolve: (()=>void) | null = null;
 
-	function log(e) {
+	function log(e: any) {
 		var now = Date.now();
 		console.log(e.data, now - st);
 		st = now;
@@ -36,14 +36,14 @@ async function test() {
 	
 	var limit = true;
 
-	function trigger(that, event, data) {
+	function trigger(that: cli.ThatClient, event: string, data: any) {
 		return new Promise((resolve,reject)=>{
 			if (limit) {
 				if (_resolve)
 					return reject('err');
 				_resolve = resolve;
 			}
-			that.trigger(event, data).then(e=>limit||resolve()).catch(reject);
+			that.trigger(event, data).then(()=>limit||resolve()).catch(reject);
 		});
 	}
 
