@@ -108,7 +108,7 @@ function hash(data: any): string {
 	var retValue = '';
 	do
 		retValue += base64_chars[value & 0x3F];
-	while ( value >>= 6 );
+	while ( value >>>= 6 );
 	return retValue;
 }
 

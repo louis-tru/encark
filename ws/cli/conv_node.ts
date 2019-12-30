@@ -179,6 +179,8 @@ export default class NodeConversation extends WSConversation {
 		super.close();
 	}
 
+	private m_count = 0;
+
 	/**
 	 * @ovrewrite
 	 */

@@ -33,15 +33,25 @@ async function test() {
 			_resolve = null;
 		}
 	}
-	
+
+	// chech death
+	setInterval(()=>{
+		if (_resolve) {
+			_resolve();
+			_resolve = null;
+		}
+	}, 1e4);
+
 	var limit = true;
 
 	function trigger(that: cli.ThatClient, event: string, data: any) {
-		return new Promise((resolve,reject)=>{
+		return new Promise(async(resolve,reject)=>{
 			if (limit) {
 				if (_resolve)
 					return reject('err');
 				_resolve = resolve;
+			} else {
+				await utils.sleep(10);
 			}
 			that.trigger(event, data).then(()=>limit||resolve()).catch(reject);
 		});
@@ -63,7 +73,7 @@ async function test() {
 			await trigger(c.that('d'), 'A', 'D-' + i);
 			await trigger(b.that('e'), 'A', 'E-' + i);
 		} catch(err) {
-			console.error(err);
+			console.error('--------------------------', err);
 		}
 	}
 

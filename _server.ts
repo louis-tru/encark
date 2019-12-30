@@ -67,7 +67,7 @@ function read_mime(filename: string) {
 read_mime('mime.types');
 read_mime('mime+.types');
 
-export interface ServerConfig {
+export interface Options {
 	host?: string;
 	printLog?: boolean;
 	autoIndex?: boolean;
@@ -262,7 +262,7 @@ export class Server extends Notification {
 	 * @constructor
 	 * @param {Object} opt (Optional) 配置项
 	 */
-	constructor(config: ServerConfig = {}) {
+	constructor(config?: Options) {
 		super();
 		this.m_server = new http.Server();
 		this.router = new Router();
@@ -271,7 +271,6 @@ export class Server extends Notification {
 		config = config || {};
 	
 		util.update(this, util.filter(config, [
-			'host',
 			'printLog',
 			'autoIndex',
 			'mimeTypes',
@@ -279,7 +278,6 @@ export class Server extends Notification {
 			'agzip',
 			'origins',
 			'allowOrigin',
-			'port',
 			'fileCacheTime',
 			'expires',
 			'timeout',
@@ -292,7 +290,8 @@ export class Server extends Notification {
 			'formHash',
 		]));
 
-		this.m_port   = parseInt(process.env.WEB_SERVER_PORT || '0') || this.m_port;
+		this.m_port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;
+		this.m_host   = config.host ? String(config.host): '';
 		this.root     = config.root ? path.resolve(config.root) : this.root;
 		this.temp     = config.temp ? path.resolve(config.temp) : this.temp;
 
