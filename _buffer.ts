@@ -49,12 +49,12 @@ function writeBigIntLE(bytes: number[], bigint: bigint): number {
 if (!!globalThis.BigInt) {
 	(function(ok: any, ...args: any[]) {
 		if (globalThis.document) { // web
-			import('./_bigint').then(ok); // bigint syntax, webpack delay load
+			import('./_bigint').then((e: any)=>ok(e)); // bigint syntax, webpack delay load
 		} else { // node
 			ok(arguments[1]('./_bigint'));
 		}
 	})(function(bigint: any) {
-		_bigint = bigint.default;
+		_bigint = bigint;
 		_bigint._set(checkInt);
 		_readBigUIntBE = _bigint._readBigUIntBE;
 		_writeBigIntLE = _bigint._writeBigIntLE;
