@@ -53,9 +53,9 @@ interface WSConversationConstructor {
 export var WSConversation: WSConversationConstructor;
 
 if (utils.haveWeb) {
-	WSConversation = require('./conv_web');
+	WSConversation = require('./conv_web').default;
 } else if (utils.haveNode) {
-	WSConversation = require('./conv_node');
+	WSConversation = require('./conv_node').default;
 } else {
 	throw new Error('Unimplementation');
 }
