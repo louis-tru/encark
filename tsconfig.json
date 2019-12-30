@@ -9,7 +9,7 @@
 		"baseUrl": ".",
 		"declaration": true,
 		"alwaysStrict": true,
-		"allowJs": true,
+		"allowJs": false,
 		"strict": true,
 		"strictNullChecks": true,
 	},
