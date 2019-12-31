@@ -56,8 +56,10 @@ else if (haveNode) {
 var shared: any = null;
 var __id = 1;
 
+export type Params = Dict | null;
+
 export interface Options {
-	params?: Dict | null;
+	params?: Params;
 	method?: string,
 	timeout?: number;
 	headers?: Dict<string>;
@@ -501,7 +503,7 @@ export class Request {
 	private m_enable_strict_response_data: boolean = true;
 	private m_cache = new Cache();
 	private m_timeout = defaultOptions.timeout;
-	private m_signer: Signer | null = null;
+	private m_signer?: Signer;
 
 	constructor(serverURL: string, mock?: Dict, mockSwitch?: Dict) {
 		this.m_user_agent = user_agent;
@@ -536,7 +538,7 @@ export class Request {
 	set timeout(value) { this.m_timeout = value }
 
 	get signer() {
-		return this.m_signer;
+		return this.m_signer || null;
 	}
 
 	set signer(value) {
@@ -567,13 +569,15 @@ export class Request {
 		}
 	}
 
-	async request(name: string, method: string = 'GET', params: Dict | null = null, options: Options = {}) {
+	async request(name: string, method: string = 'GET', params?: Params, options?: Options) {
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
 			return { data: Object.create(this.m_mock[name]) };
 		} else {
-			var { headers, timeout, signer = this.m_signer } = options || {};
+			var opts = options || {};
+			var { headers } = opts;
 			var url = this.m_server_url + '/' + name;
 
+			params = params || opts.params;
 			headers = Object.assign({}, this.getRequestHeaders(), headers);
 
 			var result: Result;
@@ -581,12 +585,12 @@ export class Request {
 			try {
 				result = await request(url, {
 					method,
-					params,
-					headers,
-					timeout: timeout || this.m_timeout,
-					dataType: this.m_data_type,
-					userAgent: this.m_user_agent,
-					signer: signer || undefined,
+					headers: headers,
+					params: params,
+					timeout: opts.timeout || this.m_timeout,
+					dataType: opts.dataType || this.m_data_type,
+					userAgent: opts.userAgent || this.m_user_agent,
+					signer: opts.signer || this.m_signer,
 				});
 			} catch(err) {
 				err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
@@ -612,7 +616,7 @@ export class Request {
 		}
 	}
 
-	async get(name: string, params: Dict | null = null, options: Options = {}) {
+	async get(name: string, params?: Params, options?: Options) {
 		var { cacheTime } = options || {};
 		var key = Cache.hash({ name: name, params: params });
 		var cache = this.m_cache.get(key);
@@ -632,11 +636,11 @@ export class Request {
 		}
 	}
 
-	post(name: string, params: Dict | null = null, options: Options = {}) {
+	post(name: string, params?: Params, options?: Options) {
 		return this.request(name, 'POST', params, options);
 	}
 
-	call(name: string, params: Dict | null = null, options: Options = {}) {
+	call(name: string, params?: Params, options?: Options) {
 		if (params) {
 			return this.post(name, params, options);
 		} else {

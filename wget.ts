@@ -49,7 +49,7 @@ export interface Result {
 	size: number; 
 }
 
-class PromiseResult extends Promise<Result> {
+export class WgetResult extends Promise<Result> {
 	private m_abort: ()=>void;
 	abort() {
 		this.m_abort();
@@ -61,11 +61,11 @@ class PromiseResult extends Promise<Result> {
 }
 
 interface Wget {
-	(www: string, save: string, options?: Options): PromiseResult;
+	(www: string, save: string, options?: Options): WgetResult;
 	LIMIT: number;
 }
 
-const wget: Wget = function wget(www: string, save: string, options?: Options): PromiseResult { // 206
+const wget: Wget = function wget(www: string, save: string, options?: Options): WgetResult { // 206
 	var { renewal = false,
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
@@ -91,7 +91,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 		}
 	}
 
-	var promise = new PromiseResult(abort, (resolve, reject)=> {
+	var promise = new WgetResult(abort, (resolve, reject)=> {
 		_reject = reject;
 		if (ok) // abort
 			return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));

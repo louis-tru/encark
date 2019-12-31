@@ -312,7 +312,7 @@ function read_config_file(pathname: string, pathname2: string) {
 	var c = inl_require_without_err(pathname);
 	var c2 = inl_require_without_err(pathname2);
 	if (c || c2) {
-		return Object.assign({}, c, c2);
+		return Object.assign({}, c.default || c, c2.default || c2);
 	}
 }
 

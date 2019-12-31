@@ -31,21 +31,22 @@
 import util from './util';
 import * as http from 'http';
 import * as net from 'net';
-import _server, {Server as BaseServer} from './_server';
+import _server, {Server} from './_server';
 import upgrade from './ws/upgrade';
 import service from './service';
 import {StaticService} from './static_service';
 import './http_service';
+export * from './_server';
 
 /**
 	* @class Server Impl
 	*/
-export class Server extends BaseServer {
+export class ServerIMPL extends Server {
 
 	private m_checkIntervalId: any;
 
 	//Handle http and websocket and http-heartbeat request
-	protected _initializ(server: http.Server) {
+	protected initializ(server: http.Server) {
 		//http
 		server.on('request', async(req: http.IncomingMessage, res: http.ServerResponse)=>{
 			if (this.interceptRequest(req, res)) 
@@ -123,7 +124,7 @@ export class Server extends BaseServer {
 }
 
 export default {
-	Server: Server,
+	ServerIMPL: ServerIMPL,
 	setShared: _server.setShared,
 	get shared() { return _server.shared },
 };

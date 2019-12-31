@@ -99,7 +99,7 @@ export interface Options {
 /**
 	* @class Server
 	*/
-export class Server extends Notification {
+export abstract class Server extends Notification {
 
 	protected m_ws_conversations: Dict<_conv.ConversationBasic> = {};
 	private m_server: http.Server;
@@ -336,10 +336,10 @@ export class Server extends Notification {
 			delete this.m_ws_conversations[conv.token]; // TODO private visit
 		});
 
-		this._initializ(this.m_server);
+		this.initializ(this.m_server);
 	}
 
-	protected _initializ(server: http.Server) {}
+	protected abstract initializ(server: http.Server): void;
 
 	/**
 	 * Get wsConversations conversation 

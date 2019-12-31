@@ -188,7 +188,4 @@ export class Console extends Notification {
 
 }
 
-export default {
-	Console: Console,
-	...console,
-}
+export default console;

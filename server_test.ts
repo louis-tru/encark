@@ -54,7 +54,7 @@ class Test extends ViewController {
 
 service.set('test', Test);
 
-var s = new server.Server({
+var s = new server.ServerIMPL({
 	port: 8091,
 	timeout: 60 * 1e3,
 	printLog: true,

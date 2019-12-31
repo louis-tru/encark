@@ -12,13 +12,13 @@ var server_1 = 8091;
 var server_2 = 8092;
 var server_3 = 8093;
 
-var s_1 = new server.Server({port: server_1, printLog: true});
+var s_1 = new server.ServerIMPL({port: server_1, printLog: true});
 s_1.start(); // start server
 
-var s_2 = new server.Server({port: server_2, printLog: true});
+var s_2 = new server.ServerIMPL({port: server_2, printLog: true});
 s_2.start(); // start server
 
-var s_3 = new server.Server({port: server_3, printLog: true});
+var s_3 = new server.ServerIMPL({port: server_3, printLog: true});
 s_3.start(); // start server
 
 new fmt.FastMessageTransferCenter(s_1, [ 'fnode://127.0.0.1:8092/', 'fnode://127.0.0.1:8093/' ], 'fnode://127.0.0.1:8091/');
