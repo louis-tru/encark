@@ -30,11 +30,12 @@
 
 var checkInt = null;
 
-function _readBigIntBE(bytes) {
+function _readBigUIntBE(self, offset, end) {
 	var num = 0n;
-	for (var byte of bytes) {
+	while (offset < end) {
 		num <<= 8n;
-		num |= BigInt(byte);
+		num |= BigInt(self[offset]);
+		offset++;
 	}
 	return num;
 }
@@ -67,14 +68,14 @@ function _readBigUInt64BE(self, offset) {
 	return (BigInt(hi) << 32n) + BigInt(lo);
 }
 
-function _writeBigIntLE(bigint, bytes) {
+function _writeBigIntLE(bytes, bigint) {
 	var i = 0;
 	do {
 		bytes.push(Number(bigint & 0xffn));
 		bigint >>= 8n;
 		i++;
 	} while(bigint || i < 8);
-	return bytes;
+	return i;
 }
 
 function writeBigU_Int64BE(buf, value, offset, min, max) {
@@ -112,10 +113,10 @@ module.exports = {
 	_set(_checkInt) {
 		checkInt = _checkInt;
 	},
-	_readBigIntBE,
+	_readBigUIntBE,
 	_readBigInt64BE,
 	_readBigUInt64BE,
 	_writeBigIntLE,
 	_writeBigInt64BE,
 	_writeBigUInt64BE,
-};
+}

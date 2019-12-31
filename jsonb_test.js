@@ -1,5 +1,5 @@
 
-var jsonb = require('./jsonb');
+var jsonb = require('./jsonb').default;
 
 var bin2 = jsonb.binaryify({
   "from": "0x09cA99fDB2D767803d8bA566054dC822c771daB4",

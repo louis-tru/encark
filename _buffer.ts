@@ -39,6 +39,10 @@ var _readBigUIntBE: (self: Uint8Array, offset: number, end: number)=>bigint;
 var _writeBigIntLE: (bytes: number[], bigint: bigint)=>number;
 
 function readBigUIntBE(self: Uint8Array, offset: number, end: number): bigint {
+	validateNumber(offset, 'offset');
+	validateNumber(end, 'end');
+	if (end > self.length)
+		boundsError(offset, self.length - (end - offset), 'end');
 	return _readBigUIntBE(self, offset, end);
 }
 
