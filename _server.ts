@@ -344,7 +344,7 @@ export abstract class Server extends Notification {
 	/**
 	 * Get wsConversations conversation 
 	 */
-	get wsConversations() {
+	get wsConversations(): Dict<_conv.ConversationBasic> {
 		return Object.create(this.m_ws_conversations);
 	}
 

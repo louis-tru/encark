@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import {MqttClient} from './mqtt';
+import {MqttClient, CreateOptions} from './mqtt';
 import {Notification} from './event';
 
 /**
@@ -48,7 +48,7 @@ export class NotificationCenter extends Notification {
 		return this.m_mqtt;
 	}
 
-	constructor(url = 'mqtt://127.0.0.1:1883', topic = 'default', options = {}) {
+	constructor(url = 'mqtt://127.0.0.1:1883', topic = 'default', options?: CreateOptions) {
 		super();
 		var msg = `${url}/${topic}`;
 		var cli = new MqttClient({ url, ...options });
@@ -112,7 +112,7 @@ export default {
 		return default_notification_center;
 	},
 
-	set defaultNotificationCenter(value) {
+	set defaultNotificationCenter(value: NotificationCenter) {
 		utils.assert(!default_notification_center);
 		utils.assert(value instanceof NotificationCenter);
 		default_notification_center = value;

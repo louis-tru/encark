@@ -97,7 +97,7 @@ function writeBigU_Int64BE(buf, value, offset, min, max) {
 	buf[offset + 1] = hi;
 	hi = hi >> 8;
 	buf[offset] = hi;
-	return offset + 8;
+	return Number(offset) + 8;
 }
 
 function _writeBigInt64BE(self, value, offset = 0) {

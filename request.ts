@@ -150,7 +150,7 @@ export interface Result {
 	requestData: Dict,
 }
 
-class PromiseResult extends Promise<Result> {}
+export type PromiseResult = Promise<Result>
 
 // Ngui implementation
 function requestNgui(
@@ -358,7 +358,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		console.log('curl', logs.join(' \\\n'));
 	}
 
-	return new PromiseResult((resolve, reject)=> {
+	return new Promise<Result>((resolve, reject)=> {
 		var uri = new url.URL(pathname);
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
@@ -556,8 +556,7 @@ export class Request {
 	}
 
 	parseResponseData(buf: IBuffer) {
-		var json = buf.toString('utf8');
-		var res = parseJSON(json);
+		var res = parseJSON(buf.toString('utf8'));
 		if (this.m_enable_strict_response_data) {
 			if (res.errno === 0) {
 				return res.data;
@@ -569,17 +568,24 @@ export class Request {
 		}
 	}
 
-	async request(name: string, method: string = 'GET', params?: Params, options?: Options) {
+	async request(name: string, method: string = 'GET', params?: Params, options?: Options): PromiseResult {
+		var opts = options || {};
+		var { headers } = opts;
+		var url = this.m_server_url + '/' + name;
+
+		headers = Object.assign({}, this.getRequestHeaders(), headers);
+		params = params || opts.params;
+
 		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
-			return { data: Object.create(this.m_mock[name]) };
+			return { 
+				data: Object.create(this.m_mock[name]),
+				headers: {},
+				statusCode: 200,
+				httpVersion: '1.1',
+				requestHeaders: headers,
+				requestData: params,
+			} as Result;
 		} else {
-			var opts = options || {};
-			var { headers } = opts;
-			var url = this.m_server_url + '/' + name;
-
-			params = params || opts.params;
-			headers = Object.assign({}, this.getRequestHeaders(), headers);
-
 			var result: Result;
 
 			try {
@@ -601,7 +607,7 @@ export class Request {
 			}
 
 			try {
-				result.data = this.parseResponseData(result.data);
+				result.data = this.parseResponseData(result.data as IBuffer);
 				return result;
 			} catch(err) {
 				err.url = url;
@@ -616,23 +622,23 @@ export class Request {
 		}
 	}
 
-	async get(name: string, params?: Params, options?: Options) {
+	async get(name: string, params?: Params, options?: Options): PromiseResult {
 		var { cacheTime } = options || {};
 		var key = Cache.hash({ name: name, params: params });
 		var cache = this.m_cache.get(key);
 		if (cacheTime) {
 			if (cache) {
-				return Object.assign({}, cache.data, { cached: true });
+				return Object.assign({}, cache.data, { cached: true }) as Result;
 			}
 			var data = await this.request(name, 'GET', params, options);
 			this.m_cache.set(key, data, cacheTime);
-			return data;
+			return data as Result;
 		} else {
 			var data = await this.request(name, 'GET', params, options);
 			if (cache) {
 				this.m_cache.set(key, data, cache.time);
 			}
-			return data;
+			return data as Result;
 		}
 	}
 

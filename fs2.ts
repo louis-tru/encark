@@ -73,12 +73,12 @@ export function remover(path: string): RemoverResult {
 }
 
 export function exists(path: PathLike) {
-	return new Promise((resolve)=>{
+	return new Promise<boolean>((resolve)=>{
 		fs.exists(path, (ok)=>resolve(ok));
 	});
 }
 
-export function mkdirp(path: string, mode: fs.MkdirOptopns) {
+export function mkdirp(path: string, mode?: fs.MkdirOptopns) {
 	return new Promise<void>((resolve, reject)=>{
 		fs.mkdirp(path, mode, (err)=>err ? reject(err): resolve());
 	});
