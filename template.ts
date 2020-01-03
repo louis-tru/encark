@@ -112,7 +112,7 @@ class Lodash {
 			 * @memberOf _.templateSettings.imports
 			 * @type {Function}
 			 */
-			'_': lodash
+			'_': this
 		},
 	}
 };
