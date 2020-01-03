@@ -236,11 +236,12 @@ function from(
 			return new IBufferIMPL(_codec.encodeUTF8(value));
 		}
 	} else if (value instanceof TypedArrayConstructor) {
-		return new IBufferIMPL((<TypedArray>value).buffer);
+		var bf = value as Uint8Array;
+		return new IBufferIMPL(bf.buffer, bf.byteOffset, bf.byteLength);
 	} else if (value instanceof ArrayBuffer || value instanceof SharedArrayBuffer) {
 		return new IBufferIMPL(value);
 	} else if (value instanceof DataView) {
-		return new IBufferIMPL(value.buffer);
+		return new IBufferIMPL(value.buffer, value.byteOffset, value.byteLength);
 	} else {
 		var bf = Uint8Array.from(<any>value, <any>encodingOrMapfn, thisArg);
 		(<any>bf).__proto__ = IBufferIMPL.prototype;
