@@ -106,15 +106,7 @@ export class FastMessageTransferCenter_IMPL {
 		return this.m_routeTable;
 	}
 
-<<<<<<< HEAD:fmt/center.js
-	get routeTable() {
-		return this.m_routeTable;
-	}
-
-	constructor(host, server, fnodes, publish) {
-=======
 	constructor(host: center.FastMessageTransferCenter, server: Server, fnodes: string[] = [], publish?: string) {
->>>>>>> develop_ts:fmt/_center.ts
 		this.m_host = host;
 		this.m_server = server;
 		this.m_publish_url = publish ? new URL(publish): null;
