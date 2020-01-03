@@ -49,8 +49,17 @@ export abstract class WSConversation extends ConversationBasic {
 	protected m_signer: Signer | null = null;
 	private   m_IntervalId: any;
 	protected m_url: URL;
+	private   m_autoReconnect = 0;
 
 	readonly onError = new EventNoticer<Error>('Error', this);
+
+	get autoReconnect() {
+		return this.m_autoReconnect;
+	}
+
+	set autoReconnect(value: number) {
+		this.m_autoReconnect = Math.min(Math.max(0, Number(value) || 0), 5e3);
+	}
 
 	get keepAliveTime() {
 		return this.m_KEEP_ALIVE_TIME;
@@ -77,6 +86,15 @@ export abstract class WSConversation extends ConversationBasic {
 		if (this.m_IntervalId) {
 			clearInterval(this.m_IntervalId);
 			this.m_IntervalId = 0;
+		}
+	}
+
+	private _autoReconnect(reason: string) {
+		if (!this.m_isOpen && this.m_autoReconnect) { // keep connect
+			utils.sleep(this.m_autoReconnect).then(()=>{
+				console.log(`Reconnect ${reason} Clo.. ${this.m_url.href}`);
+				this.connect();
+			});
 		}
 	}
 
@@ -134,6 +152,7 @@ export abstract class WSConversation extends ConversationBasic {
 		if (this.m_connect)
 			this.close();
 		utils.nextTick(()=>this.onError.trigger(err));
+		this._autoReconnect('Error');
 	}
 
 	get signer() {
@@ -168,6 +187,7 @@ export abstract class WSConversation extends ConversationBasic {
 			this.m_token = '';
 			this._clearKeepAlive();
 			this.onClose.trigger({});
+			this._autoReconnect('Close');
 			console.log('CLI Conversation Close', (<any>this).m_url?.href);
 		}
 	}

@@ -43,6 +43,7 @@ class WSConv extends cli.WSConversation {
 	constructor(path: string, headers?: Dict) {
 		super(path);
 		this.m_headers = headers || {};
+		this.autoReconnect = 500; // 500ms auto reconnect
 	}
 	getRequestHeaders() {
 		return this.m_headers;
@@ -61,26 +62,13 @@ function urlHref(url: path.URL) {
 class WSClient extends cli.WSClient {
 
 	private m_host: FMTClient;
-	private m_autoConnect = true;
-	private m_active_close = false;
-
-	get autoConnect() {
-		return this.m_autoConnect;
-	}
-
-	set autoConnect(value) {
-		this.m_autoConnect = !!value;
-	}
 
 	constructor(host: FMTClient, url: path.URL, headers?: Dict) {
 		super('_fmt', new WSConv(urlHref(url), headers));
 		this.m_host = host;
-		// this.m_autoConnect = true;
-		// this.m_active_close = false;
 
 		this.conv.onOpen.on(e=>{
 			console.log('open ok', host.id);
-			this.m_active_close = false;
 			if ((<any>host).m_subscribe.size) {
 				var events = [];
 				for (var i of (<any>host).m_subscribe)
@@ -90,18 +78,7 @@ class WSClient extends cli.WSClient {
 		});
 
 		this.conv.onClose.on(e=>{
-			if (this.m_autoConnect && !this.m_active_close) { // auto connect
-				console.log('reconnect Clo..', host.id);
-				utils.sleep(50).then(e=>this.conv.connect());
-			}
 			this.trigger('Offline', {});
-		});
-
-		this.conv.onError.on(e=>{
-			if (this.m_autoConnect && !this.m_active_close) { // auto connect
-				console.log('reconnect Err..', host.id);
-				utils.sleep(50).then(e=>this.conv.connect());
-			}
 		});
 
 		this.addEventListener('Load', e=>{
@@ -124,7 +101,6 @@ class WSClient extends cli.WSClient {
 	 * @func close() close client
 	 */
 	close() {
-		this.m_active_close = true;
 		this.conv.close();
 	}
 
@@ -149,14 +125,6 @@ export class FMTClient extends Notification {
 
 	get loaded() {
 		return this.m_cli.loaded;
-	}
-
-	get autoConnect() {
-		return this.m_cli.autoConnect;
-	}
-
-	set autoConnect(value) {
-		this.m_cli.autoConnect = value;
 	}
 
 	close() {
