@@ -1,0 +1,30 @@
+{
+	"compileOnSave": true,
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "ES2017",
+		"noImplicitAny": true,
+		"moduleResolution": "node",
+		"sourceMap": false,
+		"outDir": "out/nxkit",
+		"rootDir": ".",
+		"baseUrl": ".",
+		"declaration": true,
+		"alwaysStrict": true,
+		"allowJs": true,
+		"checkJs": false,
+		"strict": true,
+		"strictNullChecks": true,
+	},
+	"include": [
+		"**/*",
+	],
+	"exclude": [
+		"out",
+		"node_modules",
+		"var",
+		".git",
+		".svn",
+		"_build.js",
+	]
+}
