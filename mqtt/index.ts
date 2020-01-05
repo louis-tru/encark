@@ -501,7 +501,6 @@ export class MqttClient extends events.EventEmitter {
 	 */
 	private _setupStream() {
 
-		var connectPacket;
 		var that = this;
 		var writable = new Writable();
 		var parser = new Parser(/*this.options*/);
@@ -547,10 +546,9 @@ export class MqttClient extends events.EventEmitter {
 		eos(this._stream, {}, ()=>this.emit('close'));
 
 		// Send a connect packet
-		connectPacket = Object.create(this.options);
-		connectPacket.cmd = 'connect';
+		var connectPacket = Object.assign(Object.create(this.options), { cmd: 'connect' }) as Packet;
 		// avoid message queue
-		this._sendPacket(connectPacket);
+		this.__sendPacket(connectPacket);
 
 		// Echo connection errors
 		parser.on('error', this.emit.bind(this, 'error'));
@@ -1027,7 +1025,7 @@ export class MqttClient extends events.EventEmitter {
 				this._storeAndSend(packet, cb);
 				return;
 			default:
-				this._sendPacket(packet, cb);
+				this.__sendPacket(packet, cb);
 				return;
 		}
 
@@ -1044,7 +1042,7 @@ export class MqttClient extends events.EventEmitter {
 			case 0:
 				/* falls through */
 			default:
-				this._sendPacket(packet, cb);
+				this.__sendPacket(packet, cb);
 				break;
 		}
 	}
