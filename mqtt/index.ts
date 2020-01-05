@@ -544,7 +544,7 @@ export class MqttClient extends events.EventEmitter {
 		this._stream.on('error', nop);
 
 		// Echo stream close
-		eos(this._stream, {}, this.emit.bind(this, 'close'));
+		eos(this._stream, {}, ()=>this.emit('close'));
 
 		// Send a connect packet
 		connectPacket = Object.create(this.options);

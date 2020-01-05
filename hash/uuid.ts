@@ -108,8 +108,8 @@ function bytesToUuid(buf: Bytes, offset?: number) {
 	bth[buf[i++]], bth[buf[i++]]]).join('');
 }
 
-export default function uuid_v4() {
-	var rnds = rng();
+export default function uuid_v4(random?: IBuffer) {
+	var rnds = random || rng();
 
 	// Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
 	rnds[6] = (rnds[6] & 0x0f) | 0x40;
