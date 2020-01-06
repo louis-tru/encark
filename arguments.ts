@@ -102,11 +102,8 @@ function read_argv() {
 	}
 }
 
-function format_string(...args: string[]) {
-	var val = '';
-	for (var i = 1, len = args.length; i < len; i++)
-		val = val.replace(new RegExp('\\{' + (i - 1) + '\\}', 'g'), args[i]);
-	return val;
+function format_string(str: string, ...args: string[]) {
+	return String.format(str, ...args)
 }
 
 read_argv();

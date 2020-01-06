@@ -126,12 +126,13 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 	stderr = stderr instanceof stream.Writable ? stderr: undefined;
 	stdin = stdin instanceof stream.Readable ? stdin: undefined;
 
+	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null;
+
 	var promise = new SpawnPromise(function(resolve, reject) {
 		var on_stdin: any;
 		var r_stdout: string[] = [];
 		var r_stderr: string[] = [];
 		var empty = Buffer.alloc(0);
-		var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null;
 
 		var data_tmp: Dict<Buffer> = {
 			stdout: empty,
@@ -182,8 +183,11 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 				}
 			}
 		}
+		
+		ch = child_process.spawn(cmd, args);
 
-		promise.process = ch = child_process.spawn(cmd, args);
+		if (promise)
+			promise.process = ch;
 
 		ch.stdout.on('data', function(e: Buffer) {
 			if (stdout)
@@ -210,6 +214,9 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 		}
 
 	});
+
+	if (ch)
+		promise.process = ch;
 
 	return promise;
 }
