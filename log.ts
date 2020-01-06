@@ -179,9 +179,9 @@ export class Console extends Notification {
 		var time = this.m_timeStack.get(tag);
 		if (!time)
 			return warn(`No such label '${tag}' for console.timeEnd()`);
-		this.m_timeStack.delete(tag);
 		var { tag: tag1, timelines } = time;
 		this._timelog(tag, 'TimeEnd ', []);
+		this.m_timeStack.delete(tag);
 		this.log(timeSpace(this), 'Finish  ', formatTime(timelines[0].date), tag1);
 		timelines.forEach((e, j: number)=>{
 			if (j) {
