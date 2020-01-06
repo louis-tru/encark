@@ -355,20 +355,48 @@ function sleep<T>(time: number, defaultValue?: T): Promise<T> {
 	return new Promise((ok, err)=>setTimeout(()=>ok(defaultValue), time));
 }
 
+interface PromiseExecutor<T> {
+	(resolve: (value?: T)=>void, reject: (reason?: any)=>void, promise: Promise<T>): Promise<void> | void;
+}
+
+export class PromiseNx<T extends any> extends Promise<T> {
+	protected m_executor?: PromiseExecutor<T>;
+	constructor(executor?: (resolve: (value?: T)=>void, reject: (reason?: any)=>void, promise: Promise<T>)=>any) {
+		var _resolve: any;
+		var _reject: any;
+
+		super(function(resolve: (value?: T)=>void, reject: (reason?: any)=>void) {
+			_resolve = resolve;
+			_reject = reject;
+		});
+
+		this.m_executor = executor;
+
+		try {
+			var r = this.executor(_resolve, _reject);
+			if (r instanceof Promise) {
+				r.catch(_reject);
+			}
+		} catch(err) {
+			_reject(err);
+		}
+	}
+
+	executor(resolve: (value?: T)=>void, reject: (reason?: any)=>void) {
+		if (this.m_executor) {
+			return this.m_executor(resolve, reject, this);
+		} else {
+			throw Error.new('executor undefined');
+		}
+	}
+
+}
+
 /**
  * @func promise(executor)
  */
-function promise<T>(executor: (resolve: (value?: T)=>void, reject: (reason?: any)=>void)=>any): Promise<T> {
-	return new Promise(function(resolve, reject) {
-		try {
-			var r = executor(resolve, reject);
-			if (r instanceof Promise) {
-				r.catch(reject);
-			}
-		} catch(err) {
-			reject(err);
-		}
-	});
+function promise<T extends any>(executor: (resolve: (value?: T)=>void, reject: (reason?: any)=>void, promise: Promise<T>)=>any) {
+	return new PromiseNx<T>(executor) as Promise<T>;
 }
 
 export default {
@@ -417,5 +445,6 @@ export default {
 	equalsClass,
 	assert,
 	sleep,
+	PromiseNx,
 	promise,
 }

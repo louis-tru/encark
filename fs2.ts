@@ -28,6 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+import utils from './util';
 import * as fs from './fs';
 export * from './fs';
 
@@ -65,11 +66,10 @@ export interface RemoverResult extends Promise<void> {
 	cancel(): void;
 }
 
-export function remover(path: string): RemoverResult {
-	var p = <RemoverResult>new Promise((resolve, reject)=>{
-		p.cancel = fs.remover(path, (err)=>err ? reject(err): resolve()).cancel;
-	});
-	return p;
+export function remover(path: string) {
+	return utils.promise((resolve, reject, promise)=>{
+		(promise as RemoverResult).cancel = fs.remover(path, (err)=>err ? reject(err): resolve(100)).cancel;
+	}) as RemoverResult;
 }
 
 export function exists(path: PathLike) {

@@ -107,8 +107,11 @@ export class FMTService extends wss.WSService {
 	 * @overwrite
 	 */
 	async destroy() {
-		await this.m_center?.logoutFrom(this);
-		this.m_center = null;
+		var center = this.m_center;
+		if (center) {
+			this.m_center = null;
+			await center.logoutFrom(this);
+		}
 	}
 
 	/**

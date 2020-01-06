@@ -49,7 +49,7 @@ export abstract class WSConversation extends ConversationBasic {
 	protected m_signer: Signer | null = null;
 	private   m_IntervalId: any;
 	protected m_url: URL;
-	private   m_autoReconnect = 0;
+	private   m_autoReconnect = 0; // reconnect time
 
 	readonly onError = new EventNoticer<Error>('Error', this);
 
