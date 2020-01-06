@@ -164,7 +164,7 @@ export class Console extends Notification {
 		this._timelog(tag, 'TimeLine', data);
 	}
 
-	_timelog(tag: string, prefix: string, data: any[]) {
+	private _timelog(tag: string, prefix: string, data: any[]) {
 		var time = this.m_timeStack.get(tag);
 		if (!time)
 			return warn(`No such label '${tag}' for console.timeLog()`);
