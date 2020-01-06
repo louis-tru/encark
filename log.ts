@@ -68,11 +68,20 @@ function timeSpace(self: Console) {
 	return new Array((<any>self).m_timeStack.length).join('  ');
 }
 
+interface Stack {
+	date: Date;
+	tag: string;
+	timelines: { 
+		date: Date;
+		tag: string;
+	}[];
+}
+
 export class Console extends Notification {
 
 	private m_pathname: string;
 	private m_fd: number;
-	private m_timeStack: Map<string, any>;
+	private m_timeStack: Map<string, Stack>;
 	
 	get fd(): number {
 		return this.m_fd;
@@ -163,7 +172,7 @@ export class Console extends Notification {
 		var line = { tag, date: new Date() };
 		time.timelines.push(line);
 		this.log(timeSpace(this), prefix, 
-			formatTime(line.date), line.date.valueOf() - privline.date, tag, ...data);
+			formatTime(line.date), line.date.valueOf() - privline.date.valueOf(), tag, ...data);
 	}
 
 	timeEnd(tag: string = '') {
@@ -174,16 +183,16 @@ export class Console extends Notification {
 		var { tag: tag1, timelines } = time;
 		this._timelog(tag, 'TimeEnd ', []);
 		this.log(timeSpace(this), 'Finish  ', formatTime(timelines[0].date), tag1);
-		timelines.forEach((e: any, j: number)=>{
+		timelines.forEach((e, j: number)=>{
 			if (j) {
 				this.log(timeSpace(this), '---->   ', 
-					formatTime(e.date), e.date - timelines[j-1].date, e.tag);
+					formatTime(e.date), e.date.valueOf() - timelines[j-1].date.valueOf(), e.tag);
 			} else {
 				// this.log(timeSpace(this), '---->   ', formatTime(e.date), ' ' ,e.tag);
 			}
 		});
 		this.log(timeSpace(this), 'Total   ', '--------------------', tag1, 
-			timelines.last(0).date - timelines[0].date, '--------------------');
+			timelines.indexReverse(0).date.valueOf() - timelines[0].date.valueOf(), '--------------------');
 	}
 
 }
