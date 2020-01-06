@@ -68,7 +68,7 @@ export interface RemoverResult extends Promise<void> {
 
 export function remover(path: string) {
 	return utils.promise((resolve, reject, promise)=>{
-		(promise as RemoverResult).cancel = fs.remover(path, (err)=>err ? reject(err): resolve(100)).cancel;
+		(promise as RemoverResult).cancel = fs.remover(path, (err)=>err ? reject(err): resolve()).cancel;
 	}) as RemoverResult;
 }
 
