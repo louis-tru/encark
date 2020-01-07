@@ -267,6 +267,7 @@ export class WSConversation extends ConversationBasic  {
 			self.m_handles[name] = ser;
 			self.m_services_count++;
 			(<any>ser).m_loaded = true; // TODO ptinate visit
+			(<any>ser).name = name;     // TODO ptinate visit 设置服务名称
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
