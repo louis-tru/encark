@@ -453,7 +453,7 @@ export interface CopyOptions {
 	ignore_hide?: boolean, // 忽略隐藏
 	replace?: boolean, // 如果存在替换目标
 	symlink?: boolean, // copy symlink
-	isCalcel?: ()=>boolean,
+	isCancel?: (source: string, target: string)=>boolean,
 }
 
 /**
@@ -525,10 +525,10 @@ export function copySync(path: string, target: string, options?: CopyOptions) {
 		ignore_hide: false, // 忽略隐藏
 		replace: true, // 如果存在替换目标
 		symlink: true, // copy symlink
-		isCalcel: function() { return true; },
+		isCancel: function() { return false; },
 	}, options);
 
-	var check = ()=>!options2.isCalcel();
+	var check = (source: string, target: string)=>!options2.isCancel(source, target);
 
 	if (options2.ignore_hide && Path.basename(path)[0] == '.')
 		return; // 忽略隐藏
