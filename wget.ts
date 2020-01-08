@@ -49,15 +49,8 @@ export interface Result {
 	size: number; 
 }
 
-export class WgetResult extends Promise<Result> {
-	private m_abort: ()=>void;
-	abort() {
-		this.m_abort();
-	}
-	constructor(abort: ()=>void, cb: (resolve: (e: Result)=>void, reject: any)=>void) {
-		super(cb);
-		this.m_abort = abort;
-	}
+export interface WgetResult extends Promise<Result> {
+	abort(): void;
 }
 
 interface Wget {
@@ -91,7 +84,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 		}
 	}
 
-	var promise = new WgetResult(abort, (resolve, reject)=> {
+	var promise = new Promise<Result>((resolve, reject)=>{
 		_reject = reject;
 		if (ok) // abort
 			return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
@@ -287,7 +280,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 			});
 			req.end(); // send
 		});
-	});
+	}) as WgetResult;
 
 	promise.abort = abort;
 
