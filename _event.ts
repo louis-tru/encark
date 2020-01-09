@@ -475,9 +475,10 @@ export class EventNoticer<Data = any, Return = number, Sender = any> {
 		}
 		var r = 0;
 		if (listen) {
-			if ( typeof listen == 'string' ) { // by id delete 
+			if ( typeof listen == 'string' || typeof listen == 'number' ) { // by id delete 
+				listen = String(listen);
 				let listens_map = <Map<string, LiteItem<ListenItem>>>this.m_listens_map;
-				let item = listens_map.get(listen);
+				let item = listens_map.get(String(listen));
 				if ( item ) {
 					this.m_length--;
 					listens_map.delete(listen);
