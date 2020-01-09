@@ -421,9 +421,9 @@ export function sendDataPacket(socket: net.Socket, data: IBuffer | string, cb?: 
  * @func sendPingPacket()
  */
 export function sendPingPacket(socket: net.Socket, cb?: SendCallback) {
-	var header = buffer.alloc(2);
+	var header = buffer.alloc(3);
 	header[0] = 0x89;
-	header[1] = 0;
+	header[1] = 1; // 1byte
 	return socket.write(header, cb);
 }
 
@@ -431,8 +431,8 @@ export function sendPingPacket(socket: net.Socket, cb?: SendCallback) {
  * @func sendPongPacket()
  */
 export function sendPongPacket(socket: net.Socket, cb?: SendCallback) {
-	var header = buffer.alloc(2);
+	var header = buffer.alloc(3);
 	header[0] = 0x8a;
-	header[1] = 0;
+	header[1] = 1; // 1byte
 	return socket.write(header, cb);
 }
