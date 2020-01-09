@@ -53,8 +53,8 @@ export class WSConversation extends ConversationBasic  {
 	readonly socket: net.Socket;
 
 	/**
-	 * @param {http.ServerRequest}   req
-	 * @param {String}   bind_services
+	 * @arg {http.ServerRequest} req
+	 * @arg {String}   bind_services
 	 */
 	constructor(req: http.IncomingMessage, upgradeHead: any, bind_services: string) {
 		super();
@@ -94,8 +94,6 @@ export class WSConversation extends ConversationBasic  {
 		utils.assert(!self.m_isOpen);
 
 		self.m_isOpen = true;
-		self.m_last_packet_time = Date.now();
-		self.m_overflow = false;
 
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);

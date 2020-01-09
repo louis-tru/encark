@@ -77,8 +77,14 @@ export abstract class WSConversation extends ConversationBasic {
 	private _keepAlive() {
 		this._clearKeepAlive();
 		if (this.m_isOpen) {
-			this.m_IntervalId = setInterval(()=>this.ping(), 
-				utils.random(0, Math.floor(this.m_KEEP_ALIVE_TIME / 10)) + this.m_KEEP_ALIVE_TIME);
+			this.m_IntervalId = setInterval(()=>{
+				if (this.keepAliveTime * 2 + this.lastPacketTime < Date.now()) {
+					this._error(Error.new(errno.ERR_WS_CLIENT_NO_ALIVE));
+					this.close();
+				} else {
+					this.ping();
+				}
+			}, utils.random(0, Math.floor(this.m_KEEP_ALIVE_TIME / 10)) + this.m_KEEP_ALIVE_TIME);
 		}
 	}
 

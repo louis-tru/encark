@@ -42,7 +42,7 @@ export interface MessageHandle {
 export abstract class ConversationBasic {
 
 	protected m_overflow = false;
-	protected m_last_packet_time = 0;
+	protected m_last_packet_time = Date.now();
 	protected m_KEEP_ALIVE_TIME = KEEP_ALIVE_TIME;
 	protected m_isGzip = false;
 	protected m_replyPong = true;
