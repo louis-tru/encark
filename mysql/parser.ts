@@ -37,6 +37,7 @@ export enum Constants {
 	LENGTH_CODED_16BIT_WORD = 252,
 	LENGTH_CODED_24BIT_WORD = 253,
 	LENGTH_CODED_64BIT_WORD = 254,
+
 	// Parser states
 	PACKET_LENGTH = 0,
 	PACKET_NUMBER = 1,
@@ -53,39 +54,40 @@ export enum Constants {
 	FIELD_COUNT = 12,
 	ERROR_NUMBER = 13,
 	ERROR_SQL_STATE_MARKER = 14,
-	ERROR_SQL_STATE = 16,
-	ERROR_MESSAGE = 17,
-	AFFECTED_ROWS = 18,
-	INSERT_ID = 19,
-	SERVER_STATUS = 20,
-	WARNING_COUNT = 21,
-	MESSAGE = 22,
-	EXTRA_LENGTH = 23,
-	EXTRA_STRING = 24,
-	FIELD_CATALOG_LENGTH = 25,
-	FIELD_CATALOG_STRING = 26,
-	FIELD_DB_LENGTH = 27,
-	FIELD_DB_STRING = 28,
-	FIELD_TABLE_LENGTH = 29,
-	FIELD_TABLE_STRING = 30,
-	FIELD_ORIGINAL_TABLE_LENGTH = 31,
-	FIELD_ORIGINAL_TABLE_STRING = 32,
-	FIELD_NAME_LENGTH = 33,
-	FIELD_NAME_STRING = 34,
-	FIELD_ORIGINAL_NAME_LENGTH = 35,
-	FIELD_ORIGINAL_NAME_STRING = 36,
-	FIELD_FILLER_1 = 37,
-	FIELD_CHARSET_NR = 38,
-	FIELD_LENGTH = 39,
-	FIELD_TYPE = 40,
-	FIELD_FLAGS = 41,
-	FIELD_DECIMALS = 42,
-	FIELD_FILLER_2 = 43,
-	FIELD_DEFAULT = 44,
-	EOF_WARNING_COUNT = 45,
-	EOF_SERVER_STATUS = 46,
-	COLUMN_VALUE_LENGTH = 47,
-	COLUMN_VALUE_STRING = 48,
+	ERROR_SQL_STATE = 15,
+	ERROR_MESSAGE = 16,
+	AFFECTED_ROWS = 17,
+	INSERT_ID = 18,
+	SERVER_STATUS = 19,
+	WARNING_COUNT = 20,
+	MESSAGE = 21,
+	EXTRA_LENGTH = 22,
+	EXTRA_STRING = 23,
+	FIELD_CATALOG_LENGTH = 24,
+	FIELD_CATALOG_STRING = 25,
+	FIELD_DB_LENGTH = 26,
+	FIELD_DB_STRING = 27,
+	FIELD_TABLE_LENGTH = 28,
+	FIELD_TABLE_STRING = 29,
+	FIELD_ORIGINAL_TABLE_LENGTH = 30,
+	FIELD_ORIGINAL_TABLE_STRING = 31,
+	FIELD_NAME_LENGTH = 32,
+	FIELD_NAME_STRING = 33,
+	FIELD_ORIGINAL_NAME_LENGTH = 34,
+	FIELD_ORIGINAL_NAME_STRING = 35,
+	FIELD_FILLER_1 = 36,
+	FIELD_CHARSET_NR = 37,
+	FIELD_LENGTH = 38,
+	FIELD_TYPE = 39,
+	FIELD_FLAGS = 40,
+	FIELD_DECIMALS = 41,
+	FIELD_FILLER_2 = 42,
+	FIELD_DEFAULT = 43,
+	EOF_WARNING_COUNT = 44,
+	EOF_SERVER_STATUS = 45,
+	COLUMN_VALUE_LENGTH = 46,
+	COLUMN_VALUE_STRING = 47,
+
 	// Packet types
 	GREETING_PACKET = 0,
 	OK_PACKET = 1,
@@ -137,6 +139,7 @@ export interface PacketData {
 	flags?: number;
 	decimals?: number;
 	columnLength?: number;
+	sql?: string;
 }
 
 export interface IPacket {
@@ -157,7 +160,7 @@ export class Packet implements IPacket {
 	toJSON(): PacketData | Error {
 		var data = this.d;
 		if (this.type == Constants.ERROR_PACKET) {
-			var err = new Error(data.errorMessage);
+			var err = Error.new([data.errno, data.errorMessage]);
 			for (var [key, val] of Object.entries(data))
 				err[key] = val;
 			return err;
@@ -168,15 +171,15 @@ export class Packet implements IPacket {
 
 export class Parser {
 
-	_lengthCodedLength?: number;
-	_lengthCodedStringLength?: number;
+	private _lengthCodedLength?: number;
+	private _lengthCodedStringLength?: number;
+	private packet: Packet | null = null;
+	private greeted = false;
+	private authenticated = false;
+	private receivingFieldPackets = false;
+	private receivingRowPackets = false;
 
 	state = Constants.PACKET_LENGTH;
-	packet: Packet | null = null;
-	greeted = false;
-	authenticated = false;
-	receivingFieldPackets = false;
-	receivingRowPackets = false;
 
 	/**
 	 * @event onpacket
@@ -188,12 +191,11 @@ export class Parser {
 	 * @param {node.Buffer}
 	 */
 	write(buffer: Buffer) {
-		var i = 0;
 		var c: number = 0;
 		var self = this;
 		var state = this.state;
 		var length = buffer.length;
-		var packet = <Packet>this.packet;
+		var packet = this.packet as Packet;
 		var packet_: PacketData = {};
 
 		function advance(newState?: Constants) {
@@ -246,7 +248,7 @@ export class Parser {
 			}
 		}
 
-		for (; i < length; i++) {
+		for (var i = 0; i < length; i++) {
 			c = buffer[i];
 
 			if (state > Constants.PACKET_NUMBER) {
@@ -319,7 +321,7 @@ export class Parser {
 					}
 
 					// 4 bytes = probably Little endian, protocol docs are not clear
-					(<number>packet_.threadId) += POWS[packet.index] * c;
+					(packet_.threadId as number) += POWS[packet.index] * c;
 
 					if (packet.index == 3) {
 						advance();
@@ -331,7 +333,7 @@ export class Parser {
 					}
 
 					// 8 bytes
-					(<Buffer>packet_.scrambleBuffer)[packet.index] = c;
+					(packet_.scrambleBuffer as Buffer)[packet.index] = c;
 
 					if (packet.index == 7) {
 						advance();
@@ -346,7 +348,7 @@ export class Parser {
 						packet_.serverCapabilities = 0;
 					}
 					// 2 bytes = probably Little endian, protocol docs are not clear
-					(<number>packet_.serverCapabilities) += POWS[packet.index] * c;
+					(packet_.serverCapabilities as number) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
 						advance();
@@ -362,7 +364,7 @@ export class Parser {
 					}
 
 					// 2 bytes = probably Little endian, protocol docs are not clear
-					(<number>packet_.serverStatus) += POWS[packet.index] * c;
+					(packet_.serverStatus as number) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
 						advance();
@@ -377,7 +379,7 @@ export class Parser {
 				case 11: // GREETING_SCRAMBLE_BUFF_2:
 					// 12 bytes - not 13 bytes like the protocol spec says ...
 					if (packet.index < 12) {
-						(<Buffer>packet_.scrambleBuffer)[packet.index + 8] = c;
+						(packet_.scrambleBuffer as Buffer)[packet.index + 8] = c;
 					}
 					break;
 
@@ -705,7 +707,7 @@ export class Parser {
 					packet_.columnLength = lengthCoded(packet_.columnLength);
 
 					if (!packet_.columnLength && !this._lengthCodedLength) {
-						packet.onData.trigger({ buffer: packet_.columnLength === null ? null : Buffer.alloc(0), remaining: 0 });
+						packet.onData.trigger({ buffer: packet_.columnLength === undefined ? null : Buffer.alloc(0), remaining: 0 });
 						if (packet.received < packet.length) {
 							advance(Constants.COLUMN_VALUE_LENGTH);
 						} else {
@@ -717,9 +719,9 @@ export class Parser {
 					}
 					break;
 				case 47: // COLUMN_VALUE_STRING:
-					// if (packet.columnLength === null)
-					// 	throw new Error('Type error');
-					var remaining = <number>packet_.columnLength - packet.index, read;
+					if (packet_.columnLength === undefined)
+						throw new Error('Type error');
+					var remaining = packet_.columnLength - packet.index, read;
 					if (i + remaining > buffer.length) {
 						read = buffer.length - i;
 						packet.index += read;

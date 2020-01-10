@@ -200,6 +200,14 @@ interface Error {
 if (Date.formatTimeSpan !== undefined)
 	return;
 
+if (typeof globalThis == 'undefined') {
+	if (typeof global == 'object') {
+		(<any>global).globalThis = global;
+	} else if (typeof window == 'object') {
+		(<any>window).globalThis = window;
+	}
+}
+
 var currentTimezone = new Date().getTimezoneOffset() / -60;
 var G_slice = Array.prototype.slice;
 var G_hash_code_id = 1;
@@ -488,8 +496,8 @@ definePropertys(Error, {
 
 	new(arg: ErrorNewArg, ...child: ErrorNewArg[]): Error {
 		var err: Error;
-		if (arg as Object) { // ErrnoCode | Error | ErrorDescribe;
-			if (arg as Error) {
+		if (typeof arg == 'object') { // ErrnoCode | Error | ErrorDescribe;
+			if (arg instanceof Error) {
 				err = <Error>arg;
 			} if (Array.isArray(arg)) { // ErrnoCode
 				var errnoCode = <ErrnoCode>arg;

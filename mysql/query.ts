@@ -77,7 +77,7 @@ export class Query {
 	private _row?: Dict;
 	readonly sql: string;
 	readonly onError = new EventNoticer<Error>('Error', this);
-	readonly onResolve = new EventNoticer<PacketData>('Resolve', this);
+	readonly onResolve = new EventNoticer<PacketData | null>('Resolve', this);
 	readonly onField = new EventNoticer<Field>('Field', this);
 	readonly onRow = new EventNoticer<Dict>('Row', this);
 	readonly onEnd = new EventNoticer<void>('End', this);
@@ -99,13 +99,13 @@ export class Query {
 				}
 				break;
 			case Constants.ERROR_PACKET:
-				// packet.sql = self.sql;
+				packet.d.sql = self.sql;
 				this.onError.trigger(<Error>packet.toJSON());
 				break;
 			case Constants.FIELD_PACKET:
 				if (!this._fields) {
 					this._fields = [];
-					this.onResolve.trigger({});
+					this.onResolve.trigger(null);
 				}
 				var field = new Field(packet.d.name || '', packet.d.fieldType || -1);
 				this._fields.push(field);

@@ -34,7 +34,7 @@ export class OutgoingPacket {
 	 * index
 	 * @type {Number}
 	 */
-	index = 0;
+	index: number = 0;
 	buffer: Buffer;
 
 	/**

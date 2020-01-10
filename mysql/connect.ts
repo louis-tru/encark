@@ -112,22 +112,22 @@ export class Connect {
 	private _greeting: Packet | null = null;
 	private _socket: Socket | null;
 	private _tomeout = 0;
-	private _isUse = true;
+	private _isUse = false;
 	private _isReady = false;
 	private _connectError = false;
 
 	private _write(packet: OutgoingPacket) {
 		(<Socket>this._socket).write(packet.buffer);
 	}
-	
+
 	private _sendAuth(greeting: Packet) {
 		var opt = this.options;
-		var token = auth.token(<string>opt.password, greeting.d.scrambleBuffer as Buffer);
+		var token = auth.token(opt.password as string, greeting.d.scrambleBuffer as Buffer);
 		var packetSize = (
 			4 + 4 + 1 + 23 +
-			(<string>opt.user).length + 1 +
+			(opt.user as string).length + 1 +
 			token.length + 1 +
-			(<string>opt.database).length + 1
+			(opt.database  as string).length + 1
 		);
 		var packet = new OutgoingPacket(packetSize, greeting.number + 1);
 	
@@ -135,9 +135,9 @@ export class Connect {
 		packet.writeNumber(4, MAX_PACKET_SIZE);
 		packet.writeNumber(1, CHAREST_NUMBER);
 		packet.writeFiller(23);
-		packet.writeNullTerminated(<string>opt.user);
+		packet.writeNullTerminated(opt.user as string);
 		packet.writeLengthCoded(token);
-		packet.writeNullTerminated(<string>opt.database);
+		packet.writeNullTerminated(opt.database as string);
 	
 		this._write(packet);
 	
@@ -146,9 +146,9 @@ export class Connect {
 		// the greeting packet again. See sendOldAuth()
 		this._greeting = greeting;
 	}
-	
+
 	private _sendOldAuth(greeting: Packet) {
-		var token = auth.scramble323(greeting.d.scrambleBuffer as Buffer, <string>this.options.password);
+		var token = auth.scramble323(greeting.d.scrambleBuffer as Buffer, this.options.password as string);
 		var packetSize = (token.length + 1);
 	
 		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
@@ -161,18 +161,6 @@ export class Connect {
 	
 		this._write(packet);
 	}
-	
-	private _destroyConnect() {
-		utils.assert(!this._isUse, 'useing');
-		clearTimeout(this._tomeout);
-		if (!this._socket) return;
-		this.onError.off();
-		this.onPacket.off();
-		this.onReady.off();
-		this._socket.destroy();
-		this._socket = null;
-		connect_pool[this.options.host + ':' + this.options.port].deleteOf(this);
-	}
 
 	/**
 	 * option
@@ -181,8 +169,8 @@ export class Connect {
 	readonly options: Options;
 	readonly onError = new EventNoticer<Error>('Error', this);
 	readonly onPacket = new EventNoticer<Packet>('Packet', this);
-	readonly onReady = new EventNoticer<void>('Ready', this);
-	
+	private readonly _onReady = new EventNoticer<void>('_Ready', this);
+
 	/**
 	 * constructor function
 	 * @param {Object}   opt
@@ -194,21 +182,22 @@ export class Connect {
 		var parser = new Parser();
 		var socket = this._socket = new Socket();
 
-		function error(err: any) {
+		function throwError(err: any) {
 			self._connectError = true;
 			self.onError.trigger(Error.new(err));
-			self._destroyConnect();
+			self._destroy();
 		}
+
 		socket.setNoDelay(true);
-		socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
+		// socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
 		socket.on('data', e=>parser.write(e));
-		socket.on('error', err=>error(err));
-		socket.on('end', ()=>error('mysql server has been disconnected'));
+		socket.on('error', err=>throwError(err));
+		socket.on('end', ()=>throwError('mysql server has been disconnected'));
 
 		parser.onPacket.on(function(e) {
-			var packet = <Packet>e.data;
+			var packet = e.data;
 			if (packet.type === ParserConstants.ERROR_PACKET) {
-				error({ message: 'ERROR_PACKET', ...packet.toJSON() });
+				throwError({ message: 'ERROR_PACKET', ...packet.toJSON() });
 			} else if (self._isReady) {
 				self.onPacket.trigger(packet);
 			} else if (packet.type == ParserConstants.GREETING_PACKET) {
@@ -217,11 +206,11 @@ export class Connect {
 				self._sendOldAuth(self._greeting as Packet);
 			} else { // ok
 				self._isReady = true;
-				self.onReady.trigger();
+				self._onReady.trigger();
 			}
 		});
 
-		socket.connect(<number>this.options.port, <string>this.options.host);
+		socket.connect(this.options.port as number, this.options.host as string);
 	}
 
 	/**
@@ -229,7 +218,7 @@ export class Connect {
 	 * @param {node.Buffer}
 	 */
 	write(buffer: Buffer) {
-		(<Socket>this._socket).write(buffer);
+		(this._socket as Socket).write(buffer);
 	}
 
 	/**
@@ -242,9 +231,10 @@ export class Connect {
 		this._isUse = false;
 		this.onPacket.off();
 		this.onError.off();
-		this.onReady.off();
+		this._onReady.off();
 
-		if (this._connectError) return; // connect error
+		if (this._connectError)
+			return; // connect error
 
 		for (var i = 0, l = require_connect.length; i < l; i++) {
 			var req = require_connect[i];
@@ -260,7 +250,20 @@ export class Connect {
 				return;
 			}
 		}
-		this._tomeout = (()=>this._destroyConnect()).setTimeout(CONNECT_TIMEOUT);
+		this._tomeout = (()=>this._destroy()).setTimeout(CONNECT_TIMEOUT);
+	}
+
+	private _destroy() {
+		// utils.assert(!this._isUse, 'connect useing');
+		clearTimeout(this._tomeout);
+		if (this._socket) {
+			this.onError.off();
+			this.onPacket.off();
+			this._onReady.off();
+			this._socket.destroy();
+			this._socket = null;
+			connect_pool[this.options.host + ':' + this.options.port].deleteOf(this);
+		}
 	}
 
 	private _changeDB(db: string, cb: Callback) {
@@ -278,17 +281,24 @@ export class Connect {
 	}
 
 	private _ready(cb: Callback) {
-		if (this._isReady)
-			return cb(null, this);
+		this._use();
+
+		if (this._isReady) {
+			return utils.nextTick(cb, null, this);
+		}
 		// wait ready
-		this.onReady.once(()=>cb(null, this));
-		this.onError.once(e=>cb(<Error>e.data));
+		this._onReady.once(()=>{
+			this.onError.off();
+			cb(null, this);
+		});
+		this.onError.once(e=>cb(e.data));
 	}
 
 	/**
 		* start use connect
 		*/
 	private _use() {
+		utils.assert(!this._isUse);
 		this._isUse = true;
 		clearTimeout(this._tomeout);
 	}
@@ -306,11 +316,10 @@ export class Connect {
 			var options = c.options;
 			if (!c._isUse && !c._connectError) {
 				if (options.user == opt.user && options.password == opt.password) {
-					c._use();
 					if (options.database == opt.database) {
-						utils.nextTick(cb, null, c);
+						c._ready(cb);
 					} else {
-						c._changeDB(<string>opt.database, cb);
+						c._changeDB(opt.database as string, cb);
 					}
 					return;
 				}
@@ -319,9 +328,9 @@ export class Connect {
 
 		//is max connect
 		if (pool.length < MAX_CONNECT_COUNT) {
-			var con = new Connect(opt);
-			pool.push(con);
-			con._ready(cb);
+			var c = new Connect(opt);
+			pool.push(c);
+			c._ready(cb);
 			return;
 		}
 

@@ -126,8 +126,8 @@ export class Mysql extends Database {
 			} else {
 				if (!connect)
 					throw new Error('Type error');
-				connect.onPacket.on(e=>self._handlePacket(<Packet>e.data), 'using');
-				connect.onError.on(e=>self._handlError(<Error>e.data), 'using');
+				connect.onPacket.on(e=>self._handlePacket(e.data as Packet), 'using');
+				connect.onError.on(e=>self._handlError(e.data as Error), 'using');
 				self._connect = connect;
 				self._connecting = false;
 				self._queue[0].exec();
@@ -236,7 +236,7 @@ export class Mysql extends Database {
 			packet.write(sql, 'utf-8');
 			self._write(packet);
 		}, function(packet: IPacket) {
-			query.handlePacket(<Packet>packet);
+			query.handlePacket(packet as Packet);
 		});
 
 		return query;
