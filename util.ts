@@ -342,7 +342,7 @@ function assert(condition: any, code?: ErrnoCode | number | string, ...args: str
 		if (typeof code == 'number') {
 			errno = [code, 'assert fail, unforeseen exceptions'];
 		} else {
-			errno = [-30009, String.format(String(code), ...args)];
+			errno = [-30009, String.format(String(code || 'ERR_ASSERT_ERROR'), ...args)];
 		}
 		throw Error.new(errno);
 	}

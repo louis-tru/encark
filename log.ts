@@ -41,24 +41,7 @@ if (haveNgui) {
 	var fs = require('./fs');
 }
 
-function print(self: Console, TAG: string, func: any, ...args: any[]) {
-	args.unshift(new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
-	args.unshift(TAG);
-	args = args.map(e=>{
-		try {
-			return typeof e == 'object' ? JSON.stringify(e, null, 2): e;
-		} catch(e) {
-			return e;
-		}
-	});
-	func.call(console, ...args);
-	var data = args.join(' ');
-	if ((<any>self).m_fd) {
-		fs.write((<any>self).m_fd, data + '\n', 'utf-8', function() {});
-	}
-	self.trigger('Log', { tag: TAG, data: data });
-	return data;
-}
+// import  * as fs from './fs';
 
 function formatTime(time: Date) {
 	return time.toString('yyyy-MM-dd hh:mm:ss.fff');
@@ -80,9 +63,19 @@ interface Stack {
 export class Console extends Notification {
 
 	private m_pathname: string;
-	private m_fd: number;
+	private m_fd = 0;
+	private m_fd_open_time = new Date();
 	private m_timeStack: Map<string, Stack>;
-	
+	private m_autoCutFileTime = 0;
+
+	get autoCutFileTime() {
+		return this.m_autoCutFileTime;
+	}
+
+	set autoCutFileTime(value) {
+		this.m_autoCutFileTime = value ? Math.max(3600*1000, value) : value;
+	}
+
 	get fd(): number {
 		return this.m_fd;
 	}
@@ -93,19 +86,54 @@ export class Console extends Notification {
 
 	constructor(pathname?: string) {
 		super();
-		if (pathname) {
+		this.m_pathname = pathname || '';
+		this.m_timeStack = new Map<string, any>();
+		this.reopen();
+	}
+
+	reopen(cut = false) {
+		if (this.m_pathname) {
 			if (haveWeb) {
 				this.m_fd = 0;
 			} else {
-				fs.mkdirpSync(path.dirname(pathname));
-				this.m_fd = fs.openSync(pathname, 'a');
+				var now = new Date();
+				fs.mkdirpSync(path.dirname(this.m_pathname));
+				if (this.m_fd) {
+					var format = 'yyyyMMddhhmmss';
+					fs.closeSync(this.m_fd);
+					if (cut)
+						fs.renameSync(this.m_pathname, `${this.m_pathname}-${this.m_fd_open_time.toString(format)}-${now.toString(format)}`);
+					this.m_fd = 0;
+				}
+				this.m_fd = fs.openSync(this.m_pathname, 'a');
+				this.m_fd_open_time = now;
 			}
-			this.m_pathname = pathname;
 		} else {
 			this.m_fd = 0;
-			this.m_pathname = '';
 		}
-		this.m_timeStack = new Map<string, any>();
+	}
+
+	private _print(TAG: string, func: any, ...args: any[]) {
+		args.unshift(new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
+		args.unshift(TAG);
+		args = args.map(e=>{
+			try {
+				return typeof e == 'object' ? JSON.stringify(e, null, 2): e;
+			} catch(e) {
+				return e;
+			}
+		});
+		func.call(console, ...args);
+		var data = args.join(' ');
+		if (this.m_fd) {
+			var cutTime = this.autoCutFileTime;
+			if (cutTime && Date.now() - this.m_fd_open_time.valueOf() > cutTime) {
+				this.reopen(true);
+			}
+			fs.write(this.m_fd, data + '\n', function() {});
+		}
+		this.trigger('Log', { tag: TAG, data: data });
+		return data;
 	}
 
 	makeDefault() {
@@ -123,25 +151,25 @@ export class Console extends Notification {
 		(<any>console)._warn = (<any>this)._warn = warn;
 		return this;
 	}
-	
+
 	log(msg: string, ...args: any[]) {
-		return print(this, 'LOG', log, msg, ...args);
+		return this._print('LOG', log, msg, ...args);
 	}
 
 	warn(msg: string, ...args: any[]) {
-		return print(this, 'WARN', warn, msg, ...args);
+		return this._print('WARN', warn, msg, ...args);
 	}
 
 	error(msg: string, ...args: any[]) {
-		return print(this, 'ERR', error, msg, ...args);
+		return this._print('ERR', error, msg, ...args);
 	}
 
 	dir(msg: any, ...args: any[]) {
-		return print(this, 'DIR', dir, msg, ...args);
+		return this._print('DIR', dir, msg, ...args);
 	}
 
 	print(tag: string, ...args: any[]) {
-		return print(this, tag, log, ...args);
+		return this._print(tag, log, ...args);
 	}
 
 	time(tag: string = '') {

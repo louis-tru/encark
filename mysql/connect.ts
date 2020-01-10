@@ -109,7 +109,7 @@ interface Request {
 }
 
 export class Connect {
-	private _greeting: any = null;
+	private _greeting: Packet | null = null;
 	private _socket: Socket | null;
 	private _tomeout = 0;
 	private _isUse = true;
@@ -120,9 +120,9 @@ export class Connect {
 		(<Socket>this._socket).write(packet.buffer);
 	}
 	
-	private _sendAuth(greeting: any) {
+	private _sendAuth(greeting: Packet) {
 		var opt = this.options;
-		var token = auth.token(<string>opt.password, greeting.scrambleBuffer);
+		var token = auth.token(<string>opt.password, greeting.d.scrambleBuffer as Buffer);
 		var packetSize = (
 			4 + 4 + 1 + 23 +
 			(<string>opt.user).length + 1 +
@@ -147,8 +147,8 @@ export class Connect {
 		this._greeting = greeting;
 	}
 	
-	private _sendOldAuth(greeting: any) {
-		var token = auth.scramble323(greeting.scrambleBuffer, <string>this.options.password);
+	private _sendOldAuth(greeting: Packet) {
+		var token = auth.scramble323(greeting.d.scrambleBuffer as Buffer, <string>this.options.password);
 		var packetSize = (token.length + 1);
 	
 		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
@@ -214,7 +214,7 @@ export class Connect {
 			} else if (packet.type == ParserConstants.GREETING_PACKET) {
 				self._sendAuth(packet);
 			} else if (packet.type == ParserConstants.USE_OLD_PASSWORD_PROTOCOL_PACKET) {
-				self._sendOldAuth(self._greeting);
+				self._sendOldAuth(self._greeting as Packet);
 			} else { // ok
 				self._isReady = true;
 				self.onReady.trigger();

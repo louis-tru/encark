@@ -130,7 +130,7 @@ export function myRnd(r: NumberLimit) {
 	return r.seed1 / r.max_value_dbl;
 }
 
-export function scramble323(message: string, password: string) {
+export function scramble323(message: Buffer, password: string) {
 	var to = Buffer.alloc(8),
 		hashPass = hashPassword(password),
 		hashMessage = hashPassword(message.slice(0, 8)),
