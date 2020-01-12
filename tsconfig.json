@@ -3,7 +3,6 @@
 	"compilerOptions": {
 		"module": "commonjs",
 		"target": "ES2018",
-		"noImplicitAny": true,
 		"moduleResolution": "node",
 		"sourceMap": false,
 		"outDir": "out/nxkit",
@@ -14,7 +13,12 @@
 		"allowJs": true,
 		"checkJs": false,
 		"strict": true,
+		"noImplicitAny": true,
+		"noImplicitThis": true,
 		"strictNullChecks": true,
+		"strictPropertyInitialization": true,
+		"emitDecoratorMetadata": false,
+		"experimentalDecorators": true,
 	},
 	"include": [
 		"**/*",

@@ -202,9 +202,9 @@ if (Date.formatTimeSpan !== undefined)
 
 if (typeof globalThis == 'undefined') {
 	if (typeof global == 'object') {
-		(<any>global).globalThis = global;
+		(global as any).globalThis = global;
 	} else if (typeof window == 'object') {
-		(<any>window).globalThis = window;
+		(window as any).globalThis = window;
 	}
 }
 

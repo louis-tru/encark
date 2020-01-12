@@ -66,7 +66,7 @@ export class Notification<Data = any, Return = number, Sender = any> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<Event<Data, Return, Sender>>) {
+	addDefaultListener(name: string, listen: Listen<Event<Data, Return, Sender>> | string) {
 		if ( typeof listen == 'string' ) {
 			var func = (<any>this)[listen]; // find func 
 			if ( typeof func == 'function' ) {
@@ -162,13 +162,13 @@ export class Notification<Data = any, Return = number, Sender = any> {
 	/**
 	 * @func $trigger(name, event, is_event)
 	 */
-	$trigger(name: string, event?: Event<Data, Return, Sender> | Data, is_event?: boolean) {
+	$trigger(name: string, event: Event<Data, Return, Sender> | Data, is_event?: boolean) {
 		var noticer = (<any>this)[PREFIX + name];
 		if (noticer) {
 			if ( is_event ) {
-				return this.triggerWithEvent(name, <Event<Data, Return, Sender>>event)
+				return this.triggerWithEvent(name, event as Event<Data, Return, Sender>);
 			} else {
-				return this.trigger(name, <Data>event)
+				return this.trigger(name, event as Data);
 			}
 		}
 		return 0;

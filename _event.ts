@@ -175,7 +175,6 @@ export class Event<Data = any, Return = number, Sender = any> {
 	private m_data: Data;
 	protected m_noticer: EventNoticer<Data, Return, Sender> | null = null;
 	private m_return_value: Return | null = null;
-	protected __has_event = true;
 	private m_origin: any = null;
 
 	get name() {
@@ -220,6 +219,8 @@ export class Event<Data = any, Return = number, Sender = any> {
 	}
 	// @end
 }
+
+(<any>Event.prototype).__has_event = true;
 
 type DefaultEvent = Event;
 
