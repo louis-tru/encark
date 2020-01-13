@@ -45,6 +45,7 @@ import {Mysql} from './mysql';
 const original_handles: Dict<_MethodInfo> = {};
 const original_files: Dict<Date> = {};
 const REG = /\{(.+?)\}/g;
+const _eval = (s:any)=>globalThis.eval(s);
 
 export interface Config {
 	type?: string;
@@ -376,7 +377,7 @@ function get_db(self: SqlMap): Database {
 
 // exec script
 function execExp(self: SqlMap, exp: string, param: INLParams) {
-	return utils._eval(`(function (g, ctx){with(ctx){return(${exp})}})`)(globalThis, param);
+	return _eval(`(function (g, ctx){with(ctx){return(${exp})}})`)(globalThis, param);
 }
 
 //format sql

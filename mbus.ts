@@ -89,7 +89,7 @@ export class NotificationCenter extends Notification {
 	// @overwrite:
 	trigger(event: string, data: any) {
 		this.publish(event, data);
-		return null;
+		return undefined;
 	}
 
 	publish(event: string, data: any) {

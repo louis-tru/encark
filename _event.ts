@@ -174,7 +174,7 @@ export class List<T> {
 export class Event<Data = any, Return = number, Sender = any> {
 	private m_data: Data;
 	protected m_noticer: EventNoticer<Data, Return, Sender> | null = null;
-	private m_return_value: Return | null = null;
+	private m_return_value?: Return;
 	private m_origin: any = null;
 
 	get name() {
@@ -185,7 +185,7 @@ export class Event<Data = any, Return = number, Sender = any> {
 		return this.m_data;
 	}
 
-	get sender() {
+	get sender(): Sender {
 		return (<EventNoticer<Data, Return, Sender>>this.m_noticer).sender;
 	}
 
@@ -206,18 +206,16 @@ export class Event<Data = any, Return = number, Sender = any> {
 	}
 
 	set returnValue(value) {
-		if ( !(value as Return) )
-			throw new TypeError('Bad argument.');
+		// if ( !(value as Return) )
+		// 	throw new TypeError('Bad argument.');
 		this.m_return_value = value;
 	}
 
-	/**
-	 * @constructor
-	 */
-	constructor(data: Data) {
+	constructor(data: Data, returnValue?: Return) {
 		this.m_data = data;
+		if (returnValue !== undefined)
+			this.m_return_value = returnValue;
 	}
-	// @end
 }
 
 type DefaultEvent = Event;
@@ -435,7 +433,7 @@ export class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg data {Object} # 要发送的数据
 	 * @ret {Object}
 	 */
-	trigger(data: Data): Return | null {
+	trigger(data: Data): Return | undefined {
 		return this.triggerWithEvent(new Event(data));
 	}
 
@@ -444,7 +442,7 @@ export class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg data {Object} 要发送的event
 	 * @ret {Object}
 	 */
-	triggerWithEvent(evt: Event<Data, Return, Sender>): Return | null {
+	triggerWithEvent(evt: Event<Data, Return, Sender>): Return | undefined {
 		if ( this.m_enable && this.m_length ) {
 			(<any>evt).m_noticer = this;
 			var listens = <List<ListenItem>>this.m_listens;

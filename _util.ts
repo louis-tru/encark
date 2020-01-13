@@ -31,15 +31,15 @@
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
-const haveNode: boolean = !!globalThis.process;
-const haveNgui: boolean = !!globalThis.__requireNgui__;
-const haveWeb: boolean = !!globalThis.document;
-
-if (haveNgui) {
+if (typeof __requireNgui__ == 'function') {
 	require('ngui/_ext');
 } else {
 	require('./_ext');
 }
+
+const haveNode: boolean = !!globalThis.process;
+const haveNgui: boolean = !!globalThis.__requireNgui__;
+const haveWeb: boolean = !!globalThis.document;
 
 type Platform = 'aix'
 | 'android'
@@ -55,7 +55,7 @@ type Platform = 'aix'
 var argv: string[];
 var webFlags: WebPlatformFlags | null = null;
 var platform: Platform;
-var exit: (code: number)=>void;
+var exit: (code?: number)=>void;
 
 export interface WebPlatformFlags {
 	windows: boolean,
@@ -143,7 +143,7 @@ haveNode ? process.nextTick: function(cb, ...args): void {
 };
 
 function unrealized() {
-	throw new Error('Unrealized');
+	throw new Error('Unrealized function');
 }
 
 export default {
@@ -162,4 +162,5 @@ export default {
 	argv: argv,
 	webFlags: webFlags,
 	exit: exit,
+	unrealized: unrealized,
 }

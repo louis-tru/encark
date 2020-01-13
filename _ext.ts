@@ -613,4 +613,4 @@ definePropertys(Error.prototype, {
 	},
 });
 
-})(eval);
+})((s:any)=>eval(s));

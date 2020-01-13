@@ -28,17 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+import _util from './_util';
 import _pkgutil from './_pkgutil';
 
-function unrealized() {
-	throw new Error('Unrealized');
-}
-
 export default {
-	executable: unrealized,
-	documents: unrealized,
-	temp: unrealized,
-	resources: unrealized,
+	executable: _util.unrealized,
+	documents: _util.unrealized,
+	temp: _util.unrealized,
+	resources: _util.unrealized,
 	fallbackPath: _pkgutil.fallbackPath,
 	chdir: _pkgutil.chdir,
 	cwd: _pkgutil.cwd,
