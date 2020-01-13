@@ -349,9 +349,9 @@ export default {
 	isLocal,				// 
 	isLocalZip,
 	isNetwork,
-	get options() { return options },
-	get config() { return get_config() },
 	cwd: _cwd,
 	chdir,
-	dev: <boolean>options.dev,
+	get options() { return options },
+	get config() { return get_config() },
+	dev: options.dev as boolean,
 };

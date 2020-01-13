@@ -29,9 +29,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 import _pkgutil from './_pkgutil';
-import _util from './_util';
 
-const {unrealized} = _util;
+function unrealized() {
+	throw new Error('Unrealized');
+}
 
 export default {
 	executable: unrealized,

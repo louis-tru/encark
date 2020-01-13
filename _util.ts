@@ -28,18 +28,34 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import './_ext';
+const base64_chars =
+	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
 const haveNode: boolean = !!globalThis.process;
 const haveNgui: boolean = !!globalThis.__requireNgui__;
 const haveWeb: boolean = !!globalThis.document;
-const base64_chars =
-	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
-type Platform = NodeJS.Platform | 'android' | 'linux' | 'darwin' | 'web';
-var platform: Platform;
+if (haveNgui) {
+	require('ngui/_ext');
+} else {
+	require('./_ext');
+}
+
+type Platform = 'aix'
+| 'android'
+| 'darwin'
+| 'freebsd'
+| 'linux'
+| 'openbsd'
+| 'sunos'
+| 'win32'
+| 'cygwin'
+| 'netbsd' | 'web';
+
 var argv: string[];
 var webFlags: WebPlatformFlags | null = null;
+var platform: Platform;
+var exit: (code: number)=>void;
 
 export interface WebPlatformFlags {
 	windows: boolean,
@@ -63,9 +79,11 @@ if (haveNgui) {
 	var _util = __requireNgui__('_util');
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
+	exit = _util.exit;
 } else if (haveNode) {
 	platform = <Platform>process.platform;
 	argv = process.argv;
+	exit = process.exit;
 } else if (haveWeb) {
 	let USER_AGENT = navigator.userAgent;
 	let mat = USER_AGENT.match(/\(i[^;]+?; (U; )?CPU.+?OS (\d).+?Mac OS X/);
@@ -94,6 +112,7 @@ if (haveNgui) {
 	};
 	platform = <Platform>'web';
 	argv = [location.origin + location.pathname].concat(location.search.substr(1).split('&'));
+	exit = ()=>{ window.close() }
 } else {
 	throw new Error('no support');
 }
@@ -112,7 +131,7 @@ function hash(data: any): string {
 	return retValue;
 }
 
-var nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void = 
+const nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void = 
 haveNode ? process.nextTick: function(cb, ...args): void {
 	if (typeof cb != 'function')
 		throw new Error('callback must be a function');
@@ -128,16 +147,13 @@ function unrealized() {
 }
 
 export default {
-	unrealized: unrealized,
 	version: unrealized,
 	addNativeEventListener: unrealized,
 	removeNativeEventListener: unrealized,
-	garbageCollection: unrealized,
+	gc: unrealized,
 	runScript: unrealized,
-	transformJsx: unrealized,
-	transformJs: unrealized,
+	hashCode: Object.hashCode,
 	hash: hash,
-	_eval: eval,
 	nextTick: nextTick,
 	platform: platform,
 	haveNode: haveNode,
@@ -145,4 +161,5 @@ export default {
 	haveWeb: haveWeb,
 	argv: argv,
 	webFlags: webFlags,
-};
+	exit: exit,
+}

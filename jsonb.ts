@@ -242,7 +242,7 @@ function serialize(o: any, out: Out, set: Setr): number {
 			} else if (o instanceof Uint8Array) {
 				return write_flag(F_BUFFER, out) + write_buffer(o, out);
 			} else if (o instanceof TypedArray) {
-				return write_flag(F_BUFFER, out) + write_buffer(new Uint8Array(o.buffer), out);
+				return write_flag(F_BUFFER, out) + write_buffer(new Uint8Array(o.buffer, o.byteOffset, o.byteLength), out);
 			} else if (o instanceof ArrayBuffer) {
 				return write_flag(F_BUFFER, out) + write_buffer(new Uint8Array(o), out);
 			} else if (o instanceof Date) {

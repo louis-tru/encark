@@ -29,10 +29,47 @@
  * ***** END LICENSE BLOCK ***** */
 
 interface RequireFunction {
-	(require: string): any;
+	(id: string): any;
+}
+
+interface RequireResolve {
+	(id: string, options?: { paths?: string[]; }): string;
+	paths(request: string): string[] | null;
+}
+
+interface NguiExtensions {
+	'.js': (m: NguiModule, filename: string) => any;
+	'.json': (m: NguiModule, filename: string) => any;
+	'.node': (m: NguiModule, filename: string) => any;
+	[ext: string]: (m: NguiModule, filename: string) => any;
+}
+
+interface NguiRequire extends RequireFunction {
+	resolve: RequireResolve;
+	cache: Dict<NguiModule>;
+	/**
+	 * @deprecated
+	 */
+	extensions: NguiExtensions;
+	main: NguiModule | undefined;
+}
+
+interface NguiModule {
+	exports: any;
+	require: RequireFunction;
+	id: string;
+	filename: string;
+	loaded: boolean;
+	parent: NguiModule | null;
+	children: NguiModule[];
+	paths: string[];
 }
 
 declare var __requireNgui__: RequireFunction;
+declare var require: NguiRequire;
+declare var module: NguiModule;
+// Same as module.exports
+declare var exports: any;
 
 interface ObjectConstructor {
 	hashCode(obj: any): number;
@@ -186,6 +223,8 @@ interface ErrorConstructor {
 	'new'(err: ErrorNewArg, ...child: ErrorNewArg[]): Error;
 	toJSON(err: Error): any;
 	setStackTraceJSON(enable: boolean): void;
+	/** Create .stack property on a target object */
+	captureStackTrace(targetObject: Object, constructorOpt?: Function): void;
 }
 
 interface Error {
@@ -195,14 +234,15 @@ interface Error {
 	[prop: string]: any;
 }
 
-(function() {
+(function(_: any) {
 
 if (Date.formatTimeSpan !== undefined)
 	return;
 
 if (typeof globalThis == 'undefined') {
-	if (typeof global == 'object') {
-		(global as any).globalThis = global;
+	var globa = arguments[0]('(global)');
+	if (typeof globa == 'object') {
+		(globa as any).globalThis = globa;
 	} else if (typeof window == 'object') {
 		(window as any).globalThis = window;
 	}
@@ -308,6 +348,19 @@ definePropertys(Array.prototype, {
 		return this[this.length - 1 - index];
 	},
 
+});
+
+// ext TypedArray
+definePropertys((Uint8Array as any).prototype.__proto__, {
+
+	hashCode(): number {
+		var _hash = 5381;
+		var self = new Uint8Array(this.buffer, this.byteOffset, this.byteLength);
+		for (var item of self) {
+			_hash += (_hash << 5) + item;
+		}
+		return _hash;
+	},
 });
 
 definePropertys(String, {
@@ -560,4 +613,4 @@ definePropertys(Error.prototype, {
 	},
 });
 
-})();
+})(eval);

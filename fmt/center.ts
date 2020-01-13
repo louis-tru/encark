@@ -136,7 +136,8 @@ export class FastMessageTransferCenter extends Notification {
 	}
 
 	trigger(event: string, data: any) {
-		return this.publish(event, data);
+		this.publish(event, data);
+		return null;
 	}
 
 	publish(event: string, data: any) {
