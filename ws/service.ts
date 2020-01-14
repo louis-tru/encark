@@ -36,7 +36,6 @@ import {Types, DataBuilder, Data} from './data';
 import * as conv from './conv';
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
-const print_log = false; // util.dev
 
 interface CallData extends Data {
 	ok(e: any): void;
@@ -116,7 +115,7 @@ export class WSService extends Service implements conv.MessageHandle {
 			var r: { data?: any, error?: Error } = {};
 			if (msg.isCall()) {
 				this._checkMethodName(name);
-				if (print_log) 
+				if (this.server.printLog) 
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
 					r.data = await self.handleCall(name, data || {}, sender || '');
