@@ -28,14 +28,16 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-const base64_chars =
-	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
-
 if (typeof __requireNgui__ == 'function') {
 	require('ngui/_ext');
 } else {
 	require('./_ext');
 }
+
+import './_globals';
+
+const base64_chars =
+	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
 const haveNode: boolean = !!globalThis.process;
 const haveNgui: boolean = !!globalThis.__requireNgui__;
