@@ -69,7 +69,7 @@ export interface InterfaceBuffer extends Uint8Array {
 	every(callbackfn: (value: number, index: number, array: IBuffer) => unknown, thisArg?: any): boolean;
 	some(callbackfn: (value: number, index: number, array: IBuffer) => unknown, thisArg?: any): boolean;
 	subarray(begin?: number, end?: number): IBuffer;
-	toJSON(): { type: 'InterfaceIBuffer'; data: number[] };
+	toJSON(): { type: 'InterfaceBuffer'; data: number[] };
 	write(arg0: FromArg, offset?: number, encoding?: IBufferEncoding): number;
 	// read
 	readInt8(offset?: number): number;
@@ -345,10 +345,10 @@ class IBufferIMPL extends Uint8Array implements IBuffer {
 		return new IBufferIMPL(super.subarray(begin, end).buffer);
 	}
 
-	toJSON(): { type: 'InterfaceIBuffer'; data: number[] } {
+	toJSON(): { type: 'InterfaceBuffer'; data: number[] } {
 		var data = new Array(this.length);
 		this.forEach((i,j)=>data[j]=i);
-		return { type: 'InterfaceIBuffer', data };
+		return { type: 'InterfaceBuffer', data };
 	}
 
 	write(arg0: FromArg, offset?: number, encoding?: IBufferEncoding): number {
