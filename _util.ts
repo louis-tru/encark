@@ -58,6 +58,7 @@ var argv: string[];
 var webFlags: WebPlatformFlags | null = null;
 var platform: Platform;
 var exit: (code?: number)=>void;
+var gc: ()=>void = unrealized;
 
 export interface WebPlatformFlags {
 	windows: boolean,
@@ -82,6 +83,7 @@ if (haveNgui) {
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
 	exit = _util.exit;
+	gc = _util.garbageCollection;
 } else if (haveNode) {
 	platform = <Platform>process.platform;
 	argv = process.argv;
@@ -152,7 +154,7 @@ export default {
 	version: unrealized,
 	addNativeEventListener: unrealized,
 	removeNativeEventListener: unrealized,
-	gc: unrealized,
+	gc: gc,
 	runScript: unrealized,
 	hashCode: Object.hashCode,
 	hash: hash,
