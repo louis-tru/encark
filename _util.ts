@@ -34,7 +34,7 @@ if (typeof __requireNgui__ == 'function') {
 	require('./_ext');
 }
 
-import './_globals';
+import './_ext';
 
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
