@@ -107,8 +107,8 @@ export interface SpawnResult {
 	stderr: string[];
 }
 
-export class SpawnPromise extends Promise<SpawnResult> {
-	process: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null; 
+export interface SpawnPromise extends Promise<SpawnResult> {
+	process: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null;
 }
 
 export function exec(cmd: string, options: SpawnOptions = {}): SpawnPromise  {
@@ -128,7 +128,7 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 
 	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null;
 
-	var promise = new SpawnPromise(function(resolve, reject) {
+	var promise = new Promise<SpawnResult>(function(resolve, reject) {
 		var on_stdin: any;
 		var r_stdout: string[] = [];
 		var r_stderr: string[] = [];
@@ -213,10 +213,9 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 			// ch.stdin.resume();
 		}
 
-	});
+	}) as SpawnPromise;
 
-	if (ch)
-		promise.process = ch;
+	promise.process = ch;
 
 	return promise;
 }

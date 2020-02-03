@@ -152,15 +152,15 @@ export class Console extends Notification {
 		return this;
 	}
 
-	log(msg: string, ...args: any[]) {
+	log(msg: any, ...args: any[]) {
 		return this._print('LOG', log, msg, ...args);
 	}
 
-	warn(msg: string, ...args: any[]) {
+	warn(msg: any, ...args: any[]) {
 		return this._print('WARN', warn, msg, ...args);
 	}
 
-	error(msg: string, ...args: any[]) {
+	error(msg: any, ...args: any[]) {
 		return this._print('ERR', error, msg, ...args);
 	}
 
