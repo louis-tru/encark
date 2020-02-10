@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import {EventNoticer} from '../event';
+import {EventNoticer,Event} from '../event';
 import buffer,{IBuffer} from '../buffer';
 import * as net from 'net';
 
@@ -83,9 +83,9 @@ export class PacketParser {
 	private currentMessage: IBuffer[] | string | null = null;
 
 	readonly onClose = new EventNoticer('Close', this);
-	readonly onText = new EventNoticer<string>('Text', this);
-	readonly onData = new EventNoticer<IBuffer>('Data', this);
-	readonly onError = new EventNoticer<Error>('Error', this);
+	readonly onText = new EventNoticer<Event<string>>('Text', this);
+	readonly onData = new EventNoticer<Event<IBuffer>>('Data', this);
+	readonly onError = new EventNoticer<Event<Error>>('Error', this);
 	readonly onPing = new EventNoticer('Ping', this);
 	readonly onPong = new EventNoticer('Pong', this);
 

@@ -30,7 +30,7 @@
 
 import util from './util';
 import {Router, Rule} from './router';
-import {Notification, EventNoticer} from './event';
+import {Notification, EventNoticer, Event} from './event';
 import * as http from 'http';
 import * as net from 'net';
 import * as fs from './fs';
@@ -254,8 +254,8 @@ export abstract class Server extends Notification {
 		return this.m_server;
 	}
 
-	readonly onWSConversationOpen = new EventNoticer<_conv.ConversationBasic>('WSConversationOpen', this);
-	readonly onWSConversationClose = new EventNoticer<_conv.ConversationBasic>('WSConversationClose', this);
+	readonly onWSConversationOpen = new EventNoticer<Event<_conv.ConversationBasic>>('WSConversationOpen', this);
+	readonly onWSConversationClose = new EventNoticer<Event<_conv.ConversationBasic>>('WSConversationClose', this);
 
 	/**
 	 * 构造函数

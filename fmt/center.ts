@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import * as _center from './_center';
-import {EventNoticer, Notification} from '../event';
+import {EventNoticer, Notification, Event} from '../event';
 import * as server from '../_server';
 import * as service from './service';
 import * as node from './node';
@@ -137,7 +137,7 @@ export class FastMessageTransferCenter extends Notification {
 
 	trigger(event: string, data: any) {
 		this.publish(event, data);
-		return undefined;
+		return 0;
 	}
 
 	publish(event: string, data: any) {

@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import {EventNoticer} from '../event';
+import {EventNoticer,Event} from '../event';
 import {
 	Parser, Constants as ParserConstants, Packet
 } from './parser';
@@ -167,9 +167,9 @@ export class Connect {
 	 * @type {Object}
 	 */
 	readonly options: Options;
-	readonly onError = new EventNoticer<Error>('Error', this);
-	readonly onPacket = new EventNoticer<Packet>('Packet', this);
-	private readonly _onReady = new EventNoticer<void>('_Ready', this);
+	readonly onError = new EventNoticer<Event<Error>>('Error', this);
+	readonly onPacket = new EventNoticer<Event<Packet>>('Packet', this);
+	private readonly _onReady = new EventNoticer<Event<void>>('_Ready', this);
 
 	/**
 	 * constructor function

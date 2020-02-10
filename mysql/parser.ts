@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import {EventNoticer} from '../event';
+import {EventNoticer,Event} from '../event';
 
 const POWS = [1, 256, 65536, 16777216];
 
@@ -184,7 +184,7 @@ export class Parser {
 	/**
 	 * @event onpacket
 	 */
-	readonly onPacket = new EventNoticer<Packet>('Packet', this);
+	readonly onPacket = new EventNoticer<Event<Packet>>('Packet', this);
 
 	/**
 	 * write buffer and parser

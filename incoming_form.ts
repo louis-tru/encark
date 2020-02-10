@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import {EventNoticer} from './event';
+import {EventNoticer,Event} from './event';
 import * as fs from 'fs';
 import * as Path from 'path';
 import {StringDecoder} from 'string_decoder';
@@ -480,7 +480,7 @@ class Part {
 	mime = ''
 	headerField = ''
 	headerValue = ''
-	readonly onData = new EventNoticer<Buffer>('Data', this);
+	readonly onData = new EventNoticer<Event<Buffer>>('Data', this);
 	readonly onEnd = new EventNoticer('End', this);
 }
 

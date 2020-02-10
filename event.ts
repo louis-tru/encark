@@ -62,9 +62,9 @@ export declare class List<T> {
 /**
 	* @class Event
 	*/
-export declare class Event<Data = any, Return = number, Sender = any> {
+export declare class Event<Data = any, Sender = any> {
 	private m_data;
-	protected m_noticer: EventNoticer<Data, Return, Sender> | null;
+	protected m_noticer: EventNoticer<Event<Data, Sender>> | null;
 	private m_return_value;
 	private m_origin;
 	get name(): string;
@@ -72,13 +72,13 @@ export declare class Event<Data = any, Return = number, Sender = any> {
 	get sender(): Sender;
 	get origin(): any;
 	set origin(value: any);
-	get noticer(): EventNoticer<Data, Return, Sender> | null;
-	get returnValue(): Return | undefined;
-	set returnValue(value: Return | undefined);
+	get noticer(): EventNoticer<Event<Data, Sender>> | null;
+	get returnValue(): number;
+	set returnValue(value: number);
 	/**
 	 * @constructor
 	 */
-	constructor(data: Data, returnValue?: Return);
+	constructor(data: Data, returnValue?: number);
 }
 
 declare type DefaultEvent = Event;
@@ -94,7 +94,7 @@ export interface Listen2<Event = DefaultEvent, Scope = any> {
 /**
 * @class EventNoticer
 */
-export declare class EventNoticer<Data = any, Return = number, Sender = any> {
+export declare class EventNoticer<E = Event> {
 	private m_name;
 	private m_sender;
 	private m_listens;
@@ -128,21 +128,21 @@ export declare class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg name   {String} # 事件名称
 	 * @arg sender {Object} # 事件发起者
 	 */
-	constructor(name: string, sender: Sender);
+	constructor(name: string, sender: any);
 	/**
 	 * @fun on # 绑定一个事件侦听器(函数)
 	 * @arg  listen {Function} #  侦听函数
 	 * @arg [scope] {Object}   # 重新指定侦听函数this
 	 * @arg [id]  {String}     # 侦听器别名,可通过id删除
 	 */
-	on<Scope>(listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	on<Scope>(listen: Listen<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * @fun once # 绑定一个侦听器(函数),且只侦听一次就立即删除
 	 * @arg listen {Function} #         侦听函数
 	 * @arg [scope] {Object}  #         重新指定侦听函数this
 	 * @arg [id] {String}     #         侦听器别名,可通过id删除
 	 */
-	once<Scope>(listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	once<Scope>(listen: Listen<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * Bind an event listener (function),
 	 * and "on" the same processor of the method to add the event trigger to receive two parameters
@@ -151,7 +151,7 @@ export declare class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg [scope] {Object}   #      重新指定侦听函数this
 	 * @arg [id] {String}     #     侦听器别名,可通过id删除
 	 */
-	on2<Scope>(listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	on2<Scope>(listen: Listen2<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * Bind an event listener (function), And to listen only once and immediately remove
 	 * and "on" the same processor of the method to add the event trigger to receive two parameters
@@ -160,21 +160,21 @@ export declare class EventNoticer<Data = any, Return = number, Sender = any> {
 	 * @arg [scope] {Object}      # 重新指定侦听函数this
 	 * @arg [id] {String}         # 侦听器id,可通过id删除
 	 */
-	once2<Scope>(listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
-	forward(noticer: EventNoticer<Data, Return, Sender>, id?: string): string;
-	forwardOnce(noticer: EventNoticer<Data, Return, Sender>, id?: string): string;
+	once2<Scope>(listen: Listen2<E, Scope>, scope?: Scope | string, id?: string): string;
+	forward(noticer: EventNoticer<E>, id?: string): string;
+	forwardOnce(noticer: EventNoticer<E>, id?: string): string;
 	/**
 	 * @fun trigger # 通知所有观察者
 	 * @arg data {Object} # 要发送的数据
 	 * @ret {Object}
 	 */
-	trigger(data: Data): Return | undefined;
+	trigger(data?: any): number;
 	/**
 	 * @fun triggerWithEvent # 通知所有观察者
 	 * @arg data {Object} 要发送的event
 	 * @ret {Object}
 	 */
-	triggerWithEvent(evt: Event<Data, Return, Sender>): Return | undefined;
+	triggerWithEvent(evt: E): number;
 	/**
 	 * @fun off # 卸载侦听器(函数)
 	 * @arg [func] {Object}   # 可以是侦听函数,id,如果不传入参数卸载所有侦听器
@@ -186,11 +186,11 @@ export declare class EventNoticer<Data = any, Return = number, Sender = any> {
 /**
 * @class Notification
 */
-export declare class Notification<Data = any, Return = number, Sender = any> {
+export declare class Notification<E = Event> {
 	/**
 	 * @func getNoticer
 	 */
-	getNoticer(name: string): EventNoticer<Data, Return, Sender>;
+	getNoticer(name: string): EventNoticer<E>;
 	/**
 	 * @func hasNoticer
 	 */
@@ -198,37 +198,37 @@ export declare class Notification<Data = any, Return = number, Sender = any> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<Event<Data, Return, Sender>> | string): string | undefined;
+	addDefaultListener(name: string, listen: Listen<E> | string): string | undefined;
 	/**
 	 * @func addEventListener(name, listen[,scope[,id]])
 	 */
-	addEventListener<Scope>(name: string, listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	addEventListener<Scope>(name: string, listen: Listen<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * @func addEventListenerOnce(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce<Scope>(name: string, listen: Listen<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	addEventListenerOnce<Scope>(name: string, listen: Listen<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * @func addEventListener2(name, listen[,scope[,id]])
 	 */
-	addEventListener2<Scope>(name: string, listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
+	addEventListener2<Scope>(name: string, listen: Listen2<E, Scope>, scope?: Scope | string, id?: string): string;
 	/**
 	 * @func addEventListenerOnce2(name, listen[,scope[,id]])
 	 */
-	addEventListenerOnce2<Scope>(name: string, listen: Listen2<Event<Data, Return, Sender>, Scope>, scope?: Scope | string, id?: string): string;
-	addEventForward(name: string, noticer: EventNoticer<Data, Return, Sender>, id?: string): string;
-	addEventForwardOnce(noticer: EventNoticer<Data, Return, Sender>, id?: string): string;
+	addEventListenerOnce2<Scope>(name: string, listen: Listen2<E, Scope>, scope?: Scope | string, id?: string): string;
+	addEventForward(name: string, noticer: EventNoticer<E>, id?: string): string;
+	addEventForwardOnce(noticer: EventNoticer<E>, id?: string): string;
 	/**
 	* @func trigger 通知事监听器
 	* @arg name {String}       事件名称
 	* @arg data {Object}       要发送的消数据
 	*/
-	trigger(name: string, data: Data): Return | undefined;
+	trigger(name: string, data?: any): number;
 	/**
 	* @func triggerWithEvent 通知事监听器
 	* @arg name {String}       事件名称
 	* @arg event {Event}       Event
 	*/
-	triggerWithEvent(name: string, event: Event<Data, Return, Sender>): Return | undefined;
+	triggerWithEvent(name: string, event: E): number;
 	/**
 	 * @func removeEventListener(name,[func[,scope]])
 	 */
@@ -242,7 +242,7 @@ export declare class Notification<Data = any, Return = number, Sender = any> {
 	 * @func allNoticers() # Get all event noticer
 	 * @ret {Array}
 	 */
-	allNoticers(): EventNoticer<Data, Return, Sender>[];
+	allNoticers(): EventNoticer<E>[];
 	/**
 	 * @func triggerListenerChange
 	 */

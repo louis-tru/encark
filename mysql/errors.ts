@@ -1234,4 +1234,4 @@ export enum Errors {
 	ER_KEYRING_MIGRATION_STATUS                                                      = 3203,
 }
 
-export default Errno;
+export default Errors;

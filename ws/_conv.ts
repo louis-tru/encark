@@ -31,7 +31,7 @@
 import utils from '../util';
 import { DataBuilder, Types, Data } from './data';
 import buffer, { Zero, IBuffer } from '../buffer';
-import {EventNoticer} from '../event';
+import {EventNoticer, Event} from '../event';
 
 export const KEEP_ALIVE_TIME = 5e4; // 50s
 
@@ -54,8 +54,8 @@ export abstract class ConversationBasic {
 
 	readonly onClose = new EventNoticer('Close', this);
 	readonly onOpen = new EventNoticer('Open', this);
-	readonly onPing = new EventNoticer<IBuffer>('Ping', this);
-	readonly onPong = new EventNoticer<IBuffer>('Pong', this);
+	readonly onPing = new EventNoticer<Event<IBuffer>>('Ping', this);
+	readonly onPong = new EventNoticer<Event<IBuffer>>('Pong', this);
 	readonly onDrain = new EventNoticer('Drain', this);
 	readonly onOverflow = new EventNoticer('Overflow', this);
 

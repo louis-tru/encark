@@ -28,7 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import { EventNoticer } from '../event';
+import { EventNoticer, Event } from '../event';
 import { Packet, Constants, PacketData } from './parser';
 
 export enum FieldType {
@@ -76,11 +76,11 @@ export class Query {
 	private _rowIndex: number = 0;
 	private _row?: Dict;
 	readonly sql: string;
-	readonly onError = new EventNoticer<Error>('Error', this);
-	readonly onResolve = new EventNoticer<PacketData | null>('Resolve', this);
-	readonly onField = new EventNoticer<Field>('Field', this);
-	readonly onRow = new EventNoticer<Dict>('Row', this);
-	readonly onEnd = new EventNoticer<void>('End', this);
+	readonly onError = new EventNoticer<Event<Error>>('Error', this);
+	readonly onResolve = new EventNoticer<Event<PacketData | null>>('Resolve', this);
+	readonly onField = new EventNoticer<Event<Field>>('Field', this);
+	readonly onRow = new EventNoticer<Event<Dict>>('Row', this);
+	readonly onEnd = new EventNoticer<Event<void>>('End', this);
 
 	constructor(sql: string) {
 		this.sql = sql;

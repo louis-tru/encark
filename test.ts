@@ -1,14 +1,14 @@
 
 // export * from __requireNgui__('_http');
 
-import event, {EventNoticer} from './event'
+import event, {EventNoticer,Event} from './event'
 
-function Hacker<Data = any, Return = number, Sender = any>(): EventNoticer<Data, Return, Sender> {
+function Hacker<Data = any, Sender = any>(): EventNoticer<Event<Data, Sender>> {
 	return null as any;
 }
 
 export default class A {
-	@event onAA: EventNoticer<number>;
+	@event onAA: EventNoticer<Event<number>>;
 }
 
 var a = new A();
