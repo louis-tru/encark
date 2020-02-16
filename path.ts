@@ -28,12 +28,8 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-/**************************************************************************/
-
 import _path from './_path';
 import _pkgutil from './_pkgutil';
-
-/**************************************************************************/
 
 const haveWeb = typeof globalThis.window == 'object';
 
@@ -341,31 +337,26 @@ export class URL {
 	toJSON(): string {
 		return this.href;
 	}
-	// @end
 }
 
-(<any>URL).prototype._is_split = false;
-(<any>URL).prototype._is_parse = false;
-(<any>URL).prototype._value = '';
-(<any>URL).prototype._hostname = '';
-(<any>URL).prototype._port = '';
-(<any>URL).prototype._protocol = '';
-(<any>URL).prototype._search = '';
-(<any>URL).prototype._hash = '';
-(<any>URL).prototype._origin = '';
-(<any>URL).prototype._filename = '';
-(<any>URL).prototype._dirname = '';
-(<any>URL).prototype._basename = -1;
-(<any>URL).prototype._extname = -1;
-(<any>URL).prototype._params = null;
-(<any>URL).prototype._hash_params = null;
+(URL as any).prototype._is_split = false;
+(URL as any).prototype._is_parse = false;
+(URL as any).prototype._value = '';
+(URL as any).prototype._hostname = '';
+(URL as any).prototype._port = '';
+(URL as any).prototype._protocol = '';
+(URL as any).prototype._search = '';
+(URL as any).prototype._hash = '';
+(URL as any).prototype._origin = '';
+(URL as any).prototype._filename = '';
+(URL as any).prototype._dirname = '';
+(URL as any).prototype._basename = -1;
+(URL as any).prototype._extname = -1;
+(URL as any).prototype._params = null;
+(URL as any).prototype._hash_params = null;
 
 function get_path(path: string): URL {
 	return new URL(path);
-}
-
-function resolveLocal(...args: string[]) {
-	return _path.fallbackPath( _pkgutil.resolve(...args) );
 }
 
 export default {
@@ -385,9 +376,9 @@ export default {
 	resolve: _pkgutil.resolve, // func
 
 	/**
-	 * @func resolveLocal()
+	 * @func fallbackPath()
 	 */
-	resolveLocal: resolveLocal,
+	fallbackPath: _pkgutil.fallbackPath,
 
 	/**
 	 * full filename

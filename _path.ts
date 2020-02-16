@@ -32,11 +32,10 @@ import _util from './_util';
 import _pkgutil from './_pkgutil';
 
 export default {
-	executable: _util.unrealized,
-	documents: _util.unrealized,
-	temp: _util.unrealized,
-	resources: _util.unrealized,
-	fallbackPath: _pkgutil.fallbackPath,
+	executable: _util.unrealized as ()=>string,
+	documents: _util.unrealized as (path?: string)=>string,
+	temp: _util.unrealized as (path?: string)=>string,
+	resources: _util.unrealized as (path?: string)=>string,
 	chdir: _pkgutil.chdir,
 	cwd: _pkgutil.cwd,
 };

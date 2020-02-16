@@ -146,7 +146,7 @@ haveNode ? process.nextTick: function(cb, ...args): void {
 	}
 };
 
-function unrealized() {
+function unrealized(): any {
 	throw new Error('Unrealized function');
 }
 

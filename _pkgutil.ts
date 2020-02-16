@@ -47,7 +47,7 @@ var _require = typeof require == 'function' ? require: function(req: string) {
 
 var cwd:()=>string;
 var _cwd:()=>string;
-var chdir:(cwd:string)=>void;
+var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
 var _pkg: any;
@@ -68,8 +68,10 @@ if (haveNgui) {
 	}: function() {
 		return PREFIX + cwd().substr(1);
 	};
-	chdir = function(cwd) {
-		return process.chdir(fallbackPath(cwd));
+	chdir = function(path) {
+		path = fallbackPath(path);
+		process.chdir(path);
+		return cwd() == path;
 	};
 	process.execArgv = process.execArgv || [];
 } else if (haveWeb) { // web
@@ -79,7 +81,7 @@ if (haveNgui) {
 	let cwdPath = origin + dirname;
 	cwd = function() { return cwdPath };
 	_cwd = function() { return cwdPath };
-	chdir = function() {};
+	chdir = function() { return false };
 } else {
 	throw new Error('no support');
 }
@@ -108,7 +110,7 @@ const matchs = win32 ? {
 	resolve: /^((\/|[a-z]:)|([a-z]{2,}:\/\/[^\/]+)|((file|zip):\/\/\/))/i,
 	isAbsolute: /^([\/\\]|[a-z]:|[a-z]{2,}:\/\/[^\/]+|(file|zip):\/\/\/)/i,
 	isLocal: /^([\/\\]|[a-z]:|(file|zip):\/\/\/)/i,
-} : {
+}: {
 	resolve: /^((\/)|([a-z]{2,}:\/\/[^\/]+)|((file|zip):\/\/\/))/i,
 	isAbsolute: /^(\/|[a-z]{2,}:\/\/[^\/]+|(file|zip):\/\/\/)/i,
 	isLocal: /^(\/|(file|zip):\/\/\/)/i,
@@ -165,6 +167,7 @@ function resolve(...args: string[]) {
 				prefix = mat[0];
 				slash = '/';
 			}
+			// if (prefix == path.length)
 			if (prefix == path) // file:///
 				return prefix;
 			path = path.substr(prefix.length);
