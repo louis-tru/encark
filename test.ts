@@ -3,7 +3,7 @@
 
 import event, {EventNoticer,Event} from './event'
 
-function Hacker<Data = any, Sender = any>(): EventNoticer<Event<Data, Sender>> {
+function Hacker<Data = any, Sender extends object = object>(): EventNoticer<Event<Data, Sender>> {
 	return null as any;
 }
 
