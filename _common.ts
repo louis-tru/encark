@@ -148,10 +148,10 @@ async function scopeLockDequeue(mutex: any): Promise<void> {
 /**
  * @func scopeLock(mutex, cb)
  */
-export function scopeLock(mutex: any, cb: ()=>void): Promise<void> {
+export function scopeLock<R>(mutex: any, cb: ()=>Promise<R>|R): Promise<R> {
 	assert(mutex, 'Bad argument');
 	assert(typeof cb == 'function', 'Bad argument');
-	return new Promise((resolve, reject)=>{
+	return new Promise<R>((resolve, reject)=>{
 		if (scopeLockQueue.has(mutex)) {
 			scopeLockQueue.get(mutex).push({resolve, reject, cb});
 		} else {
