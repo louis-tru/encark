@@ -37,5 +37,5 @@ export default {
 	get id() { return _common.getId() },
 	get options() { return _pkg.options },
 	get config() { return _pkg.config },
-	get dev() { return _pkg.dev },
+	get debug() { return _pkg.debug },
 }

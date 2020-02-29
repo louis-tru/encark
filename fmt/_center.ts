@@ -114,12 +114,12 @@ export class FastMessageTransferCenter_IMPL {
 		this.m_host.addEventListener('AddNode', e=>{ // New Node connect
 			if (e.data.publish)
 				this.addFnodeCfg(e.data.publish);
-			if (utils.dev)
+			if (utils.debug)
 				console.log('FastMessageTransferCenter_IMPL.onAddNode', e.data.publish);
 		});
 
 		this.m_host.addEventListener('DeleteNode', e=>{ // Node Disconnect
-			if (utils.dev)
+			if (utils.debug)
 				console.log('FastMessageTransferCenter_IMPL.DeleteNode', e.data.fnodeId);
 		});
 
@@ -293,7 +293,7 @@ export class FastMessageTransferCenter_IMPL {
 		var fnodes = Object.values(this.m_fnodes);
 		while (fnodes.length) {
 			var i = utils.random(0, fnodes.length - 1);
-			if (utils.dev)
+			if (utils.debug)
 				console.log('FastMessageTransferCenter_IMPL.exec', i, fnodes.length - 1, id);
 			var _fnode = fnodes[i];
 			if (this.m_fnodes[_fnode.id]) {
@@ -359,7 +359,7 @@ export class FastMessageTransferCenter_IMPL {
 			id: fmtservice.id, uuid: fmtservice.uuid,
 			time: fmtservice.time, fnodeId: this.id, 
 		});
-		if (utils.dev)
+		if (utils.debug)
 			console.log('Login', fmtservice.id);
 	}
 
@@ -374,7 +374,7 @@ export class FastMessageTransferCenter_IMPL {
 		this.publish('_Logout', {
 			id: fmtservice.id, uuid: fmtservice.uuid, fnodeId: this.id,
 		});
-		if (utils.dev)
+		if (utils.debug)
 			console.log('Logout', fmtservice.id);
 	}
 

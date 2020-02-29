@@ -333,7 +333,7 @@ function read_original_mapinfo(self: SqlMap, original_path: string, table: strin
 
 function get_original_mapinfo(self: SqlMap, name: string) {
 	var info = <_MethodInfo>(<any>self).m_original_mapinfo[name];
-	if (info && !utils.dev) {
+	if (info && !utils.debug) {
 		return info;
 	}
 
@@ -342,7 +342,7 @@ function get_original_mapinfo(self: SqlMap, name: string) {
 	var original_path = path.resolve(self.original, table_name);
 
 	if (original_path in original_files) {
-		if (utils.dev) {
+		if (utils.debug) {
 			if (fs.statSync(original_path + '.xml').mtime != original_files[original_path]) {
 				read_original_mapinfo(self, original_path, table_name);
 			}
@@ -745,7 +745,7 @@ function exec(
 		var sql = map.sql, key: string;
 		var table = map.table
 
-		if (utils.dev) {
+		if (utils.debug) {
 			console.log(sql);
 		}
 

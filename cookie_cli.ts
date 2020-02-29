@@ -144,4 +144,4 @@ ImplCookie = class implements ClientCookie {
 	removeAll() {}
 }
 
-export default <ClientCookie>new ImplCookie();
+export default new ImplCookie() as ClientCookie;

@@ -37,7 +37,7 @@ export * from './conv';
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 
-const print_log = false; // util.dev
+const print_log = false; // utils.debug
 
 class WSConversationIMPL extends conv.WSConversation {
 	initialize() {}

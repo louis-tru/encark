@@ -31,14 +31,13 @@
 import _keys from './_keys' ;
 import _util from './_util' ;
 
-export type Optopns = Dict;
+export type Optopns = Dict<string|string[]>;
 
 const {haveNode, haveNgui, haveWeb} = _util;
 const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
-var ignore_local_package, ignore_all_local_package;
-var config: Optopns | null = null;
+var config: Dict | null = null;
 var _require = typeof require == 'function' ? require: function(req: string) {
 	var e = new Error(`Cannot find module \"${req}\"`);
 	e.code = 'MODULE_NOT_FOUND';
@@ -51,6 +50,7 @@ var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
 var _pkg: any;
+var debug = false;
 
 if (haveNgui) {
 	_pkg = __requireNgui__('_pkg');
@@ -241,24 +241,13 @@ function stripBOM(content: string): string {
 	return content;
 }
 
-function Packages_require_parse_argv(self: any) {
-	var args: string[] = [];
-
-	if (_util.argv.length > 1) {
-		if ( String(_util.argv[1])[0] != '-' ) {
-			self.m_main_startup_path = String(_util.argv[1] || '');
-			args = _util.argv.slice(2);
-		} else {
-			args = _util.argv.slice(1);
-		}
-	}
-
+function parseOptions(args: string[], options: Optopns) {
 	for (var i = 0; i < args.length; i++) {
 		var item = args[i];
 		var mat = item.match(/^-{1,2}([^=]+)(?:=(.*))?$/);
 		if (mat) {
 			var name = mat[1].replace(/-/gm, '_');
-			var val = mat[2] || 1;
+			var val = mat[2] || 'ok';
 			var raw_val = options[name];
 			if ( raw_val ) {
 				if ( Array.isArray(raw_val) ) {
@@ -271,55 +260,21 @@ function Packages_require_parse_argv(self: any) {
 			}
 		}
 	}
-
-	// options.dev = _util.dev;
-
-	if (haveNode) {
-		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
-			options.dev = true;
-		}
-	}
-
-	options.dev = !!options.dev;
-
-	if ( !('url_arg' in options) ) {
-		options.url_arg = '';
-	}
-
-	if ('no_cache' in options || options.dev) {
-		if (options.url_arg) {
-			options.url_arg += '&__nocache';
-		} else {
-			options.url_arg = '__nocache';
-		}
-	}
-
-	ignore_local_package = options.ignore_local || [];
-	ignore_all_local_package = false;
-	if ( typeof ignore_local_package == 'string' ) {
-		if ( ignore_local_package == '' || ignore_local_package == '*' ) {
-			ignore_all_local_package = true;
-		} else {
-			ignore_local_package = [ ignore_local_package ];
-		}
-	} else {
-		ignore_all_local_package = ignore_local_package.indexOf('*') != -1;
-	}
 }
 
-function inl_require_without_err(pathname: string) {
+function requireWithoutErr(pathname: string) {
 	try { return _require(pathname) } catch(e) {}
 }
 
-function read_config_file(pathname: string, pathname2: string) {
-	var c = inl_require_without_err(pathname);
-	var c2 = inl_require_without_err(pathname2);
+function readConfigFile(pathname: string, pathname2: string) {
+	var c = requireWithoutErr(pathname);
+	var c2 = requireWithoutErr(pathname2);
 	if (c || c2) {
 		return Object.assign({}, c, c2);
 	}
 }
 
-function get_config(): Optopns {
+function getConfig(): Dict {
 	if (haveNgui) {
 		return _pkg.config;
 	}
@@ -328,21 +283,38 @@ function get_config(): Optopns {
 			var mainModule = process.mainModule;
 			if (mainModule) {
 				config = 
-					read_config_file(
+					readConfigFile(
 						_path.dirname(mainModule.filename) + '/.config', 
 						_path.dirname(mainModule.filename) + '/config') || 
-					read_config_file(cwd() + '/.config', cwd() + '/config') || {};
+						readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
 			} else {
-				config = read_config_file(cwd() + '/.config', cwd() + '/config') || {};
+				config = readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
 			}
 		} else {
 			config = {};
 		}
 	}
-	return <Optopns>config;
+	return config as Dict;
 }
 
-Packages_require_parse_argv({});
+(function() { // init
+	var args: string[] = [];
+	if (_util.argv.length > 2) {
+		args = _util.argv.slice(2);
+	}
+	parseOptions(args, options);
+
+	if (haveNgui) {
+		debug = __requireNgui__('_util').debug;
+	} else if (haveNode) {
+		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
+			debug = true;
+		}
+	}
+	if (options.dev || options.debug) {
+		debug = true;
+	}
+})();
 
 export default {
 	fallbackPath,
@@ -355,6 +327,6 @@ export default {
 	cwd: _cwd,
 	chdir,
 	get options() { return options },
-	get config() { return get_config() },
-	dev: options.dev as boolean,
+	get config() { return getConfig() },
+	debug,
 };

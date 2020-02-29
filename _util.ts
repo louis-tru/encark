@@ -43,14 +43,10 @@ const haveNode: boolean = !!globalThis.process;
 const haveNgui: boolean = !!globalThis.__requireNgui__;
 const haveWeb: boolean = !!globalThis.document;
 
-type Platform = 'aix'
-| 'android'
-| 'darwin'
+type Platform = 'darwin' | 'linux' | 'win32' | 'android'
 | 'freebsd'
-| 'linux'
 | 'openbsd'
 | 'sunos'
-| 'win32'
 | 'cygwin'
 | 'netbsd' | 'web';
 

@@ -317,7 +317,7 @@ function returnErrorStatus(self: StaticService, statusCode: number, html?: strin
 			if (err) {
 				resultError(self, statusCode, html);
 			} else {
-				if (util.dev && html) {
+				if (util.debug && html) {
 					resultError(self, statusCode, html);
 				} else {
 					returnFile(self, filename);
@@ -334,7 +334,7 @@ function returnFile(self: StaticService, filename: string) {
 	var req = self.request;
 	var res = self.response;
 	
-	if (!util.dev && return_cache(self, filename)) {  //high speed Cache
+	if (!util.debug && return_cache(self, filename)) {  //high speed Cache
 		return;
 	}
 	

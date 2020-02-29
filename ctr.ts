@@ -37,7 +37,7 @@ import template, {Options} from './template';
 // import * as Module from 'module';
 const Module = require('module');
 
-var FILE_CACHE_TIMEOUT = util.dev ? 0 : 1000 * 60 * 10; // 10分钟
+var FILE_CACHE_TIMEOUT = util.debug ? 0 : 1000 * 60 * 10; // 10分钟
 var FILE_CACHES: Dict = {};
 var _require = require;
 

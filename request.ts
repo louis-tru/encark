@@ -500,7 +500,6 @@ export class Request {
 	private m_mock: Dict;
 	private m_mock_switch: Dict | null;
 	private m_data_type: string = 'urlencoded';
-	private m_enable_strict_response_data: boolean = true;
 	private m_cache = new Cache();
 	private m_timeout = defaultOptions.timeout;
 	private m_signer?: Signer;
@@ -532,8 +531,6 @@ export class Request {
 	set mock(v) { this.m_mock = v }
 	get mockSwitch() { return this.m_mock_switch }
 	set mockSwitch(v) { this.m_mock_switch = v }
-	get strictResponseData() { return this.m_enable_strict_response_data }
-	set strictResponseData(value) { this.m_enable_strict_response_data = value }
 	get timeout() { return this.m_timeout }
 	set timeout(value) { this.m_timeout = value }
 
@@ -556,16 +553,7 @@ export class Request {
 	}
 
 	parseResponseData(buf: IBuffer) {
-		var res = parseJSON(buf.toString('utf8'));
-		if (this.m_enable_strict_response_data) {
-			if (res.errno === 0) {
-				return res.data;
-			} else {
-				throw Error.new(res);
-			}
-		} else {
-			return res;
-		}
+		return buf;
 	}
 
 	async request(name: string, method: string = 'GET', params?: Params, options?: Options): PromiseResult {
