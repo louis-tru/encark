@@ -29,6 +29,6 @@
 		"var",
 		".git",
 		".svn",
-		"_build.js",
+		"_.js",
 	]
 }
