@@ -31,26 +31,28 @@
 export var options: Dict = {};
 export var helpInfo: string[] = [];
 
-export function defOpts(name: string, defaults: any, info: string) {
-	var relation = [];
+export function defOpts(name: string | string[], defaults: any, info: string) {
+	var id: string = '';
+	var relation: string[] = [];
 	if ( Array.isArray(name) ) {
 		relation = name.splice(1);
-		name = name[0];
+		id = name[0];
 	}
-	name = name.replace(/\-/mg, '_');
+
+	id = id.replace(/\-/mg, '_');
 
 	relation.forEach(function(i) {
 		i = i.replace(/\-/mg, '_');
 		if ( i in options ) {
-			options[name] = options[i];
+			options[id] = options[i];
 		}
 	});
 
-	if ( ! (name in options) ) {
-		options[name] = defaults;
+	if ( ! (id in options) ) {
+		options[id] = defaults;
 	}
 	
-	var default_val = options[name] === 0 ? 'no' : options[name] === 1 ? 'yes' : options[name];
+	var default_val = options[id] === 0 ? 'no' : options[id] === 1 ? 'yes' : options[id];
 	helpInfo.push(format_string(info, default_val));
 }
 
