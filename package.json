@@ -1,6 +1,6 @@
 {
 	"name": "nxkit",
-	"version": "0.10.30",
+	"version": "0.10.31",
 	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "util.js",
 	"types": "util.ts",

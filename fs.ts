@@ -618,7 +618,7 @@ export interface StatsDescribe extends fs.Stats {
 }
 
 export type EachDirectoryCallback = (stats: StatsDescribe, pathname: string)=>void;
-export type StatsDescribeCallback = (err: NodeJS.ErrnoException | null, stats: StatsDescribe[] | null)=>void;
+export type StatsDescribeCallback = (err: NodeJS.ErrnoException | null, stats: StatsDescribe[])=>void;
 
 /**
  * @func inl_ls_sync
@@ -694,7 +694,7 @@ export function list(
 
 	fs.stat(path, function (err, stat) {
 		if (err)
-			return cb2(err, null);
+			return cb2(err, []);
 
 		var stat2 = <StatsDescribe>stat;
 		stat2.name = Path.basename(path);
@@ -703,9 +703,9 @@ export function list(
 		each_cb2(stat2, '');
 
 		if (stat.isDirectory()) {
-			inl_ls(path, '', depth2, each_cb2).then(e=>cb2(null, e)).catch(e=>cb2(e, null))
+			inl_ls(path, '', depth2, each_cb2).then(e=>cb2(null, e)).catch(e=>cb2(e, []))
 		} else {
-			cb2(null, null);
+			cb2(null, []);
 		}
 	});
 }
@@ -730,7 +730,7 @@ export function listSync(path: string, depth?: boolean | EachDirectoryCallback, 
 
 	each_cb2(stat, '');
 
-	return stat.isDirectory() ? inl_ls_sync(path, '', depth2, each_cb2): null;
+	return stat.isDirectory() ? inl_ls_sync(path, '', depth2, each_cb2): [];
 }
 
 export var ls = list;
