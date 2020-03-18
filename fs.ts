@@ -493,9 +493,9 @@ export function copy(path: string, target: string, options?: CopyOptions | Cance
 			if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
 				inl_copy_symlink(path, target, options, cb2);
 			} else if (stat.isFile()) {
-				inl_copy_file(path, target, options, cb2);
+				inl_copy_file(path, target, options2, cb2);
 			} else if (stat.isDirectory()) {
-				inl_copy_dir(path, target, options, cb2);
+				inl_copy_dir(path, target, options2, cb2);
 			} else {
 				console.warn('ignore cp', path, 'to', target);
 				cb2(null);
@@ -538,11 +538,11 @@ export function copySync(path: string, target: string, options?: CopyOptions) {
 	mkdirpSync(Path.dirname(target));
 
 	if (stat.isSymbolicLink() && options2.symlink) { // copy symlink
-		inl_copy_symlink_sync(path, target, options, check);
+		inl_copy_symlink_sync(path, target, options2, check);
 	} else if (stat.isFile()) {
-		inl_copy_file_sync(path, target, options, check);
+		inl_copy_file_sync(path, target, options2, check);
 	} else if (stat.isDirectory()) {
-		inl_copy_dir_sync(path, target, options, check);
+		inl_copy_dir_sync(path, target, options2, check);
 	} else {
 		console.warn('ignore cp', path, 'to', target);
 	}
