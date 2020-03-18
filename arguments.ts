@@ -28,11 +28,13 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+import util from './util';
+
 export var options: Dict = {};
 export var helpInfo: string[] = [];
 
-export function defOpts(name: string | string[], defaults: any, info: string) {
-	var id: string = '';
+export function defOpts(name: string | string[], defaultValue: any, info: string) {
+	var id: string = name as string;
 	var relation: string[] = [];
 	if ( Array.isArray(name) ) {
 		relation = name.splice(1);
@@ -49,7 +51,7 @@ export function defOpts(name: string | string[], defaults: any, info: string) {
 	});
 
 	if ( ! (id in options) ) {
-		options[id] = defaults;
+		options[id] = defaultValue;
 	}
 	
 	var default_val = options[id] === 0 ? 'no' : options[id] === 1 ? 'yes' : options[id];
@@ -57,7 +59,7 @@ export function defOpts(name: string | string[], defaults: any, info: string) {
 }
 
 function read_argv() {
-	var argv = process.argv.slice(2);
+	var argv = util.argv;
 
 	for (var i = 0; i < argv.length; i++) {
 		var item = argv[i];

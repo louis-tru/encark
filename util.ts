@@ -28,14 +28,14 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import _pkg from './_pkgutil';
+import _pkgutil from './_pkgutil';
 import _util from './_util';
 import * as _common from './_common';
 
 export default {
 	..._util, ..._common,
 	get id() { return _common.getId() },
-	get options() { return _pkg.options },
-	get config() { return _pkg.config },
-	get debug() { return _pkg.debug },
+	get options() { return _pkgutil.options },
+	get config() { return _pkgutil.config },
+	get debug() { return _pkgutil.debug },
 }

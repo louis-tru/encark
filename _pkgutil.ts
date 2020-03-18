@@ -49,11 +49,11 @@ var _cwd:()=>string;
 var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
-var _pkg: any;
+var _ngui_pkgutil: any;
 var debug = false;
 
 if (haveNgui) {
-	_pkg = __requireNgui__('_pkg');
+	_ngui_pkgutil = __requireNgui__('_pkguitl');
 	_path = __requireNgui__('_path');
 	win32 = __requireNgui__('_util').platform == 'win32';
 	cwd = _path.cwd;
@@ -247,7 +247,7 @@ function parseOptions(args: string[], options: Optopns) {
 		var mat = item.match(/^-{1,2}([^=]+)(?:=(.*))?$/);
 		if (mat) {
 			var name = mat[1].replace(/-/gm, '_');
-			var val = mat[2] || 'ok';
+			var val = mat[2] || 'true';
 			var raw_val = options[name];
 			if ( raw_val ) {
 				if ( Array.isArray(raw_val) ) {
@@ -276,7 +276,7 @@ function readConfigFile(pathname: string, pathname2: string) {
 
 function getConfig(): Dict {
 	if (haveNgui) {
-		return _pkg.config;
+		return _ngui_pkgutil.config;
 	}
 	if (!config) {
 		if (haveNode) {
@@ -297,7 +297,7 @@ function getConfig(): Dict {
 	return config as Dict;
 }
 
-(function() { // init
+function initArgv() { // init
 	var args: string[] = [];
 	if (_util.argv.length > 2) {
 		args = _util.argv.slice(2);
@@ -314,7 +314,9 @@ function getConfig(): Dict {
 	if (options.dev || options.debug) {
 		debug = true;
 	}
-})();
+};
+
+initArgv();
 
 export default {
 	fallbackPath,
@@ -324,9 +326,10 @@ export default {
 	isLocal,				// 
 	isLocalZip,
 	isNetwork,
-	cwd: _cwd,
-	chdir,
 	get options() { return options },
 	get config() { return getConfig() },
 	debug,
+	//
+	cwd: _cwd,
+	chdir,
 };
