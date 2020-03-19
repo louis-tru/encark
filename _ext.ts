@@ -236,6 +236,13 @@ interface Error {
 	[prop: string]: any;
 }
 
+declare function setTimeout<A extends any[]>(cb: (...args: A)=>void, timeout?: number, ...args: A): TimeoutResult;
+declare function setInterval<A extends any[]>(cb: (...args: A)=>void, timeout?: number, ...args: A): TimeoutResult;
+declare function setImmediate<A extends any[]>(cb: (...args: A)=>void, ...args: A): TimeoutResult;
+declare function clearTimeout(id?: TimeoutResult): void;
+declare function clearInterval(id?: TimeoutResult): void;
+declare function clearImmediate(id?: TimeoutResult): void;
+
 (function(_: any) {
 
 if (Date.formatTimeSpan !== undefined)
@@ -378,8 +385,10 @@ definePropertys(String.prototype, {
 	hashCode: function(): number {
 		var _hash = 5381;
 		var len = this.length;
-		while (len--) 
+		while (len) {
 			_hash += (_hash << 5) + this.charCodeAt(len);
+			len--;
+		}
 		return _hash;
 	},
 });
