@@ -614,11 +614,10 @@ export function mkdirpSync(path: string, mode?: MkdirOptopns) {
 
 export interface StatsDescribe extends fs.Stats {
 	name: string;
-	children: StatsDescribe[] | null;
+	children: StatsDescribe[];
 }
 
-export type EachDirectoryCallback = (stats: StatsDescribe, pathname: string)=>void;
-export type StatsDescribeCallback = (err: NodeJS.ErrnoException | null, stats: StatsDescribe[])=>void;
+export type EachDirectoryCallback = (stats: StatsDescribe, pathname: string)=>(boolean|undefined);
 
 /**
  * @func inl_ls_sync
@@ -632,12 +631,12 @@ function inl_ls_sync(origin: string, path: string, depth: boolean, each_cb: Each
 		var pathname = path ? `${path}/${name}` : name;
 		var stat = <StatsDescribe>fs.statSync(`${origin}/${pathname}`);
 		stat.name = name;
-		each_cb(stat, pathname);
+		stat.children = [];
 
-		if (stat.isDirectory()) {
-			stat.children = depth ? inl_ls_sync(origin, pathname, depth, each_cb): [];
-		} else {
-			stat.children = null;
+		if (!each_cb(stat, pathname)) {
+			if (depth && stat.isDirectory()) {
+				stat.children = inl_ls_sync(origin, pathname, depth, each_cb);
+			}
 		}
 		rev.push(stat);
 	}
@@ -654,11 +653,12 @@ async function inl_ls(origin: string, path: string, depth: boolean, each_cb: Eac
 		var pathname = path ? `${path}/${name}` : name;
 		var stat = <StatsDescribe>await async_call(fs.stat, `${origin}/${pathname}`);
 		stat.name = name;
-		stat.children = null;
-		each_cb(stat, pathname);
+		stat.children = [];
 
-		if (stat.isDirectory()) {
-			stat.children = depth ? await inl_ls(origin, pathname, depth, each_cb): [];
+		if (!each_cb(stat, pathname)) {
+			if (depth && stat.isDirectory()) {
+				stat.children = await inl_ls(origin, pathname, depth, each_cb);
+			}
 		}
 		rev.push(stat);
 	}
@@ -673,40 +673,39 @@ async function inl_ls(origin: string, path: string, depth: boolean, each_cb: Eac
 	* @param {Function} cb
 	*/
 export function list(
-	path: string, 
-	cb: StatsDescribeCallback, 
+	path: string,
 	depth?: boolean | EachDirectoryCallback,
-	each_cb?: EachDirectoryCallback) 
+	each_cb?: EachDirectoryCallback): Promise<StatsDescribe[]>
 {
 	path = Path.resolve(path);
 
-	var depth2: any = depth;
-	var each_cb2: any = each_cb;
-
 	if (typeof depth == 'function') {
 		each_cb = depth;
-		depth2 = false;
+		depth = false;
 	}
 
-	var cb2 = cb || function (err: any) {
-		if (err) throw Error.new(err);
-	};
+	var depth2 = !!depth;
+	var each_cb2 = each_cb || function () {} as EachDirectoryCallback;
 
-	fs.stat(path, function (err, stat) {
-		if (err)
-			return cb2(err, []);
+	return new Promise(function(reserve, reject) {
 
-		var stat2 = <StatsDescribe>stat;
-		stat2.name = Path.basename(path);
-		stat2.children = null;
+		fs.stat(path, function (err, stat) {
+			if (err)
+				return reject(err);
 
-		each_cb2(stat2, '');
+			var stat2 = stat as StatsDescribe;
+			stat2.name = Path.basename(path);
+			stat2.children = [];
 
-		if (stat.isDirectory()) {
-			inl_ls(path, '', depth2, each_cb2).then(e=>cb2(null, e)).catch(e=>cb2(e, []))
-		} else {
-			cb2(null, []);
-		}
+			if (each_cb2(stat2, '')) {
+				return reserve([]);
+			}
+			if (stat.isDirectory()) {
+				inl_ls(path, '', depth2, each_cb2).then(e=>reserve(e)).catch(reject);
+			} else {
+				reserve([]);
+			}
+		});
 	});
 }
 
@@ -716,19 +715,21 @@ export function list(
 export function listSync(path: string, depth?: boolean | EachDirectoryCallback, each_cb?: EachDirectoryCallback) {
 	path = Path.resolve(path);
 
-	var depth2: any = depth;
-	var each_cb2: any = each_cb;
-
 	if (typeof depth == 'function') {
 		each_cb = depth;
-		depth2 = false;
+		depth = false;
 	}
-	
-	var stat = <StatsDescribe>fs.statSync(path);
-	stat.name = Path.basename(path);
-	stat.children = null;
 
-	each_cb2(stat, '');
+	var depth2 = !!depth;
+	var each_cb2 = each_cb || function () {} as EachDirectoryCallback;
+
+	var stat = fs.statSync(path) as StatsDescribe;
+	stat.name = Path.basename(path);
+	stat.children = [];
+
+	if (each_cb2(stat, '')) {
+		return [];
+	}
 
 	return stat.isDirectory() ? inl_ls_sync(path, '', depth2, each_cb2): [];
 }

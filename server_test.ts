@@ -36,7 +36,8 @@ import {ViewController} from './ctr';
 class Test extends ViewController {
 
 	async timeout() {
-		this.markResponse();
+
+		this.markReturnInvalid();
 
 		var res = this.response;
 

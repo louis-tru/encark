@@ -65,6 +65,14 @@ export class HttpService extends StaticService {
 
 	private m_cookie: Cookie | undefined;
 	private m_session: Session | undefined;
+	private m_actionReturnInvalid: boolean;
+
+	/**
+	 * @func markReturnInvalid() mark action return invalid
+	 */
+	markReturnInvalid() {
+		this.m_actionReturnInvalid = true;
+	}
 
 	/**
 	 * site cookie
@@ -179,7 +187,7 @@ export class HttpService extends StaticService {
 			} catch(e) {
 				err = e;
 			}
-			if (!self._response_ok) {
+			if (!self.m_actionReturnInvalid) {
 				if (err) {
 					if (self.server.printLog) {
 						console.error(err);
@@ -237,7 +245,6 @@ export class HttpService extends StaticService {
 	 * @arg data {Object} #    data
 	 */
 	returnData(type: string, data: any): void {
-		this.markResponse();
 
 		var self = this;
 		var res = this.response;

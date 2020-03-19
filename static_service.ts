@@ -123,10 +123,7 @@ function returnDirectory(self: StaticService, filename: string) {
 		return returnRedirect(self, self.pathname + '/');
 	}
 
-	fs.list(filename, function (err, files) {
-		if (err) {
-			return returnErrorStatus(self, 404);
-		}
+	fs.list(filename).then(function(files) {
 		var	dir = filename.replace((<any>self)._root, '');
 		var html =
 			String.format(
@@ -141,7 +138,7 @@ function returnDirectory(self: StaticService, filename: string) {
 		var ls1 = [];
 		var ls2 = [];
 
-		for (var stat of <fs.StatsDescribe[]>files) {
+		for (var stat of files) {
 			var name = stat.name;
 			if (name.slice(0, 1) == '.'){
 				continue;
@@ -164,9 +161,11 @@ function returnDirectory(self: StaticService, filename: string) {
 		setHeader(self);
 
 		// var type = self.server.getMime('html');
-		
+
 		res.writeHead(200);
 		res.end(html);
+	}).catch(function() {
+		returnErrorStatus(self, 404);
 	});
 }
 
@@ -424,7 +423,6 @@ export class StaticService extends Service {
 	// @private:
 	// private m_root: string;
 	private m_no_cache: boolean | undefined;
-	protected _response_ok: boolean | undefined;
 
 	private get _root(): string {
 		return <any>this.server.root
@@ -478,20 +476,10 @@ export class StaticService extends Service {
 	}
 
 	/**
-	 * @func markResponse
-	 */
-	markResponse() {
-		if (this._response_ok)
-			throw new Error('request has been completed');
-		this._response_ok = true;
-	}
-
-	/**
 	 * returnRedirect
 	 * @param {String} path
 	 */
 	returnRedirect(path: string) {
-		this.markResponse();
 		returnRedirect(this, path);
 	}
 	
@@ -501,7 +489,6 @@ export class StaticService extends Service {
 	 * @param {String} text (Optional)  not default status ,return text
 	 */
 	returnErrorStatus(statusCode: number, html?: string) {
-		this.markResponse();
 		returnErrorStatus(this, statusCode, html);
 	}
 	
@@ -509,7 +496,6 @@ export class StaticService extends Service {
 	 * 返回站点文件
 	 */
 	returnSiteFile(name: string) {
-		this.markResponse();
 		return returnFile(this, this.server.root + '/' + name);
 	}
 
@@ -540,7 +526,6 @@ export class StaticService extends Service {
 	 * @param {String}       filename
 	 */	
 	returnFile(filename: string) {
-		this.markResponse();
 		return returnFile(this, filename);
 	}
 	
@@ -549,7 +534,6 @@ export class StaticService extends Service {
 	 * @param {String}       filename
 	 */
 	returnDirectory(filename: string) {
-		this.markResponse();
 		return returnDirectory(this, filename);
 	}
 
