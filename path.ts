@@ -305,8 +305,8 @@ export class URL {
 	
 	// del hash all params
 	clearHash(): URL {
-		(<any>this)._hash_params = {};
-		(<any>this)._hash = '';
+		(this as any)._hash_params = {};
+		(this as any)._hash = '';
 		return this;
 	}
 	
@@ -314,9 +314,9 @@ export class URL {
 	relative(targetPath: string): string {
 		var target = new URL(targetPath);
 		if ( this.origin != target.origin )
-			return (<any>this)._origin + (<any>this)._filename;
-		var ls: string[]  = (<any>this)._filename == '/' ? [] : (<any>this)._filename.split('/');
-		var ls2: string[] = (<any>this)._filename == '/' ? [] : (<any>this)._filename.split('/');
+			return (this as any)._origin + (this as any)._filename;
+		var ls: string[]  = (this as any)._filename == '/' ? [] : (this as any)._filename.split('/');
+		var ls2: string[] = (target as any)._filename == '/' ? [] : (target as any)._filename.split('/');
 		var len = Math.max(ls.length, ls2.length);
 		
 		for (var i = 1; i < len; i++) {
@@ -331,7 +331,7 @@ export class URL {
 				return ls2.splice(i).join('/');
 			}
 		}
-		return '';
+		return '.';
 	}
 
 	toJSON(): string {
