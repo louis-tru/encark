@@ -364,7 +364,7 @@ export function timeout<T>(promise: Promise<T> | T, time: number): Promise<T> {
 			}, time);
 
 			var ok = (err: any, r?: any)=>{
-				if (!id) {
+				if (id) {
 					clearTimeout(id);
 					id = 0;
 					if (err)
