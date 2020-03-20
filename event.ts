@@ -198,7 +198,7 @@ export declare class Notification<E = Event> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<E> | string): string | undefined;
+	addDefaultListener(name: string, listen: Listen<E> | string | null): string | undefined;
 	/**
 	 * @func addEventListener(name, listen[,scope[,id]])
 	 */

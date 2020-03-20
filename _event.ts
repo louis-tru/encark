@@ -581,7 +581,7 @@ export class Notification<E = Event> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<E> | string) {
+	addDefaultListener(name: string, listen: Listen<E> | string | null) {
 		if ( typeof listen == 'string' ) {
 			var func = (<any>this)[listen]; // find func 
 			if ( typeof func == 'function' ) {
