@@ -697,6 +697,10 @@ export function list(
 			stat2.name = Path.basename(path);
 			stat2.children = [];
 
+			if (each_cb2(stat2, '')) {
+				return reserve([]);
+			}
+
 			if (stat.isDirectory()) {
 				inl_ls(path, '', depth2, each_cb2).then(e=>reserve(e)).catch(reject);
 			} else {
@@ -723,6 +727,10 @@ export function listSync(path: string, depth?: boolean | EachDirectoryCallback, 
 	var stat = fs.statSync(path) as StatsDescribe;
 	stat.name = Path.basename(path);
 	stat.children = [];
+
+	if (each_cb2(stat, '')) {
+		return [];
+	}
 
 	return stat.isDirectory() ? inl_ls_sync(path, '', depth2, each_cb2): [];
 }
