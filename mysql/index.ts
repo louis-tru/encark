@@ -137,7 +137,7 @@ export class Mysql extends Database {
 
 	//write packet
 	private _write(packet: OutgoingPacket) {
-		(<Connect>this._connect).write(packet.buffer);
+		(this._connect as Connect).write(packet.buffer);
 	}
 
 	//enqueue

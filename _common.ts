@@ -29,6 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import {List} from './event';
+import errno from './errno';
 
 var id = 10;
 var AsyncFunctionConstructor = (async function() {}).constructor;
@@ -352,6 +353,32 @@ export function assert(condition: any, code?: ErrnoCode | number | string, ...ar
  */
 export function sleep<T>(time: number, defaultValue?: T): Promise<T> {
 	return new Promise((ok, err)=>setTimeout(()=>ok(defaultValue), time));
+}
+
+export function timeout<T>(promise: Promise<T> | T, time: number): Promise<T> {
+	if (promise instanceof Promise) {
+		return new Promise(function(_resolve, _reject) {
+			var id: any = setTimeout(function() {
+				id = 0;
+				_reject(Error.new(errno.ERR_EXECUTE_TIMEOUT));
+			}, time);
+
+			var ok = (err: any, r?: any)=>{
+				if (!id) {
+					clearTimeout(id);
+					id = 0;
+					if (err)
+						_reject(err);
+					else
+						_resolve(r);
+				}
+			};
+
+			promise.then(e=>ok(null, e)).catch(ok);
+		});
+	} else {
+		return Promise.resolve(promise);
+	}
 }
 
 interface PromiseExecutor<T> {

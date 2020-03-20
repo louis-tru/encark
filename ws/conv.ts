@@ -253,12 +253,16 @@ export class WSConversation extends ConversationBasic  {
 			utils.assert(utils.equalsClass(wsservice.WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_handles), 'Service no need to repeat binding');
 
+			console.log('SW requestAuth', this.request.url);
+
 			var ser = new cls(self);
-			var ok = await ser.requestAuth({ service: name, action: '' });
+			var ok = await utils.timeout(ser.requestAuth({ service: name, action: '' }), 2e4);
 			utils.assert(ok, errno.ERR_REQUEST_AUTH_FAIL);
 			self.m_isGzip = ser.headers['use-gzip'] == 'on';
 
-			await ser.load(); // load
+			console.log('SER Loading', this.request.url);
+
+			await utils.timeout(ser.load(), 2e4);
 
 			if (!self.m_default_service)
 				self.m_default_service = name;

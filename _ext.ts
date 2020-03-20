@@ -386,8 +386,8 @@ definePropertys(String.prototype, {
 		var _hash = 5381;
 		var len = this.length;
 		while (len) {
-			_hash += (_hash << 5) + this.charCodeAt(len);
 			len--;
+			_hash += (_hash << 5) + this.charCodeAt(len);
 		}
 		return _hash;
 	},
