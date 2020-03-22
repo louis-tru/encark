@@ -42,7 +42,7 @@ import {Socket} from 'net';
 import {Options, defaultOptions} from '../db';
 
 const CONNECT_TIMEOUT = 1e4;
-const connect_pool: Dict<Connect[]> = {};
+const connect_pool: Dict<Connection[]> = {};
 const require_connect: Request[] = [];
 
 /**
@@ -100,7 +100,7 @@ export default {
 };
 
 interface Callback {
-	(e: Error | null, connect?: Connect): void;
+	(e: Error | null, connect?: Connection): void;
 }
 
 interface Request {
@@ -108,16 +108,15 @@ interface Request {
 	args: [ Options, Callback ];
 }
 
-export class Connect {
+export class Connection {
 	private _greeting: Packet | null = null;
 	private _socket: Socket | null;
-	private _tomeout = 0;
+	private _idle_tomeout = 0;
 	private _isUse = false;
 	private _isReady = false;
-	private _connectError = false;
 
 	private _write(packet: OutgoingPacket) {
-		(<Socket>this._socket).write(packet.buffer);
+		(this._socket as Socket).write(packet.buffer);
 	}
 
 	private _sendAuth(greeting: Packet) {
@@ -130,7 +129,7 @@ export class Connect {
 			(opt.database  as string).length + 1
 		);
 		var packet = new OutgoingPacket(packetSize, greeting.number + 1);
-	
+
 		packet.writeNumber(4, DEFAULT_FLAGS);
 		packet.writeNumber(4, MAX_PACKET_SIZE);
 		packet.writeNumber(1, CHAREST_NUMBER);
@@ -138,7 +137,7 @@ export class Connect {
 		packet.writeNullTerminated(opt.user as string);
 		packet.writeLengthCoded(token);
 		packet.writeNullTerminated(opt.database as string);
-	
+
 		this._write(packet);
 	
 		// Keep a reference to the greeting packet. We might receive a
@@ -150,16 +149,39 @@ export class Connect {
 	private _sendOldAuth(greeting: Packet) {
 		var token = auth.scramble323(greeting.d.scrambleBuffer as Buffer, this.options.password as string);
 		var packetSize = (token.length + 1);
-	
+
 		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
-	
+
 		// I could not find any official documentation for this, but from sniffing
 		// the mysql command line client, I think this is the right way to send the
 		// scrambled token after receiving the USE_OLD_PASSWORD_PROTOCOL_PACKET.
 		packet.write(token);
 		packet.writeFiller(1);
-	
+
 		this._write(packet);
+	}
+
+	private _clearTimeout() {
+		if (this._idle_tomeout) {
+			clearTimeout(this._idle_tomeout);
+			this._idle_tomeout = 0;
+		}
+	}
+
+	private destroy(reason?: any) {
+		var self = this;
+		var socket = self._socket;
+		if (socket) {
+			self._socket = null;
+			if (reason)
+				self.onError.trigger(Error.new(reason));
+			self._clearTimeout();
+			self.onError.off();
+			self.onPacket.off();
+			self._onReady.off();
+			socket.destroy();
+			connect_pool[self.options.host + ':' + self.options.port].deleteOf(self);
+		}
 	}
 
 	/**
@@ -172,9 +194,8 @@ export class Connect {
 	private readonly _onReady = new EventNoticer<Event<void>>('_Ready', this);
 
 	/**
-	 * constructor function
-	 * @param {Object}   opt
 	 * @constructor
+	 * @arg opt {Object}
 	 */
 	constructor(options?: Options) {
 		this.options = Object.assign({}, defaultOptions, options);
@@ -182,22 +203,17 @@ export class Connect {
 		var parser = new Parser();
 		var socket = this._socket = new Socket();
 
-		function throwError(err: any) {
-			self._connectError = true;
-			self.onError.trigger(Error.new(err));
-			self._destroy();
-		}
-
 		socket.setNoDelay(true);
-		// socket.setTimeout(72e5, ()=>/*2h timeout*/ socket.end());
+		socket.setTimeout(36e5, ()=>/*1h timeout*/ socket.end());
 		socket.on('data', e=>parser.write(e));
-		socket.on('error', err=>throwError(err));
-		socket.on('end', ()=>throwError('mysql server has been disconnected'));
+		socket.on('error', err=>self.destroy(err));
+		socket.on('end', ()=>self.destroy('mysql server has been socket end'));
+		socket.on('close', ()=>self.destroy('mysql server has been socket close'));
 
 		parser.onPacket.on(function(e) {
 			var packet = e.data;
 			if (packet.type === ParserConstants.ERROR_PACKET) {
-				throwError({ message: 'ERROR_PACKET', ...packet.toJSON() });
+				self.destroy({ message: 'ERROR_PACKET', ...packet.toJSON() });
 			} else if (self._isReady) {
 				self.onPacket.trigger(packet);
 			} else if (packet.type == ParserConstants.GREETING_PACKET) {
@@ -215,7 +231,7 @@ export class Connect {
 
 	/**
 	 * write buffer
-	 * @param {node.Buffer}
+	 * @arg {node.Buffer}
 	 */
 	write(buffer: Buffer) {
 		(this._socket as Socket).write(buffer);
@@ -225,16 +241,16 @@ export class Connect {
 	 * return connection pool
 	 */
 	idle() {
-		utils.assert(this.onPacket.length === 0, 'Connect.idle(), this.onPacket.length');
-		utils.assert(this._isUse, 'Connect.idle(), _isUse');
+		utils.assert(this.onPacket.length === 0, 'Connection.idle(), this.onPacket.length');
+		utils.assert(this._isUse, 'Connection.idle(), _isUse');
 
 		this._isUse = false;
 		this.onPacket.off();
 		this.onError.off();
 		this._onReady.off();
 
-		if (this._connectError)
-			return; // connect error
+		if (!this._socket)
+			return; // socket destroy
 
 		for (var i = 0, l = require_connect.length; i < l; i++) {
 			var req = require_connect[i];
@@ -250,20 +266,8 @@ export class Connect {
 				return;
 			}
 		}
-		this._tomeout = (()=>this._destroy()).setTimeout(CONNECT_TIMEOUT);
-	}
 
-	private _destroy() {
-		// utils.assert(!this._isUse, 'connect useing');
-		clearTimeout(this._tomeout);
-		if (this._socket) {
-			this.onError.off();
-			this.onPacket.off();
-			this._onReady.off();
-			this._socket.destroy();
-			this._socket = null;
-			connect_pool[this.options.host + ':' + this.options.port].deleteOf(this);
-		}
+		this._idle_tomeout = (()=>this.destroy()).setTimeout(CONNECT_TIMEOUT);
 	}
 
 	private _changeDB(db: string, cb: Callback) {
@@ -289,7 +293,7 @@ export class Connect {
 		// wait ready
 		this._onReady.once(()=>{
 			this.onError.off();
-			cb(null, this);
+			utils.nextTick(cb, null, this);
 		});
 		this.onError.once(e=>cb(e.data));
 	}
@@ -300,7 +304,7 @@ export class Connect {
 	private _use() {
 		utils.assert(!this._isUse);
 		this._isUse = true;
-		clearTimeout(this._tomeout);
+		this._clearTimeout();
 	}
 
 	/**
@@ -310,11 +314,13 @@ export class Connect {
 	 */
 	static resolve(opt: Options, cb: Callback) {
 		var key = opt.host + ':' + opt.port;
-		var pool = connect_pool[key] || (connect_pool[key] = []);
+		var pool = connect_pool[key];
+		if (!pool)
+			connect_pool[key] = pool = [];
 
 		for (var c of pool) {
 			var options = c.options;
-			if (!c._isUse && !c._connectError) {
+			if (!c._isUse && !c._socket) {
 				if (options.user == opt.user && options.password == opt.password) {
 					if (options.database == opt.database) {
 						c._ready(cb);
@@ -328,23 +334,22 @@ export class Connect {
 
 		//is max connect
 		if (pool.length < MAX_CONNECT_COUNT) {
-			var c = new Connect(opt);
+			var c = new Connection(opt);
 			pool.push(c);
 			c._ready(cb);
-			return;
+		} else {
+			// queue up
+			var req: Request = {
+				timeout: function() {
+					require_connect.deleteOf(req);
+					cb(new Error('obtaining a connection from the connection pool timeout'));
+				}.setTimeout(CONNECT_TIMEOUT),
+				args: [opt, cb]
+			};
+			//append to require connect
+			require_connect.push(req);
 		}
-
-		// queue up
-		var req: Request = {
-			timeout: function() {
-				require_connect.deleteOf(req);
-				cb(new Error('obtaining a connection from the connection pool timeout'));
-			} .setTimeout(CONNECT_TIMEOUT),
-			args: [opt, cb]
-		};
-		//append to require connect
-		require_connect.push(req);
 	}
 }
 
-export const resolve = Connect.resolve;
+export const resolve = Connection.resolve;

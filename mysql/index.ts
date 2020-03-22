@@ -33,8 +33,9 @@ import {Database, Callback, Options, Result} from '../db';
 import constants from './constants';
 import {Query, Field} from './query';
 import {OutgoingPacket} from './outgoing_packet';
-import { Connect } from './connect';
+import { Connection } from './connection';
 import { Constants, Packet, IPacket } from './parser';
+import util from '../util';
 
 interface After {
 	(packet: IPacket): void;
@@ -49,19 +50,23 @@ interface Queue {
 export class Mysql extends Database {
 
 	private _queue: Queue[];
-	private _connect: Connect | null = null;
-	private _transaction = false;
+	private _connection: Connection | null = null;
 	private _connecting = false;
+	private _transaction = false;
 
 	//close back connect
 	private _close() {
 		var self = this;
-		var connect = self._connect;
-		self._connect = null;
-		if (connect) {
-			connect.onPacket.off('using');
-			connect.onError.off('using');
-			connect.idle();
+		var connection = self._connection;
+		self._connection = null;
+		if (connection) {
+			connection.onPacket.off('Mysql');
+			connection.onError.off('Mysql');
+			try {
+				connection.idle();
+			} catch(err) {
+				console.error(err);
+			}
 		} else if (self._connecting) {
 			self._connecting = false;
 		}
@@ -92,7 +97,7 @@ export class Mysql extends Database {
 			after(packet);
 		} else {
 			if (packet.type === Constants.ERROR_PACKET) {
-				self.onError.trigger(<Error>packet.toJSON());
+				self.onError.trigger(packet.toJSON() as Error);
 				console.error(packet);
 			}
 			self._dequeue();
@@ -104,66 +109,81 @@ export class Mysql extends Database {
 		return function(packet: IPacket) {
 			var data = packet.toJSON();
 			if (packet.type === Constants.ERROR_PACKET) {
-				cb(<Error>data);
+				utils.nextTick(cb, data as Error);
 			} else {
-				cb(null, [data]);
+				utils.nextTick(cb, null, [data]);
 			}
 			self._dequeue();
 		}
 	}
 
 	//get connect
-	private __connect() {
+	private _connect() {
 		var self = this;
 		if (self._connecting)
 			return;
 		self._connecting = true;
 
-		Connect.resolve(self.options, function(err, connect) {
-			utils.assert(self._connecting);
+		util.assert(!self._connection, '_connection null ??');
+
+		Connection.resolve(self.options, function(err, connection) {
 			if (err) {
 				self._handlError(err);
-			} else {
-				if (!connect)
-					throw new Error('Type error');
-				connect.onPacket.on(e=>self._handlePacket(e.data as Packet), 'using');
-				connect.onError.on(e=>self._handlError(e.data as Error), 'using');
-				self._connect = connect;
+			} else if (self._connecting && self._queue.length) {
+				if (!connection)
+					throw new Error('connection null ??');
+				connection.onPacket.on(e=>self._handlePacket(e.data as Packet), 'Mysql');
+				connection.onError.on(e=>self._handlError(e.data as Error), 'Mysql');
+				self._connection = connection;
 				self._connecting = false;
-				self._queue[0].exec();
+				self._exec();
+			} else {
+				self._connecting = false;
+				connection?.idle();
 			}
 		});
 	}
 
 	//write packet
 	private _write(packet: OutgoingPacket) {
-		(this._connect as Connect).write(packet.buffer);
+		(this._connection as Connection).write(packet.buffer);
+	}
+
+	private _exec() {
+		var self = this;
+		utils.assert(this._connection, 'this._connection null ??');
+		utils.assert(self._queue.length, 'self._queue.length == 0 ??');
+		try {
+			self._queue[0].exec();
+		} catch(err) {
+			self._handlError(err);
+		}
 	}
 
 	//enqueue
 	private _enqueue(exec: ()=>void, after?: After) {
 		var self = this;
 		self._queue.push({ exec, after });
-		if (self._connect) {
+		if (self._connection) {
 			if (self._queue.length === 1) {
-				if (self._connect)
-					exec();
+				if (self._connection) {
+					self._exec();
+				}
 			}
 		} else {
-			self.__connect();
+			self._connect();
 		}
 	}
 
 	//dequeue
 	private _dequeue() {
 		var self = this;
-		var queue = self._queue;
-		queue.shift();
-		if (queue.length) {
-			if (self._connect) {
-				queue[0].exec();
+		self._queue.shift();
+		if (self._queue.length) {
+			if (self._connection) {
+				self._exec();
 			} else {
-				self.__connect();
+				self._connect();
 			}
 		}
 	}
@@ -172,7 +192,7 @@ export class Mysql extends Database {
 		* is connection
 		*/
 	get connected() {
-		return !!this._connect;
+		return !!this._connection;
 	}
 
 	/**
@@ -201,10 +221,6 @@ export class Mysql extends Database {
 			var rows: Dict[] = [];
 			var fields: Dict<Field> = {};
 
-			query.onError.on(function (e) {
-				cb(e.data);
-				self._dequeue();
-			});
 			query.onResolve.on(function(e) {
 				rows = []; fields = {};
 				dataSet.push(e.data ? e.data : { rows, fields });
@@ -216,16 +232,20 @@ export class Mysql extends Database {
 			query.onRow.on(function(e) {
 				rows.push(e.data);
 			});
-			query.onEnd.on(function(e) {
-				cb(null, dataSet);
+			query.onEnd.on(function() {
+				utils.nextTick(cb, null, dataSet);
+				self._dequeue();
+			});
+			query.onError.on(function (e) {
+				utils.nextTick(cb, e.data);
 				self._dequeue();
 			});
 		}
 		else {
-			query.onError.on(function (e) {
+			query.onEnd.on(function () {
 				self._dequeue();
 			});
-			query.onEnd.on(function () {
+			query.onError.on(function () {
 				self._dequeue();
 			});
 		}
