@@ -94,12 +94,12 @@ export class Query {
 		switch (packet.type) {
 			case Constants.OK_PACKET:
 				this.onResolve.trigger(<PacketData>packet.toJSON());
-				if (packet.d.serverStatus == 2 || packet.d.serverStatus == 3) {
+				if (packet.data.serverStatus == 2 || packet.data.serverStatus == 3) {
 					this.onEnd.trigger();
 				}
 				break;
 			case Constants.ERROR_PACKET:
-				packet.d.sql = self.sql;
+				packet.data.sql = self.sql;
 				this.onError.trigger(<Error>packet.toJSON());
 				break;
 			case Constants.FIELD_PACKET:
@@ -107,7 +107,7 @@ export class Query {
 					this._fields = [];
 					this.onResolve.trigger(null);
 				}
-				var field = new Field(packet.d.name || '', packet.d.fieldType || -1);
+				var field = new Field(packet.data.name || '', packet.data.fieldType || -1);
 				this._fields.push(field);
 				this.onField.trigger(field);
 				break;
@@ -120,7 +120,7 @@ export class Query {
 				if (this._eofs == 2) {
 					this._fields = null;
 					this._eofs = 0;
-					if (packet.d.serverStatus == 34 || packet.d.serverStatus == 2) {
+					if (packet.data.serverStatus == 34 || packet.data.serverStatus == 2) {
 						this.onEnd.trigger();
 					}
 				}

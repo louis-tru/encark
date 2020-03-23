@@ -142,14 +142,9 @@ export interface PacketData {
 	sql?: string;
 }
 
-export interface IPacket {
-	type: Constants;
-	toJSON(): PacketData | Error;
-}
-
-export class Packet implements IPacket {
+export class Packet {
 	readonly onData = new EventNoticer('Data', this);
-	readonly d: PacketData = {};
+	readonly data: PacketData = {};
 
 	type = Constants.LENGTH_CODED_NULL;
 	number = 0;
@@ -158,7 +153,7 @@ export class Packet implements IPacket {
 	received = 0;
 
 	toJSON(): PacketData | Error {
-		var data = this.d;
+		var data = this.data;
 		if (this.type == Constants.ERROR_PACKET) {
 			var err = Error.new([data.errno, data.errorMessage]);
 			for (var [key, val] of Object.entries(data))
@@ -260,7 +255,7 @@ export class Parser {
 				case 0: // PACKET_LENGTH:
 					if (!packet) {
 						packet = this.packet = new Packet();
-						packet_ = packet.d;
+						packet_ = packet.data;
 					}
 
 					// 3 bytes - Little endian

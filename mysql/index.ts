@@ -34,16 +34,26 @@ import constants from './constants';
 import {Query, Field} from './query';
 import {OutgoingPacket} from './outgoing_packet';
 import { Connection } from './connection';
-import { Constants, Packet, IPacket } from './parser';
+import { Constants, Packet } from './parser';
 import util from '../util';
 
 interface After {
-	(packet: IPacket): void;
+	(packet: Packet): void;
 }
 
 interface Queue {
 	exec(): void;
 	after?: After;
+}
+
+export class ErrorPacket extends Packet {
+	error: Error;
+	type = Constants.ERROR_PACKET;
+	constructor(err: Error) {
+		super();
+		this.error = err;
+	}
+	toJSON() { return this.error }
 }
 
 //public:
@@ -79,7 +89,7 @@ export class Mysql extends Database {
 		var item = self._queue[0];
 		var after = item ? item.after : null;
 		if (after) {
-			after({ type: Constants.ERROR_PACKET, toJSON: function() { return err } });
+			after(new ErrorPacket(err));
 		} else {
 			self.onError.trigger(err);
 			self._dequeue();
@@ -106,7 +116,7 @@ export class Mysql extends Database {
 
 	private _after(cb: Callback): After {
 		var self = this;
-		return function(packet: IPacket) {
+		return function(packet: Packet) {
 			var data = packet.toJSON();
 			if (packet.type === Constants.ERROR_PACKET) {
 				utils.nextTick(cb, data as Error);
@@ -255,8 +265,8 @@ export class Mysql extends Database {
 			packet.writeNumber(1, constants.COM_QUERY);
 			packet.write(sql, 'utf-8');
 			self._write(packet);
-		}, function(packet: IPacket) {
-			query.handlePacket(packet as Packet);
+		}, function(packet: Packet) {
+			query.handlePacket(packet);
 		});
 
 		return query;
