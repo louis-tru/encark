@@ -205,7 +205,9 @@ export class Connection {
 
 		socket.setNoDelay(true);
 		socket.setTimeout(36e5, ()=>/*1h timeout*/ socket.end());
-		socket.on('data', e=>parser.write(e));
+		socket.on('data', e=>{
+			try { parser.write(e) } catch(err) { self.destroy(err) }
+		});
 		socket.on('error', err=>self.destroy(err));
 		socket.on('end', ()=>self.destroy('mysql server has been socket end'));
 		socket.on('close', ()=>self.destroy('mysql server has been socket close'));

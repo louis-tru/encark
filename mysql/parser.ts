@@ -210,7 +210,7 @@ export class Parser {
 					self._lengthCodedLength = 8;
 				} else if (c === Constants.LENGTH_CODED_NULL) {
 					advance(nextState);
-					return; //null;
+					return; // null;
 				} else if (c < Constants.LENGTH_CODED_NULL) {
 					advance(nextState);
 					return c;
