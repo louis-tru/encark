@@ -121,7 +121,7 @@ export class Connection {
 
 	private _sendAuth(greeting: Packet) {
 		var opt = this.options;
-		var token = auth.token(opt.password as string, greeting.d.scrambleBuffer as Buffer);
+		var token = auth.token(opt.password as string, greeting.data.scrambleBuffer as Buffer);
 		var packetSize = (
 			4 + 4 + 1 + 23 +
 			(opt.user as string).length + 1 +
@@ -147,7 +147,7 @@ export class Connection {
 	}
 
 	private _sendOldAuth(greeting: Packet) {
-		var token = auth.scramble323(greeting.d.scrambleBuffer as Buffer, this.options.password as string);
+		var token = auth.scramble323(greeting.data.scrambleBuffer as Buffer, this.options.password as string);
 		var packetSize = (token.length + 1);
 
 		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
