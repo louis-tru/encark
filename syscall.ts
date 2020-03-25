@@ -49,7 +49,7 @@ export function syscall(cmd: string): SpawnResult {
 		var stderr = ch.stderr.length ? ch.stderr.split('\n'): [];
 		return {
 			code: ch.status,
-			first: stdout[0],
+			first: stdout[0] || '',
 			stdout, stderr,
 		};
 	}
@@ -70,7 +70,7 @@ export function spawnSync(cmd: string, args: string[] = []): SpawnResult {
 		var stderr = ch.stderr.length ? ch.stderr.split('\n'): [];
 		return {
 			code: ch.status || 0,
-			first: stdout[0],
+			first: stdout[0] || '',
 			stdout, stderr,
 		};
 	}
