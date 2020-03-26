@@ -54,7 +54,7 @@ export default class WebConversation extends WSConversation {
 		var self = this;
 		var url = this.m_url;
 		var bind_services = Object.keys(this.m_handles).join(',');
-		var headers = this.getRequestHeaders() || {};
+		var headers = Object.create(this.getRequestHeaders());
 
 		if (this.m_signer) {
 			Object.assign(headers, this.m_signer.sign(url.path));

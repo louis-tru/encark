@@ -176,8 +176,8 @@ export abstract class WSConversation extends ConversationBasic {
 	 * @rewrite
 	 * @func getRequestHeaders
 	 */
-	getRequestHeaders(): Dict | null {
-		return null;
+	getRequestHeaders(): Dict {
+		return {};
 	}
 
 	/**

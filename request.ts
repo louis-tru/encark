@@ -326,8 +326,11 @@ export class Signer {
 	get options() {
 		return this.m_options;
 	}
-	constructor(options: any) {
-		this.m_options = options || {};
+	set options(opts: any) {
+		this.m_options = opts || {};
+	}
+	constructor(options?: any) {
+		this.options = options || {};
 	}
 	sign(path: string, data?: any) { /* subclass rewrite */ }
 }
@@ -548,8 +551,8 @@ export class Request {
 	/**
 	 * @func getRequestHeaders
 	 */
-	getRequestHeaders() {
-		return null;
+	getRequestHeaders(): Dict {
+		return {};
 	}
 
 	parseResponseData(buf: IBuffer) {

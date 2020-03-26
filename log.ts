@@ -32,7 +32,6 @@ import utils from './util';
 import path from './path';
 import { Notification } from './event';
 
-const { log, error, dir, warn } = console;
 const { haveNode, haveNgui, haveWeb } = utils;
 
 if (haveNgui) {
@@ -59,6 +58,13 @@ interface Stack {
 		tag: string;
 	}[];
 }
+
+export const log = console.log;
+export const error = console.error;
+export const dir = console.dir;
+export const warn = console.warn;
+
+var cur: Console | null = null;
 
 export class Console extends Notification {
 
@@ -149,7 +155,15 @@ export class Console extends Notification {
 		(<any>console)._error = (<any>this)._error = error;
 		(<any>console)._dir = (<any>this)._dir = dir;
 		(<any>console)._warn = (<any>this)._warn = warn;
+		cur = this;
 		return this;
+	}
+
+	static get defaultInstance() {
+		if (!cur) {
+			cur = new Console().makeDefault();
+		}
+		return cur;
 	}
 
 	log(msg: any, ...args: any[]) {
