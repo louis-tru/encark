@@ -60,15 +60,15 @@ export class FastMessageTransferCenterDelegate {
 	/** 
 	 * @func auth() auth client, return client user info
 	*/
-	auth(fmtService: service.FMTService) {
+	auth(fmtService: service.FMTService): Dict | null {
 		return {/* user info */};
 	}
 
 	/** 
 	 * @func authFnode() auth fnode
 	*/
-	authFnode(fnodeRemoteService: node.FNodeRemoteService) {
-		return fnodeRemoteService.headers.certificate;
+	authFnode(fnodeRemoteService: node.FNodeRemoteService): boolean {
+		return !!fnodeRemoteService.headers.certificate;
 	}
 
 	/**
