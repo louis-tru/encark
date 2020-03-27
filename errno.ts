@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-class ErrnoList {
+export class ErrnoList {
 	ERR_UNKNOWN_ERROR: ErrnoCode = [-30000, 'UNKNOWN_ERROR']
 	ERR_MONITOR_BEEN_STARTED: ErrnoCode = [-30001, 'MONITOR BEEN STARTED']
 	ERR_MONITOR_NOT_BEEN_STARTED: ErrnoCode = [-30002, 'MONITOR NOT BEEN STARTED']

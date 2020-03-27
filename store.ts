@@ -65,7 +65,7 @@ export interface Methods {
 	[method: string]: (args?: any, opts?: Options)=>Promise<any>;
 }
 
-class WrapClient extends Notification {
+export class WrapClient extends Notification {
 
 	private m_desc: Descriptors;
 	protected m_name = '';
@@ -171,7 +171,7 @@ class WSConversation2 extends WSConversation {
 /**
  * @class APIStore
  */
-export class APIStore extends Notification {
+export default class APIStore extends Notification {
 	private m_name: string;
 	private m_conv: WSConversation2 | null;
 	private m_req: Request2 | null;
@@ -317,6 +317,8 @@ export class APIStore extends Notification {
 		this._setUncaughtException();
 
 		log.Console.defaultInstance.log('nxkit/store', 'startup complete');
+
+		this.m_isloaded = true;
 	}
 
 	trigger(name: string, data: any) {
@@ -324,7 +326,3 @@ export class APIStore extends Notification {
 		return super.trigger(name, data);
 	}
 }
-
-export const store = new APIStore();
-
-export default store.core;
