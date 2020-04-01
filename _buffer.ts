@@ -52,9 +52,9 @@ function writeBigIntLE(bytes: number[], bigint: bigint): number {
 
 if (!!globalThis.BigInt) {
 	(function(ok: any, ...args: any[]) {
-		if (globalThis.document) { // webpack
+		if (globalThis.document) { // webpack amd
 			import('./_bigint.js').then((e: any)=>ok(e)); // bigint syntax, webpack delay load
-		} else { // node
+		} else { // node cjs
 			ok(args[0]('./_bigint'));
 		}
 	})(function(bigint: any) {
