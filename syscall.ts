@@ -129,7 +129,6 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null;
 
 	var promise = new Promise<SpawnResult>(function(resolve, reject) {
-		var on_stdin: any;
 		var r_stdout: string[] = [];
 		var r_stderr: string[] = [];
 		var empty = Buffer.alloc(0);
@@ -166,10 +165,10 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 
 		function on_end(err?: Error | null, code?: number) {
 			if (ch) {
-				ch = null;
 				if (stdin) {
-					stdin.removeListener('data', on_stdin);
+					stdin.unpipe(ch.stdin);
 				}
+				ch = null;
 				if (err) {
 					reject(Error.new(err));
 				} else {
@@ -190,27 +189,26 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 			promise.process = ch;
 
 		ch.stdout.on('data', function(e: Buffer) {
-			if (stdout)
-				stdout.write(e);
 			parse_data(e, 'stdout');
 		});
 
-		ch.stderr.on('error', function(e: Buffer) {
-			if (stderr)
-				stderr.write(e);
+		ch.stderr.on('data', function(e: Buffer) {
 			parse_data(e, 'stderr');
 		});
 
 		ch.on('error', (e: Error)=>on_end(e));
 		ch.on('exit', (e: number)=>util.nextTick(on_end, null, e));
 
+		if (stdout) {
+			ch.stdout.pipe(stdout);
+		}
+
+		if (stderr) {
+			ch.stderr.pipe(stderr);
+		}
+
 		if (stdin) {
-			stdin.addListener('data', on_stdin = function(chunk: any) {
-				if (ch) {
-					ch.stdin.write(chunk);
-				}
-			});
-			// ch.stdin.resume();
+			stdin.pipe(ch.stdin);
 		}
 
 	}) as SpawnPromise;
