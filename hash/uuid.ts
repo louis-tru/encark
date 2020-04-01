@@ -45,13 +45,10 @@ var _rng: ()=>IBuffer = function() {
 };
 
 if (utils.haveNode) { // node 
-
-	import('crypto').then(crypto=>{
-		_rng = function() {
-			return buffer.from(crypto.randomBytes(16));
-		};
-	});
-
+	const crypto = require('crypto');
+	_rng = function() {
+		return buffer.from(crypto.randomBytes(16));
+	};
 } else if (utils.haveWeb) {
 
 	// Unique ID creation requires a high quality random # generator.  In the

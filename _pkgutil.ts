@@ -38,11 +38,7 @@ const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
 var config: Dict | null = null;
-var _require = typeof require == 'function' ? require: function(req: string) {
-	var e = new Error(`Cannot find module \"${req}\"`);
-	e.code = 'MODULE_NOT_FOUND';
-	throw e;
-};
+const _require = (module as any).require;
 
 var cwd:()=>string;
 var _cwd:()=>string;
@@ -60,7 +56,7 @@ if (haveNgui) {
 	_cwd = cwd;
 	chdir = _path.chdir;
 } else if (haveNode) {
-	_path = _require('path');
+	_path = require('path');
 	win32 = process.platform == 'win32';
 	cwd = process.cwd;
 	_cwd = win32 ? function() {
@@ -216,8 +212,8 @@ function isNetwork(path: string): boolean {
 }
 
 if (haveNode && !haveNgui) {
-	var fs = _require('fs');
-	_require('module').Module._extensions['.keys'] = 
+	var fs = require('fs');
+	require('module').Module._extensions['.keys'] = 
 		function(module: NodeModule, filename: string): any {
 		var content = fs.readFileSync(filename, 'utf8');
 		try {
