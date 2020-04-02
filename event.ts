@@ -257,4 +257,5 @@ if (typeof __requireNgui__ == 'function') { // ngui
 	Object.assign(exports, require('./_event'));
 }
 
+export declare function event(target: any, name: string): void;
 export default (exports.event as (target: any, name: string)=>void);

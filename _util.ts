@@ -131,6 +131,15 @@ function hash(data: any): string {
 	return retValue;
 }
 
+if (!globalThis.setImmediate) {
+	(globalThis as any).setImmediate = function<A extends any[]>(cb: (...args: A) => void, ...args: A): any {
+		return globalThis.setTimeout(function() {
+			cb(...args);
+		}, 1);
+	};
+	globalThis.clearImmediate = globalThis.clearTimeout;
+}
+
 const nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void = 
 haveNode ? process.nextTick: function(cb, ...args): void {
 	if (typeof cb != 'function')

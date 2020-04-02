@@ -31,8 +31,9 @@
 import utils from './util';
 import path from './path';
 import { Notification } from './event';
-import { Request, Options as RequestOptions, Signer } from'./request';
+import { Request, Options as RequestOptions, Signer, parseJSON } from'./request';
 import { WSConversation, WSClient, METHOD_CALL_TIMEOUT } from './ws/cli';
+import {IBuffer} from './buffer';
 import * as log from './log';
 
 var __j = 0;
@@ -149,6 +150,15 @@ class Request2 extends Request {
 	constructor(host: APIStore, url: string) {
 		super(url);
 		this.m_host = host;
+	}
+
+	parseResponseData(buf: IBuffer) {
+		var res = parseJSON(buf.toString('utf8'));
+		if (res.errno === 0) {
+			return res.data;
+		} else {
+			throw Error.new(res);
+		}
 	}
 
 	getRequestHeaders() {
@@ -301,7 +311,6 @@ export default class APIStore extends Notification {
 			this.m_req.signer = this.m_signer;
 
 		var { data: desc } = await this.m_req.get('descriptors/descriptors');
-		this.m_desc = desc;
 		delete this.m_desc.descriptors;
 
 		for (var name in desc) {

@@ -290,7 +290,7 @@ export class HttpService extends StaticService {
 	 */
 	returnJSON(data: any): void {
 		this.setNoCache();
-		return returnJSON(this, { data: data, code: 0, st: new Date().valueOf() });
+		return returnJSON(this, { data: data, errno: 0, code: 0, st: new Date().valueOf() });
 	}
 
 	/**
@@ -313,8 +313,8 @@ export class HttpService extends StaticService {
 	returnJSONError(err: any) {
 		err = Error.toJSON(err);
 		err.st = new Date().valueOf();
-		if ( !err.code ) {
-			err.code = -1;
+		if ( !err.errno ) {
+			err.errno = -1;
 		}
 		err.st = new Date().valueOf();
 		return returnJSON(this, err);
@@ -327,7 +327,7 @@ export class HttpService extends StaticService {
 		err = Error.toJSON(err);
 		var msg = [];
 		if (err.message) msg.push(err.message);
-		if (err.code) msg.push('Code: ' + err.code);
+		if (err.errno) msg.push('Errno: ' + err.errno);
 		if (err.exception) msg.push('Exception: ' + err.exception);
 		if (err.path) msg.push('Path: ' + err.path);
 		if (err.stack) msg.push(err.stack);
