@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import util from './util';
-import {List,LiteItem} from './event';
+import {List,ListItem} from './event';
 import * as http from 'http';
 import * as https from 'https';
 import * as url from 'url';
@@ -151,7 +151,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 			function write() {
 				if (fd) {
 					if (buffers.length) {
-						fs.write(fd, (<LiteItem<Buffer>>buffers.first).value, function(err) {
+						fs.write(fd, (<ListItem<Buffer>>buffers.first).value, function(err) {
 							if (err) {
 								error(err);
 								req.abort();

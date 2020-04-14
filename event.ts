@@ -28,15 +28,15 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-export declare class LiteItem<T> {
+export declare class ListItem<T> {
 	private _host;
 	private _prev;
 	private _next;
 	private _value;
-	constructor(host: List<T>, prev: LiteItem<T> | null, next: LiteItem<T> | null, value: T);
+	constructor(host: List<T>, prev: ListItem<T> | null, next: ListItem<T> | null, value: T);
 	get host(): List<T> | null;
-	get prev(): LiteItem<T> | null;
-	get next(): LiteItem<T> | null;
+	get prev(): ListItem<T> | null;
+	get next(): ListItem<T> | null;
 	get value(): T | null;
 	set value(value: T | null);
 }
@@ -48,12 +48,12 @@ export declare class List<T> {
 	private _first;
 	private _last;
 	private _length;
-	get first(): LiteItem<T> | null;
-	get last(): LiteItem<T> | null;
+	get first(): ListItem<T> | null;
+	get last(): ListItem<T> | null;
 	get length(): number;
-	del(item: LiteItem<T>): LiteItem<T> | null;
-	unshift(value: T): LiteItem<T>;
-	push(value: T): LiteItem<T>;
+	del(item: ListItem<T>): ListItem<T> | null;
+	unshift(value: T): ListItem<T>;
+	push(value: T): ListItem<T>;
 	pop(): T | null;
 	shift(): T | null;
 	clear(): void;
