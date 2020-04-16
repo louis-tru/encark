@@ -422,10 +422,15 @@ function returnFile(self: StaticService, filename: string) {
 export class StaticService extends Service {
 	// @private:
 	// private m_root: string;
-	private m_no_cache: boolean | undefined;
+	private m_no_cache?: boolean;
+	private m_markCompleteResponse?: boolean;
 
 	private get _root(): string {
 		return <any>this.server.root
+	}
+
+	get isCompleteResponse() {
+		return this.m_markCompleteResponse ? true: false;
 	}
 
 	// @public:
@@ -444,10 +449,15 @@ export class StaticService extends Service {
 	constructor(req: http.IncomingMessage, res: http.ServerResponse) {
 		super(req);
 		this.response = res;
-		// this.m_root = <any>this.server.root; //.substr(0, this.server.root.length - 1);
+		// this.m_root = this.server.root as any; //.substr(0, this.server.root.length - 1);
 		// this.setTimeout(this.server.timeout * 1e3);
 	}
-	
+
+	protected markCompleteResponse() {
+		util.assert(!this.m_markCompleteResponse, 'markCompleteResponse');
+		this.m_markCompleteResponse = true;
+	}
+
 	/** 
 	 * @overwrite
 	 */
@@ -480,6 +490,7 @@ export class StaticService extends Service {
 	 * @param {String} path
 	 */
 	returnRedirect(path: string) {
+		this.markCompleteResponse();
 		returnRedirect(this, path);
 	}
 	
@@ -489,6 +500,7 @@ export class StaticService extends Service {
 	 * @param {String} text (Optional)  not default status ,return text
 	 */
 	returnErrorStatus(statusCode: number, html?: string) {
+		this.markCompleteResponse();
 		returnErrorStatus(this, statusCode, html);
 	}
 	
@@ -496,6 +508,7 @@ export class StaticService extends Service {
 	 * 返回站点文件
 	 */
 	returnSiteFile(name: string) {
+		this.markCompleteResponse();
 		return returnFile(this, this.server.root + '/' + name);
 	}
 
@@ -526,6 +539,7 @@ export class StaticService extends Service {
 	 * @param {String}       filename
 	 */	
 	returnFile(filename: string) {
+		this.markCompleteResponse();
 		return returnFile(this, filename);
 	}
 	
@@ -534,6 +548,7 @@ export class StaticService extends Service {
 	 * @param {String}       filename
 	 */
 	returnDirectory(filename: string) {
+		this.markCompleteResponse();
 		return returnDirectory(this, filename);
 	}
 

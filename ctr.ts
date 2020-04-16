@@ -129,8 +129,6 @@ export class ViewController extends HttpService {
 		var ext = path.extname(name);
 		var filename = path.resolve(dirname, ext ? name: name + '.ejs');
 
-		this.markReturnInvalid();
-
 		data = data || {};
 		try {
 			var func = requireEjs(filename, data, filename);

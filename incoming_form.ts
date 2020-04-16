@@ -176,14 +176,14 @@ export class File {
 	}
 
 	private _open() {
-		this._writeStream = new WriteStream();
+		this._writeStream = fs.createWriteStream(this._path);
 	}
 
 	write(buffer: Buffer, cb: any) {
 		var self = this;
 		if (!self._writeStream) 
 			self._open();
-		(<WriteStream>self._writeStream).write(buffer, function() {
+		(self._writeStream as WriteStream).write(buffer, function() {
 			self._lastModifiedDate = Date.now();
 			self._size += buffer.length;
 			self.onProgress.trigger(self.size);

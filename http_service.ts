@@ -65,13 +65,12 @@ export class HttpService extends StaticService {
 
 	private m_cookie: Cookie | undefined;
 	private m_session: Session | undefined;
-	private m_actionReturnInvalid: boolean;
 
 	/**
 	 * @func markReturnInvalid() mark action return invalid
 	 */
 	markReturnInvalid() {
-		this.m_actionReturnInvalid = true;
+		this.markCompleteResponse();
 	}
 
 	/**
@@ -183,11 +182,11 @@ export class HttpService extends StaticService {
 			var data = Object.assign({}, self.params, self.data, _info);
 			var err, r;
 			try {
-				r = await (<any>self)[action](data);
+				r = await (self as any)[action](data);
 			} catch(e) {
 				err = e;
 			}
-			if (!self.m_actionReturnInvalid) {
+			if (!self.isCompleteResponse) {
 				if (err) {
 					if (self.server.printLog) {
 						console.error(err);
@@ -246,9 +245,9 @@ export class HttpService extends StaticService {
 	 */
 	returnData(type: string, data: any): void {
 
-		var self = this;
 		var res = this.response;
 		var ae = <string>this.request.headers['accept-encoding'];
+		this.markCompleteResponse();
 
 		this.setDefaultHeader();
 		res.setHeader('Content-Type', type);
@@ -265,7 +264,7 @@ export class HttpService extends StaticService {
 			res.end(data);
 		}
 	}
-	
+
 	/**
 	 * @fun returnString # return string to browser
 	 * @arg type {String} #    MIME type
@@ -274,7 +273,7 @@ export class HttpService extends StaticService {
 	returnString(str: string, type: string = 'text/plain'): void {
 		return this.returnData(type + ';charset=utf-8', str);
 	}
-	
+
 	/**
 	 * @fun returnHtml # return html to browser
 	 * @arg html {String}  
@@ -283,7 +282,7 @@ export class HttpService extends StaticService {
 		var type = this.server.getMime('html');
 		return this.returnString(html, type);
 	}
-	
+
 	/**
 	 * @fun rev # return data to browser
 	 * @arg data {JSON}
