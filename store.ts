@@ -240,12 +240,12 @@ export default class APIStore extends Notification {
 			globalThis.addEventListener('error', function(e) {
 				var { message, filename, lineno, colno, error } = e;
 				// console.error(error);
-				self.trigger('uncaughtException', error);
+				self.trigger('uncaughtException', Error.new(error || e.message || 'UNKNOWN_ERROR'));
 			});
 		
 			globalThis.addEventListener('unhandledrejection', function(e) {
 				// console.error(e.reason);
-				self.trigger('uncaughtException', e.reason);
+				self.trigger('uncaughtException', Error.new(e.reason || 'UNKNOWN_ERROR'));
 			});
 		
 		} else if (utils.haveNode) {
