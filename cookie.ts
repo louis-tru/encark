@@ -56,7 +56,7 @@ export class ReadCookie {
 	 * @return {Object} 返回cookie值
 	 */
 	getAll() {
-		var j = (this._req.headers.cookie || '').split(';');
+		// var j = (this._req.headers.cookie || '').split(';');
 		var cookie: Dict = {};
 		for (var item of (this._req.headers.cookie || '').split(';')) {
 			if (item) {
