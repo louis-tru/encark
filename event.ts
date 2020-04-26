@@ -56,6 +56,7 @@ export declare class List<T> {
 	push(value: T): ListItem<T>;
 	pop(): T | null;
 	shift(): T | null;
+	insert(prev: ListItem<T>, value: T): ListItem<T>;
 	clear(): void;
 }
 
