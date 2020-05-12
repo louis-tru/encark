@@ -321,18 +321,8 @@ var _request_platform =
 /**
  * @class Signer
  */
-export class Signer {
-	private m_options: any;
-	get options() {
-		return this.m_options;
-	}
-	set options(opts: any) {
-		this.m_options = opts || {};
-	}
-	constructor(options?: any) {
-		this.options = options || {};
-	}
-	sign(path: string, data?: any) { /* subclass rewrite */ }
+export interface Signer {
+	sign(path: string, data?: any): Dict<string> | Promise<Dict<string>>;
 }
 
 /**
@@ -361,7 +351,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		console.log('curl', logs.join(' \\\n'));
 	}
 
-	return new Promise<Result>((resolve, reject)=> {
+	return utils.promise<Result>(async (resolve, reject)=> {
 		var uri = new url.URL(pathname);
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
@@ -422,7 +412,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		}
 
 		if (signer) {
-			Object.assign(headers, signer.sign(raw_path, post_data));
+			Object.assign(headers, await signer.sign(raw_path, post_data));
 		}
 
 		var timeout = Number( options.timeout || '' );
@@ -542,10 +532,7 @@ export class Request {
 	}
 
 	set signer(value) {
-		if (value) {
-			utils.assert(value instanceof Signer, 'Type Error');
-			this.m_signer = value;
-		}
+		this.m_signer = value ? value: undefined;
 	}
 
 	/**
@@ -648,7 +635,6 @@ export class Request {
 
 export default {
 
-	Signer: Signer,
 	Request: Request,
 
 	/**
