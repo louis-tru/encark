@@ -235,6 +235,7 @@ export default class APIStore extends Notification {
 	destroy() {
 		if (this.m_conv)
 			this.m_conv.close();
+		this.m_core = {};
 		clearInterval(this.m_timeoutid);
 	}
 
