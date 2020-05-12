@@ -36,20 +36,18 @@ import { WSConversation, WSClient, METHOD_CALL_TIMEOUT } from './ws/cli';
 import {IBuffer} from './buffer';
 import * as log from './log';
 
-var __j = 0;
-
-var serviceAPI = new path.URL(utils.config.serviceAPI || 'http://127.0.0.1:8091');
+var serviceAPI = new path.URL(utils.config.serviceAPI || 'http://127.0.0.1:8091/service-api');
 
 if (utils.haveWeb) {
 	var default_host = path.getParam('D_SDK_HOST') || serviceAPI.hostname;
 	var default_port = path.getParam('D_SDK_PORT') || serviceAPI.port;
 	var default_ssl = !!Number(path.getParam('D_SDK_SSL')) || /^(http|ws)s/.test(serviceAPI.protocol);
-	var default_virtual = path.getParam('D_SDK_VIRTUAL') || serviceAPI.filename;
+	var default_directory = path.getParam('D_SDK_VIRTUAL') || serviceAPI.filename;
 } else {
 	var default_host = serviceAPI.hostname;
 	var default_port = serviceAPI.port;
 	var default_ssl = /^(http|ws)s/.test(serviceAPI.protocol);
-	var default_virtual = serviceAPI.filename;
+	var default_directory = serviceAPI.filename;
 }
 
 interface Descriptors {
@@ -192,7 +190,7 @@ export default class APIStore extends Notification {
 	private m_port = ''
 	private m_ssl = '';
 	private m_host = '';
-	private m_virtual = '';
+	private m_directory = '';
 	private m_core: Dict<WrapClient> = {};
 	private m_isloaded = false;
 
@@ -217,7 +215,7 @@ export default class APIStore extends Notification {
 		var self = this;
 		if (!self.m_conv) {
 			var port = self.m_port != (self.m_ssl?'443':'80') ? ':'+self.m_port: '';
-			var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_virtual);
+			var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_directory);
 			var conv = self.m_conv = new WSConversation2(self, pathname);
 			if (self.m_signer)
 				conv.signer = self.m_signer;
@@ -232,35 +230,6 @@ export default class APIStore extends Notification {
 			});
 		}
 		return self.m_conv;
-	}
-
-	private _setUncaughtException() {
-		var self = this;
-		if (utils.haveWeb) {
-			globalThis.addEventListener('error', function(e) {
-				var { message, filename, lineno, colno, error } = e;
-				// console.error(error);
-				self.trigger('uncaughtException', Error.new(error || e.message || 'UNKNOWN_ERROR'));
-			});
-		
-			globalThis.addEventListener('unhandledrejection', function(e) {
-				// console.error(e.reason);
-				self.trigger('uncaughtException', Error.new(e.reason || 'UNKNOWN_ERROR'));
-			});
-		
-		} else if (utils.haveNode) {
-		
-			process.on('uncaughtException', function(err) {
-				// console.error(err);
-				self.trigger('uncaughtException', err);
-			});
-		
-			process.on('unhandledRejection', (err, promise) => {
-				// console.error(err);
-				self.trigger('uncaughtException', err);
-			});
-		}
-		
 	}
 
 	destroy() {
@@ -292,18 +261,18 @@ export default class APIStore extends Notification {
 	async initialize(
 		host = default_host,
 		port = default_port,
-		ssl = default_ssl, virtual = default_virtual
+		ssl = default_ssl, directory = default_directory
 	)
 	{
 		this.m_host = host;
 		this.m_port = port || (ssl?'443':'80');
 		this.m_ssl = ssl ? 's': '';
-		this.m_virtual = virtual.replace('service-api', '');
+		this.m_directory = directory;
 
 		port = this.m_port != (ssl?'443':'80') ? ':'+this.m_port: '';
 
 		var service_api = path.resolve(
-			`http${this.m_ssl}://${host}${port}`, this.m_virtual, 'service-api');
+			`http${this.m_ssl}://${host}${port}`, this.m_directory);
 
 		this.m_req = new Request2(this, service_api);
 		this.m_req.urlencoded = false;
@@ -323,9 +292,7 @@ export default class APIStore extends Notification {
 			}
 		}
 
-		this._setUncaughtException();
-
-		log.Console.defaultInstance.log('nxkit/store', 'startup complete');
+		// log.log('nxkit/store', 'startup complete');
 
 		this.m_isloaded = true;
 	}

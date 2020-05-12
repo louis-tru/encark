@@ -35,6 +35,7 @@ if (typeof __requireNgui__ == 'function') {
 }
 
 import './_ext';
+import {Event, Notification, EventNoticer} from './event';
 
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
@@ -53,7 +54,6 @@ type Platform = 'darwin' | 'linux' | 'win32' | 'android'
 var argv: string[];
 var webFlags: WebPlatformFlags | null = null;
 var platform: Platform;
-var exit: (code?: number)=>void;
 var gc: ()=>void = unrealized;
 
 export interface WebPlatformFlags {
@@ -74,17 +74,57 @@ export interface WebPlatformFlags {
 	gecko: boolean
 }
 
+interface IProcess {
+	getNoticer(name: string): EventNoticer;
+	exit(code?: number): void;
+}
+
+export var _process: IProcess;
+
+var _processHandles = {
+	BeforeExit: (noticer: EventNoticer, code = 0)=>{
+		return noticer.triggerWithEvent(new Event(code, code));
+	},
+	Exit: (noticer: EventNoticer, code = 0)=>{
+		return noticer.triggerWithEvent(new Event(code, code));
+	},
+	UncaughtException: (noticer: EventNoticer, err: Error)=>{
+		return noticer.length && noticer.triggerWithEvent(new Event(err, 0)) === 0;
+	},
+	UnhandledRejection: (noticer: EventNoticer, reason: Error, promise: Promise<any>)=>{
+		return noticer.length && noticer.triggerWithEvent(new Event({ reason, promise }, 0)) === 0;
+	},
+};
+
 if (haveNgui) {
 	var _util = __requireNgui__('_util');
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
-	exit = _util.exit;
 	gc = _util.garbageCollection;
-} else if (haveNode) {
-	platform = <Platform>process.platform;
+	_process = require('ngui/_util')._process;
+}
+else if (haveNode) {
+	let _nodeProcess = (globalThis as any).process;
+	platform = _nodeProcess.platform;
 	argv = process.argv;
-	exit = process.exit;
-} else if (haveWeb) {
+
+	class NodeProcess extends Notification implements IProcess {
+		getNoticer(name: 'BeforeExit'|'Exit'|'UncaughtException'|'UnhandledRejection') {
+			if (!this.hasNoticer(name)) {
+				var noticer = super.getNoticer(name);
+				_nodeProcess.on(name.substr(0, 1).toLowerCase() + name.substr(1), function(...args: any[]) {
+					return (_processHandles[name] as any)(noticer, ...args);
+				});
+			}
+			return super.getNoticer(name);
+		}
+		exit(code?: number) {
+			_nodeProcess.exit(code || 0);
+		}
+	}
+	_process = new NodeProcess();
+}
+else if (haveWeb) {
 	let USER_AGENT = navigator.userAgent;
 	let mat = USER_AGENT.match(/\(i[^;]+?; (U; )?CPU.+?OS (\d).+?Mac OS X/);
 	let ios = !!mat;
@@ -110,9 +150,32 @@ if (haveNgui) {
 			USER_AGENT.indexOf('Gecko') > -1 &&
 			USER_AGENT.indexOf('KHTML') == -1, // || !!globalThis.MozCSSKeyframeRule
 	};
-	platform = <Platform>'web';
+	platform = 'web' as Platform;
 	argv = [location.origin + location.pathname].concat(location.search.substr(1).split('&'));
-	exit = ()=>{ window.close() }
+
+	class WebProcess extends Notification implements IProcess {
+		getNoticer(name: 'BeforeExit'|'Exit'|'UncaughtException'|'UnhandledRejection') {
+			if (!this.hasNoticer(name)) {
+				var noticer = super.getNoticer(name);
+				if (name == 'UncaughtException') {
+					globalThis.addEventListener('error', function(e) {
+						var { message, error, filename, lineno, colno } = e;
+						return _processHandles.UncaughtException(noticer, Error.new(error || message || 'unknown UncaughtException'));
+					});
+				} else if (name == 'UnhandledRejection') {
+					globalThis.addEventListener('unhandledrejection', function(e) {
+						var {reason,reason} = e;
+						return _processHandles.UnhandledRejection(noticer, Error.new(reason || 'unknown UnhandledRejection'), e.promise);
+					});
+				}
+			}
+			return super.getNoticer(name);
+		}
+		exit(code?: number) {
+			window.close();
+		}
+	}
+	_process = new WebProcess();
 } else {
 	throw new Error('no support');
 }
@@ -170,6 +233,6 @@ export default {
 	haveWeb: haveWeb,
 	argv: argv,
 	webFlags: webFlags,
-	exit: exit,
+	exit: (code?: number)=>{ _process.exit(code) },
 	unrealized: unrealized,
 }

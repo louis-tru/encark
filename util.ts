@@ -29,8 +29,9 @@
  * ***** END LICENSE BLOCK ***** */
 
 import _pkgutil from './_pkgutil';
-import _util from './_util';
+import _util, {_process} from './_util';
 import * as _common from './_common';
+import {EventNoticer, Event} from './event';
 
 export default {
 	..._util, ..._common,
@@ -38,4 +39,9 @@ export default {
 	get options() { return _pkgutil.options },
 	get config() { return _pkgutil.config },
 	get debug() { return _pkgutil.debug },
+	// events
+	get onBeforeExit(): EventNoticer<Event<number>> { return _process.getNoticer('BeforeExit') },
+	get onExit(): EventNoticer<Event<number>> { return _process.getNoticer('BeforeExit') },
+	get onUncaughtException(): EventNoticer<Event<Error>> { return _process.getNoticer('UncaughtException') },
+	get onUnhandledRejection(): EventNoticer<Event<{reason: Error, promise: Promise<any>}>> { return _process.getNoticer('UnhandledRejection') },
 }
