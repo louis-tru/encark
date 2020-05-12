@@ -166,10 +166,7 @@ export abstract class WSConversation extends ConversationBasic {
 	}
 
 	set signer(value) {
-		if (value) {
-			utils.assert(value instanceof Signer, 'Type Error');
-			this.m_signer = value;
-		}
+		this.m_signer = value;
 	}
 
 	/**
