@@ -47,7 +47,7 @@ export default class NodeConversation extends WSConversation {
 	private m_req: http.ClientRequest | null = null;
 	private m_socket: net.Socket | null = null; // web socket connection
 
-	initialize() {
+	async initialize() {
 		utils.assert(!this.m_req, 'No need to repeat open');
 
 		if (_conv.USE_GZIP_DATA)
@@ -78,7 +78,7 @@ export default class NodeConversation extends WSConversation {
 		});
 
 		if (this.m_signer) {
-			Object.assign(headers, this.m_signer.sign(path));
+			Object.assign(headers, await this.m_signer.sign(path));
 		}
 
 		var options: https.RequestOptions = {
@@ -109,7 +109,7 @@ export default class NodeConversation extends WSConversation {
 		req.on('upgrade', function(res, socket, upgradeHead) {
 			console.log('CLI NodeConversation Upgrade', self.m_url.href);
 
-			if ( !self.m_connect || !handshakes(res, key) ) {
+			if ( !self.m_connecting || !handshakes(res, key) ) {
 				socket.end();
 				self.close(); return;
 			}
@@ -145,7 +145,7 @@ export default class NodeConversation extends WSConversation {
 			self._error(e);
 			self.close();
 		});
-		console.log('CLI NodeConversation init', self.m_url.href, self.m_connect);
+		console.log('CLI NodeConversation init', self.m_url.href, self.m_connecting);
 
 		req.end();
 	}

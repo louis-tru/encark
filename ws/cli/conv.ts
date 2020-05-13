@@ -45,7 +45,7 @@ var USE_GZIP_DATA = false;
  */
 export abstract class WSConversation extends ConversationBasic {
 
-	protected m_connect = false; // 是否尝试连接中
+	protected m_connecting = false; // 是否尝试连接中
 	protected m_signer: Signer | null = null;
 	private   m_IntervalId: any;
 	protected m_url: URL;
@@ -144,10 +144,10 @@ export abstract class WSConversation extends ConversationBasic {
 
 	protected /*async */_open() {
 		utils.assert(!this.m_isOpen);
-		utils.assert(this.m_connect);
+		utils.assert(this.m_connecting);
 		// await utils.sleep(1e2); // 100ms
 		this.m_isOpen = true;
-		this.m_connect = false;
+		this.m_connecting = false;
 		this.m_last_packet_time = Date.now();
 		this.m_overflow = false;
 		this.onOpen.trigger({});
@@ -155,7 +155,7 @@ export abstract class WSConversation extends ConversationBasic {
 	}
 
 	protected _error(err: Error) {
-		if (this.m_connect)
+		if (this.m_connecting)
 			this.close();
 		utils.nextTick(()=>this.onError.trigger(err));
 		this._autoReconnect('Error');
@@ -181,9 +181,9 @@ export abstract class WSConversation extends ConversationBasic {
 	 * @fun close # close conversation connection
 	 */
 	close() {
-		if (this.m_connect) {
+		if (this.m_connecting) {
 			// console.log('**** close conversation connection');
-			this.m_connect = false;
+			this.m_connecting = false;
 		}
 		if (this.m_isOpen) {
 			this.m_isOpen = false;
@@ -199,10 +199,10 @@ export abstract class WSConversation extends ConversationBasic {
 	 * @fun connect # connercion server
 	 */
 	connect() {
-		if (!this.m_isOpen && !this.m_connect) {
+		if (!this.m_isOpen && !this.m_connecting) {
 			utils.assert(this.m_default_service, 'connection must bind service'); // 连接必需要绑定服务才能使用
-			console.log('Connection..', (<any>this).m_url?.href, this.m_connect);
-			this.m_connect = true;
+			console.log('Connection..', (<any>this).m_url?.href, this.m_connecting);
+			this.m_connecting = true;
 			this.initialize();
 		}
 	}

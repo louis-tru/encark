@@ -356,8 +356,8 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
 		var port = Number(uri.port) || (is_https ? 443: 80);
-		var raw_path = uri.path;
-		var path = raw_path;
+		var path = uri.path;
+		uri.clearHash();
 
 		var headers: Dict<string> = {
 			'User-Agent': <string>options.userAgent,
@@ -366,23 +366,6 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		Object.assign(headers, options.headers);
 
 		var post_data = null;
-
-		if (!haveWeb) {
-			// set proxy
-			var proxy = process.env.HTTP_PROXY || process.env.http_proxy;
-			if (proxy && /^https?:\/\//.test(proxy)) {
-				var proxyUrl = new url.URL(proxy);
-				is_https = proxyUrl.protocol == 'https:';
-				hostname = proxyUrl.hostname;
-				port = Number(proxyUrl.port) || (is_https ? 443: 80);
-				path = pathname;
-				// set headers
-				headers.host = uri.hostname;
-				if (uri.port) {
-					headers.host += ':' + uri.port;
-				}
-			}
-		}
 
 		if (method == 'POST') {
 			if (options.urlencoded || options.dataType == 'urlencoded') {
@@ -407,12 +390,31 @@ export function request(pathname: string, opts: Options): PromiseResult {
 			}
 		} else {
 			if (params) {
-				path += (uri.search ? '&' : '?') + querystringStringify(params);
+				uri.params = Object.assign(uri.params, params);
 			}
 		}
 
+		var path = uri.path;
+
 		if (signer) {
-			Object.assign(headers, await signer.sign(raw_path, post_data));
+			Object.assign(headers, await signer.sign(path, post_data));
+		}
+
+		if (!haveWeb) {
+			// set proxy
+			var proxy = process.env.HTTP_PROXY || process.env.http_proxy;
+			if (proxy && /^https?:\/\//.test(proxy)) {
+				var proxyUrl = new url.URL(proxy);
+				is_https = proxyUrl.protocol == 'https:';
+				hostname = proxyUrl.hostname;
+				port = Number(proxyUrl.port) || (is_https ? 443: 80);
+				path = uri.href;
+				// set headers
+				headers.host = uri.hostname;
+				if (uri.port) {
+					headers.host += ':' + uri.port;
+				}
+			}
 		}
 
 		var timeout = Number( options.timeout || '' );

@@ -48,7 +48,7 @@ export default class WebConversation extends WSConversation {
 	/**
 	 * @ovrewrite 
 	 */
-	initialize() {
+	async initialize() {
 		utils.assert(!this.m_req, 'No need to repeat open');
 
 		var self = this;
@@ -57,7 +57,7 @@ export default class WebConversation extends WSConversation {
 		var headers = Object.create(this.getRequestHeaders());
 
 		if (this.m_signer) {
-			Object.assign(headers, this.m_signer.sign(url.path));
+			Object.assign(headers, await this.m_signer.sign(url.path));
 		}
 		url.setParam('_headers', JSON.stringify(headers));
 		url.setParam('bind_services', bind_services);
@@ -67,7 +67,7 @@ export default class WebConversation extends WSConversation {
 		req.onopen = function(e) {
 			console.log('CLI WebConversation Upgrade', self.m_url.href);
 
-			if (!self.m_connect) {
+			if (!self.m_connecting) {
 				self.close(); return;
 			}
 			// self.m_token = res.headers['session-token'] || '';
@@ -98,7 +98,7 @@ export default class WebConversation extends WSConversation {
 			self.close();
 		};
 
-		console.log('CLI WebConversation init', self.m_url.href, self.m_connect);
+		console.log('CLI WebConversation init', self.m_url.href, self.m_connecting);
 	}
 
 	/**
