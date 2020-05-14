@@ -164,8 +164,8 @@ else if (haveWeb) {
 					});
 				} else if (name == 'UnhandledRejection') {
 					globalThis.addEventListener('unhandledrejection', function(e) {
-						var {reason,reason} = e;
-						return _processHandles.UnhandledRejection(noticer, Error.new(reason || 'unknown UnhandledRejection'), e.promise);
+						var {reason,promise} = e;
+						return _processHandles.UnhandledRejection(noticer, Error.new(reason || 'unknown UnhandledRejection'), promise);
 					});
 				}
 			}
