@@ -602,20 +602,11 @@ export class Notification<E = Event> {
 	/**
 	 * @func addDefaultListener
 	 */
-	addDefaultListener(name: string, listen: Listen<E> | string | null) {
-		if ( typeof listen == 'string' ) {
-			var func = (<any>this)[listen]; // find func 
-			if ( typeof func == 'function' ) {
-				return this.addEventListener(name, func, '0'); // default id 0
-			} else {
-				throw Error.new(`Cannot find a function named "${listen}"`);
-			}
-		} else {
-			if (listen) {
-				return this.addEventListener(name, listen, '0'); // default id 0
-			} else { // delete default listener
-				this.removeEventListener(name, '0');
-			}
+	addDefaultListener(name: string, listen: Listen<E> | null) {
+		if (listen) {
+			this.addEventListener(name, listen, '0'); // default id 0
+		} else { // delete default listener
+			this.removeEventListener(name, '0');
 		}
 	}
 
@@ -750,6 +741,6 @@ export function event(target: any, name: string) {
 		configurable: false,
 		enumerable: true,
 		get() { return this.getNoticer(event) },
-		set(listen: Function | string) { this.addDefaultListener(event, listen) },
+		set(listen: Function | null) { this.addDefaultListener(event, listen) },
 	});
 }
