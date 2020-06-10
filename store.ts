@@ -283,7 +283,7 @@ export default class APIStore extends Notification {
 		if (this.m_signer)
 			this.m_req.signer = this.m_signer;
 
-		var { data: desc } = await this.m_req.get('descriptors/descriptors', undefined, {timeout: 5e3});
+		var { data: desc } = await this.m_req.get('descriptors/descriptors', undefined, {timeout: 2e4});
 
 		delete this.m_desc.descriptors;
 
