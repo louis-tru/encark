@@ -30,6 +30,7 @@
 
 import util from './util';
 import * as fs from './fs';
+import * as fs2 from './fs2';
 import service, {Service} from './service';
 import * as http from 'http';
 import * as zlib from 'zlib';
@@ -124,7 +125,7 @@ function returnDirectory(self: StaticService, filename: string) {
 	}
 
 	fs.list(filename).then(function(files) {
-		var	dir = filename.replace((<any>self)._root, '');
+		var	dir = filename.replace((self as any)._root[0], '');
 		var html =
 			String.format(
 			'<!DOCTYPE html><html><head><title>Index of {0}</title>', dir) +
@@ -307,55 +308,34 @@ function resultError(self: StaticService, statusCode: number, html?: string) {
 		'</h3><br/>' + (html || '') + '</body></html>');
 }
 
-function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
-	var filename = self.server.errorStatus[statusCode];
-	
-	if (filename) {
-		filename = (<any>self)._root + filename;
-		fs.stat(filename, function (err) {
-			if (err) {
-				resultError(self, statusCode, html);
-			} else {
-				if (util.debug && html) {
-					resultError(self, statusCode, html);
-				} else {
-					returnFile(self, filename);
-				}
-			}
-		});
-	} else {
-		resultError(self, statusCode, html);
-	}
-}
-
 function returnFile(self: StaticService, filename: string) {
-		
+
 	var req = self.request;
 	var res = self.response;
 	
 	if (!util.debug && return_cache(self, filename)) {  //high speed Cache
 		return;
 	}
-	
+
 	fs.stat(filename, function (err, stat) {
-		
+
 		if (err) {
 			return returnErrorStatus(self, 404);
 		}
-		
+
 		if (stat.isDirectory()) {  //dir
 			return tryReturnDirectory(self, filename);
 		}
-		
+
 		if (!stat.isFile()) {
 			return returnErrorStatus(self, 404);
 		}
-		
+
 		//for file
 		if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
 			return returnErrorStatus(self, 403);
 		}
-		
+
 		var mtime = <Date>stat.mtime;
 		var ims = req.headers['if-modified-since'];
 		var range = <string>req.headers['range'];
@@ -416,6 +396,27 @@ function returnFile(self: StaticService, filename: string) {
 	});
 }
 
+function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
+	var filename = self.server.errorStatus[statusCode];
+
+	if (filename) {
+		filename = (self as any)._root[0] + filename;
+		fs.stat(filename, function (err) {
+			if (err) {
+				resultError(self, statusCode, html);
+			} else {
+				if (util.debug && html) {
+					resultError(self, statusCode, html);
+				} else {
+					returnFile(self, filename);
+				}
+			}
+		});
+	} else {
+		resultError(self, statusCode, html);
+	}
+}
+
 /**
  * @class StaticService
  */
@@ -425,8 +426,8 @@ export class StaticService extends Service {
 	private m_no_cache?: boolean;
 	private m_markCompleteResponse?: boolean;
 
-	private get _root(): string {
-		return <any>this.server.root
+	private get _root(): string[] {
+		return this.server.root;
 	}
 
 	get isCompleteResponse() {
@@ -449,7 +450,6 @@ export class StaticService extends Service {
 	constructor(req: http.IncomingMessage, res: http.ServerResponse) {
 		super(req);
 		this.response = res;
-		// this.m_root = this.server.root as any; //.substr(0, this.server.root.length - 1);
 		// this.setTimeout(this.server.timeout * 1e3);
 	}
 
@@ -479,7 +479,7 @@ export class StaticService extends Service {
 			if (this.server.disable.test(filename)) {  //禁止访问的路径
 				return this.returnErrorStatus(403);
 			}
-			this.returnFile(this._root + filename);
+			this.returnSiteFile(filename.substr(1));
 		} else {
 			this.returnErrorStatus(405);
 		}
@@ -493,7 +493,7 @@ export class StaticService extends Service {
 		this.markCompleteResponse();
 		returnRedirect(this, path);
 	}
-	
+
 	/**
 	 * return the state to the browser
 	 * @param {Number} statusCode
@@ -503,13 +503,20 @@ export class StaticService extends Service {
 		this.markCompleteResponse();
 		returnErrorStatus(this, statusCode, html);
 	}
-	
+
 	/**
 	 * 返回站点文件
 	 */
 	returnSiteFile(name: string) {
 		this.markCompleteResponse();
-		return returnFile(this, this.server.root + '/' + name);
+		!async function(self) {
+			for (var f of self._root) {
+				if (await fs2.exists(f)) {
+					return returnFile(self, f + '/' + name);
+				}
+			}
+			returnFile(self, self._root[0] + '/' + name);
+		}(this);
 	}
 
 	isAcceptGzip(filename: string) {
@@ -533,7 +540,7 @@ export class StaticService extends Service {
 		this.response.setHeader('Cache-Control', 'no-cache');
 		this.response.setHeader('Expires', '-1');
 	}
-	
+
 	/**
 	 * return file to browser
 	 * @param {String}       filename

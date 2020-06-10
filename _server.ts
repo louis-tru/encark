@@ -40,7 +40,7 @@ import * as _conv from './ws/_conv';
 
 var shared: Server | null = null;
 var mimeTypes: Dict = {};
-var default_root: string = process.cwd();
+var default_root: string[] = [process.cwd()];
 var default_temp: string = incoming_form.temp_dir;
 
 function read_mime(filename: string) {
@@ -88,7 +88,7 @@ export interface Options {
 	defaults?: string[];
 	formHash?: string;
 	disable?: RegExp | string | string[];
-	root?: string;
+	root?: string | string[];
 	temp?: string;
 	virtual?: string;
 	gzip?: RegExp | string | false;
@@ -130,7 +130,7 @@ export abstract class Server extends Notification {
 	 * 站点根目录
 	 * @type {String}
 	 */
-	readonly root: string = default_root;
+	readonly root: string[] = default_root;
 
 	/**
 	 * 临时目录
@@ -292,7 +292,8 @@ export abstract class Server extends Notification {
 
 		this.m_port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;
 		this.m_host   = config.host ? String(config.host): '';
-		this.root     = config.root ? path.resolve(config.root) : this.root;
+		this.root     = config.root ? Array.isArray(config.root) ? 
+			config.root.map(e=>path.resolve(e)): [path.resolve(config.root)] : this.root;
 		this.temp     = config.temp ? path.resolve(config.temp) : this.temp;
 
 		var disable   = config.disable;
