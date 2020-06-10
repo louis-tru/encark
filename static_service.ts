@@ -308,92 +308,89 @@ function resultError(self: StaticService, statusCode: number, html?: string) {
 		'</h3><br/>' + (html || '') + '</body></html>');
 }
 
-function returnFile(self: StaticService, filename: string) {
+function _returnFile(self: StaticService, filename: string, stat: fs.Stats) {
 
 	var req = self.request;
 	var res = self.response;
 	
-	if (!util.debug && return_cache(self, filename)) {  //high speed Cache
-		return;
+	//for file
+	if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
+		return returnErrorStatus(self, 403);
 	}
 
-	fs.stat(filename, function (err, stat) {
+	var mtime = <Date>stat.mtime;
+	var ims = req.headers['if-modified-since'];
+	var range = <string>req.headers['range'];
+	var type = self.server.getMime(filename);
+	var gzip = isGzip(self, filename);
+	
+	setHeader(self);
+	res.setHeader('Last-Modified', mtime.toUTCString());
+	res.setHeader('Accept-Ranges', 'bytes');
 
+	if (range) { // return Range
+		if (range.substr(0, 6) == 'bytes=') {
+			var ranges = range.substr(6).split('-');
+			var start_range = ranges[0] ? Number(ranges[0]) : 0;
+			var end_range = ranges[1] ? Number(ranges[1]) : stat.size - 1;
+			if (isNaN(start_range) || isNaN(end_range)) {
+				return returnErrorStatus(self, 400);
+			}
+			if (!ranges[0]) { // 选择文件最后100字节  bytes=-100
+				start_range = Math.max(0, stat.size - end_range);
+				end_range = stat.size - 1;
+			}
+			end_range++;
+			end_range = Math.min(stat.size, end_range);
+			start_range = Math.min(start_range, end_range);
+			// var ir = req.headers['if-range'];
+			// if (ir && Math.abs(new Date(ims) - mtime) < 1000) {
+			// }
+			return resultFileData(self, filename, type, stat.size, start_range, end_range);
+		}
+	}
+
+	if (ims && Math.abs(new Date(ims).valueOf() - mtime.valueOf()) < 1000) { //use 304 cache
+		res.setHeader('Content-Type', getContentType(self, type));
+		res.writeHead(304);
+		res.end();
+		return;
+	}
+	
+	if (stat.size > 5 * 1024 * 1024) { // 数据大于5MB使用这个函数处理
+		return resultFileData(self, filename, type, stat.size, -1, -1);
+	}
+	else if ( ! gzip ) { //no use gzip format
+		return fs.readFile(filename, function(err, data) {
+			result_data(self, filename, type, mtime, false, err, data);
+		});
+	}
+	
+	fs.readFile(filename, function(err, data) {
 		if (err) {
+			console.error(err);
 			return returnErrorStatus(self, 404);
 		}
-
-		if (stat.isDirectory()) {  //dir
-			return tryReturnDirectory(self, filename);
-		}
-
-		if (!stat.isFile()) {
-			return returnErrorStatus(self, 404);
-		}
-
-		//for file
-		if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
-			return returnErrorStatus(self, 403);
-		}
-
-		var mtime = <Date>stat.mtime;
-		var ims = req.headers['if-modified-since'];
-		var range = <string>req.headers['range'];
-		var type = self.server.getMime(filename);
-		var gzip = isGzip(self, filename);
-		
-		setHeader(self);
-		res.setHeader('Last-Modified', mtime.toUTCString());
-		res.setHeader('Accept-Ranges', 'bytes');
-
-		if (range) { // return Range
-			if (range.substr(0, 6) == 'bytes=') {
-				var ranges = range.substr(6).split('-');
-				var start_range = ranges[0] ? Number(ranges[0]) : 0;
-				var end_range = ranges[1] ? Number(ranges[1]) : stat.size - 1;
-				if (isNaN(start_range) || isNaN(end_range)) {
-					return returnErrorStatus(self, 400);
-				}
-				if (!ranges[0]) { // 选择文件最后100字节  bytes=-100
-					start_range = Math.max(0, stat.size - end_range);
-					end_range = stat.size - 1;
-				}
-				end_range++;
-				end_range = Math.min(stat.size, end_range);
-				start_range = Math.min(start_range, end_range);
-				// var ir = req.headers['if-range'];
-				// if (ir && Math.abs(new Date(ims) - mtime) < 1000) {
-				// }
-				return resultFileData(self, filename, type, stat.size, start_range, end_range);
-			}
-		}
-
-		if (ims && Math.abs(new Date(ims).valueOf() - mtime.valueOf()) < 1000) { //use 304 cache
-			res.setHeader('Content-Type', getContentType(self, type));
-			res.writeHead(304);
-			res.end();
-			return;
-		}
-		
-		if (stat.size > 5 * 1024 * 1024) { // 数据大于5MB使用这个函数处理
-			return resultFileData(self, filename, type, stat.size, -1, -1);
-		}
-		else if ( ! gzip ) { //no use gzip format
-			return fs.readFile(filename, function(err, data) {
-				result_data(self, filename, type, mtime, false, err, data);
-			});
-		}
-		
-		fs.readFile(filename, function(err, data) {
-			if (err) {
-				console.error(err);
-				return returnErrorStatus(self, 404);
-			}
-			zlib.gzip(data, function (err, data) {        		//gzip
-				result_data(self, filename, type, mtime, true, err, data);
-			});
+		zlib.gzip(data, function (err, data) {        		//gzip
+			result_data(self, filename, type, mtime, true, err, data);
 		});
 	});
+}
+
+function returnFile(self: StaticService, filename: string) {
+	if (util.debug || !return_cache(self, filename)) {  //high speed Cache
+		fs.stat(filename, function (err, stat) {
+			if (err) {
+				returnErrorStatus(self, 404);
+			} else if (stat.isDirectory()) {  //dir
+				tryReturnDirectory(self, filename);
+			} else if (stat.isFile()) {
+				_returnFile(self, filename, stat);
+			} else {
+				returnErrorStatus(self, 404);
+			}
+		});
+	}
 }
 
 function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
@@ -507,16 +504,27 @@ export class StaticService extends Service {
 	/**
 	 * 返回站点文件
 	 */
-	returnSiteFile(name: string) {
+	async returnSiteFile(name: string) {
 		this.markCompleteResponse();
-		!async function(self) {
-			for (var f of self._root) {
-				if (await fs2.exists(f)) {
-					return returnFile(self, f + '/' + name);
+		var self = this;
+
+		if (util.debug || !return_cache(self, name)) {  //high speed Cache
+			for (var root of this._root) {
+				var filename = root + '/' + name;
+				try {
+					var stat = await fs2.stat(filename);
+					if (stat.isDirectory()) {
+						tryReturnDirectory(self, filename);
+					} else if (stat.isFile()) {
+						_returnFile(self, filename, stat);
+					} else {
+						returnErrorStatus(self, 404);
+					}
+				} catch(err) {
 				}
 			}
-			returnFile(self, self._root[0] + '/' + name);
-		}(this);
+			returnErrorStatus(self, 404);
+		}
 	}
 
 	isAcceptGzip(filename: string) {

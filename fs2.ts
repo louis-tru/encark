@@ -83,3 +83,9 @@ export function mkdirp(path: string, mode?: fs.MkdirOptopns) {
 		fs.mkdirp(path, mode, (err)=>err ? reject(err): resolve());
 	});
 }
+
+export function stat(path: PathLike): Promise<fs.Stats> {
+	return new Promise(function(resolve, reject) {
+		fs.stat(path, (err, stat)=>(err ? reject(err): resolve(stat)));
+	});
+}
