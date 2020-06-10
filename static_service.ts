@@ -514,11 +514,11 @@ export class StaticService extends Service {
 				try {
 					var stat = await fs2.stat(filename);
 					if (stat.isDirectory()) {
-						tryReturnDirectory(self, filename);
+						return tryReturnDirectory(self, filename);
 					} else if (stat.isFile()) {
-						_returnFile(self, filename, stat);
+						return _returnFile(self, filename, stat);
 					} else {
-						returnErrorStatus(self, 404);
+						return returnErrorStatus(self, 404);
 					}
 				} catch(err) {
 				}
