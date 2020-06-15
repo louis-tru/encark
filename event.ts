@@ -37,13 +37,12 @@ export declare class ListItem<T> {
 	get host(): List<T> | null;
 	get prev(): ListItem<T> | null;
 	get next(): ListItem<T> | null;
-	get value(): T | null;
-	set value(value: T | null);
+	get value(): T;
+	set value(value: T);
 }
-
 /**
-* @class List linked
-*/
+ * @class List linked
+ */
 export declare class List<T> {
 	private _first;
 	private _last;
@@ -59,14 +58,13 @@ export declare class List<T> {
 	insert(prev: ListItem<T>, value: T): ListItem<T>;
 	clear(): void;
 }
-
 /**
 	* @class Event
 	*/
-export declare class Event<Data = any, Sender extends object = object> {
+export declare class Event<Data, Sender extends object = object> {
 	private m_data;
-	protected m_noticer: EventNoticer<Event<Data, Sender>> | null;
 	private m_return_value;
+	protected m_noticer: EventNoticer<Event<Data, Sender>> | null;
 	private m_origin;
 	get name(): string;
 	get data(): Data;
@@ -76,26 +74,16 @@ export declare class Event<Data = any, Sender extends object = object> {
 	get noticer(): EventNoticer<Event<Data, Sender>> | null;
 	get returnValue(): number;
 	set returnValue(value: number);
-	/**
-	 * @constructor
-	 */
 	constructor(data: Data, returnValue?: number);
 }
-
-declare type DefaultEvent = Event;
-
+declare type DefaultEvent = Event<any>;
 export interface Listen<Event = DefaultEvent, Scope extends object = object> {
 	(this: Scope, evt: Event): any;
 }
-
 export interface Listen2<Event = DefaultEvent, Scope extends object = object> {
-	(scope: Scope, evt: Event): any;
+	(self: Scope, evt: Event): any;
 }
-
-/**
-* @class EventNoticer
-*/
-export declare class EventNoticer<E = Event> {
+export declare class EventNoticer<E = DefaultEvent> {
 	private m_name;
 	private m_sender;
 	private m_listens;
@@ -118,7 +106,7 @@ export declare class EventNoticer<E = Event> {
 	/**
 	 * @get {Object} # 事件发送者
 	 */
-	get sender(): any;
+	get sender(): object;
 	/**
 	 *
 	 * @get {int} # 添加的事件侦听数量
@@ -183,11 +171,10 @@ export declare class EventNoticer<E = Event> {
 	 */
 	off(listen?: string | Function | object, scope?: object): number;
 }
-
 /**
-* @class Notification
-*/
-export declare class Notification<E = Event> {
+ * @class Notification
+ */
+export declare class Notification<E = DefaultEvent> {
 	/**
 	 * @func getNoticer
 	 */
@@ -249,6 +236,8 @@ export declare class Notification<E = Event> {
 	 */
 	triggerListenerChange(name: string, count: number, change: number): void;
 }
+export declare function event(target: any, name: string): void;
+export {};
 
 // ======================== IMPL ========================
 
@@ -258,5 +247,4 @@ if (typeof __requireNgui__ == 'function') { // ngui
 	Object.assign(exports, require('./_event'));
 }
 
-export declare function event(target: any, name: string): void;
 export default (exports.event as (target: any, name: string)=>void);

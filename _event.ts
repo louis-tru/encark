@@ -192,7 +192,7 @@ export class List<T> {
 /**
 	* @class Event
 	*/
-export class Event<Data = any, Sender extends object = object> {
+export class Event<Data, Sender extends object = object> {
 	private m_data: Data;
 	private m_return_value: number; // = 0
 	protected m_noticer: EventNoticer<Event<Data, Sender>> | null; // = null;
@@ -241,7 +241,7 @@ export class Event<Data = any, Sender extends object = object> {
 (Event as any).prototype.m_noticer = null;
 (Event as any).prototype.m_origin = null;
 
-type DefaultEvent = Event;
+type DefaultEvent = Event<any>;
 
 export interface Listen<Event = DefaultEvent, Scope extends object = object> {
 	(this: Scope, evt: Event): any;
@@ -278,7 +278,9 @@ function forwardNoticeNoticer<E>(forward_noticer: EventNoticer<E>, evt: E) {
 	}
 }
 
-export class EventNoticer<E = Event> {
+// export interface EventNoticer<E = DefaultEvent> extends Listen<E> {}
+
+export class EventNoticer<E = DefaultEvent> {
 
 	private m_name: string;
 	private m_sender: object;
@@ -478,7 +480,7 @@ export class EventNoticer<E = Event> {
 			}
 			(evt as any).m_noticer = null;
 		}
-		return (evt as unknown as Event).returnValue;
+		return (evt as unknown as DefaultEvent).returnValue;
 	}
 
 	/**
@@ -578,7 +580,7 @@ const FIND_REG = new RegExp('^' + PREFIX);
 /**
  * @class Notification
  */
-export class Notification<E = Event> {
+export class Notification<E = DefaultEvent> {
 
 	/**
 	 * @func getNoticer
@@ -598,7 +600,7 @@ export class Notification<E = Event> {
 	hasNoticer(name: string) {
 		return (PREFIX + name) in this;
 	}
-	
+
 	/**
 	 * @func addDefaultListener
 	 */
@@ -683,7 +685,7 @@ export class Notification<E = Event> {
 		if (noticer) {
 			return noticer.triggerWithEvent(event);
 		}
-		return (event as unknown as Event).returnValue;
+		return (event as unknown as DefaultEvent).returnValue;
 	}
 
 	/**
