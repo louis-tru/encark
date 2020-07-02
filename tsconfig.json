@@ -5,7 +5,7 @@
 		"target": "ES2018",
 		"moduleResolution": "node",
 		"sourceMap": false,
-		"outDir": "out/nxkit",
+		"outDir": "out/somes",
 		"rootDir": ".",
 		"baseUrl": ".",
 		"declaration": true,

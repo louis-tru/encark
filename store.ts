@@ -297,7 +297,7 @@ export default class APIStore extends Notification {
 			}
 		}
 
-		// log.log('nxkit/store', 'startup complete');
+		// log.log('fxkit/store', 'startup complete');
 
 		this.m_isloaded = true;
 	}

@@ -1,5 +1,5 @@
 {
-	"name": "nxkit",
+	"name": "somes",
 	"version": "0.10.68",
 	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "util.js",
@@ -7,10 +7,10 @@
 	"author": {
 		"name": "xuewen.chu",
 		"email": "louistru@hotmail.com",
-		"url": "https://github.com/louis-tru/nxkit/"
+		"url": "https://github.com/louis-tru/somes/"
 	},
 	"scripts": {
-		"build": "tsc && cp LICENSE *.md *.types out/nxkit && node _.js"
+		"build": "tsc && cp LICENSE *.md *.types out/somes && node _.js"
 	},
 	"devDependencies": {
 		"@types/node": "~12.12.20"
@@ -38,8 +38,8 @@
 	],
 	"license": "BSD-2-Clause",
 	"bugs": {
-		"url": "https://github.com/louis-tru/nxkit/issues",
+		"url": "https://github.com/louis-tru/somes/issues",
 		"email": "louistru@hotmail.com"
 	},
-	"homepage": "https://github.com/louis-tru/nxkit/"
+	"homepage": "https://github.com/louis-tru/somes/"
 }
