@@ -33,8 +33,8 @@ import _keys from './_keys';
 
 var readFile: (path: string)=>string;
 
-if (util.haveNgui) {
-	let reader = __requireNgui__('_reader');
+if (util.haveFtr) {
+	let reader = __requireFtr__('_reader');
 	readFile = function(path: string) {
 		return reader.readFileSync(path, 'utf8');
 	};

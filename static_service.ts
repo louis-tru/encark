@@ -42,7 +42,7 @@ type RouterInfo = Dict;
 //set util
 function setHeader(self: StaticService, expires?: number) {
 	var res = self.response;
-	res.setHeader('Server', 'Ngui utils');
+	res.setHeader('Server', 'Ftr utils');
 	res.setHeader('Date', new Date().toUTCString());
 	if (self.request.method == 'GET') {
 		expires = expires === undefined ? self.server.expires : expires;

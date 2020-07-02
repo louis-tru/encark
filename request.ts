@@ -33,13 +33,13 @@ import buffer,{IBuffer} from './buffer';
 import url from './path';
 import errno from './errno';
 
-const { haveNgui, haveNode, haveWeb } = utils;
+const { haveFtr, haveNode, haveWeb } = utils;
 const _user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 
-if (haveNgui) {
+if (haveFtr) {
 	var user_agent = _user_agent;
-	var httpNgui = __requireNgui__('_http');
+	var httpFtr = __requireFtr__('_http');
 }
 else if (haveWeb) {
 	var user_agent = navigator.userAgent;
@@ -152,8 +152,8 @@ export interface Result {
 
 export type PromiseResult = Promise<Result>
 
-// Ngui implementation
-function requestNgui(
+// Ftr implementation
+function requestFtr(
 	options: Dict,
 	soptions: Dict, 
 	resolve: (e: Result)=>void,
@@ -167,7 +167,7 @@ function requestNgui(
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
 	url += soptions.path;
 
-	httpNgui.request({
+	httpFtr.request({
 		url: url,
 		method: method == 'POST'? http.HTTP_METHOD_POST: http.HTTP_METHOD_GET,
 		headers: soptions.headers,
@@ -313,7 +313,7 @@ function requestNode(	options: Dict,
 
 // request implementation
 var _request_platform = 
-	haveNgui ? requestNgui:
+	haveFtr ? requestFtr:
 	haveWeb ? requestWeb:
 	haveNode ? requestNode:
 	utils.unrealized;

@@ -32,10 +32,10 @@ import utils from './util';
 import path from './path';
 import { Notification } from './event';
 
-const { haveNode, haveNgui, haveWeb } = utils;
+const { haveNode, haveFtr, haveWeb } = utils;
 
-if (haveNgui) {
-	var fs = __requireNgui__('_fs');
+if (haveFtr) {
+	var fs = __requireFtr__('_fs');
 } else if (haveNode) {
 	var fs = require('./fs');
 }

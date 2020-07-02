@@ -1,5 +1,5 @@
 
-// export * from __requireNgui__('_http');
+// export * from __requireFtr__('_http');
 
 import event, {EventNoticer,Event} from './event'
 

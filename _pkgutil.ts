@@ -33,7 +33,7 @@ import _util from './_util' ;
 
 export type Optopns = Dict<string|string[]>;
 
-const {haveNode, haveNgui, haveWeb} = _util;
+const {haveNode, haveFtr, haveWeb} = _util;
 const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
@@ -45,13 +45,13 @@ var _cwd:()=>string;
 var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
-var _ngui_pkgutil: any;
+var _ftr_pkgutil: any;
 var debug = false;
 
-if (haveNgui) {
-	_ngui_pkgutil = __requireNgui__('_pkguitl');
-	_path = __requireNgui__('_path');
-	win32 = __requireNgui__('_util').platform == 'win32';
+if (haveFtr) {
+	_ftr_pkgutil = __requireFtr__('_pkguitl');
+	_path = __requireFtr__('_path');
+	win32 = __requireFtr__('_util').platform == 'win32';
 	cwd = _path.cwd;
 	_cwd = cwd;
 	chdir = _path.chdir;
@@ -211,7 +211,7 @@ function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-if (haveNode && !haveNgui) {
+if (haveNode && !haveFtr) {
 	var fs = require('fs');
 	require('module').Module._extensions['.keys'] = 
 		function(module: NodeModule, filename: string): any {
@@ -271,8 +271,8 @@ function readConfigFile(pathname: string, pathname2: string) {
 }
 
 function getConfig(): Dict {
-	if (haveNgui) {
-		return _ngui_pkgutil.config;
+	if (haveFtr) {
+		return _ftr_pkgutil.config;
 	}
 	if (!config) {
 		if (haveNode) {
@@ -300,8 +300,8 @@ function initArgv() { // init
 	}
 	parseOptions(args, options);
 
-	if (haveNgui) {
-		debug = __requireNgui__('_util').debug;
+	if (haveFtr) {
+		debug = __requireFtr__('_util').debug;
 	} else if (haveNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
 			debug = true;

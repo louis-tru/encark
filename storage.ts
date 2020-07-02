@@ -32,7 +32,7 @@ import util from './util';
 import url from './path';
 import {DelayCall} from './delay_call';
 
-const { haveNode, haveNgui, haveWeb } = util;
+const { haveNode, haveFtr, haveWeb } = util;
 
 if (haveWeb) {
 
@@ -55,8 +55,8 @@ if (haveWeb) {
 	};
 
 } else {
-	if (haveNgui) {
-		var fs = __requireNgui__('_fs');
+	if (haveFtr) {
+		var fs = __requireFtr__('_fs');
 	} else if (haveNode) {
 		var fs = require('fs');
 	}

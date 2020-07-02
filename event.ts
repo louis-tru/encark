@@ -241,8 +241,8 @@ export {};
 
 // ======================== IMPL ========================
 
-if (typeof __requireNgui__ == 'function') { // ngui
-	Object.assign(exports, __requireNgui__('_event'));
+if (typeof __requireFtr__ == 'function') { // ftr
+	Object.assign(exports, __requireFtr__('_event'));
 } else {
 	Object.assign(exports, require('./_event'));
 }

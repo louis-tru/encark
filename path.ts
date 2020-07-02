@@ -162,7 +162,7 @@ export class URL {
 		(<any>this)._value = path;
 	}
 	
-	// href: "http://xxxx.xxx:81/v1.1.0/ngui/path.js?sasasas&asasasa#sdsdsd"
+	// href: "http://xxxx.xxx:81/v1.1.0/ftr/path.js?sasasas&asasasa#sdsdsd"
 	get href(): string {
 		parse_path(this);
 		return (<any>this)._origin + (<any>this)._filename + (<any>this)._search + (<any>this)._hash;
@@ -206,19 +206,19 @@ export class URL {
 		return (<any>this)._hash;
 	}
 	
-	// host: "ngui.fun:81"
+	// host: "ftr.fun:81"
 	get host(): string {
 		parse_path(this);
 		return (<any>this)._hostname + ((<any>this)._port ? ':' + (<any>this)._port : '');
 	}
 	
-	// hostname: "ngui.fun"
+	// hostname: "ftr.fun"
 	get hostname(): string {
 		parse_path(this);
 		return (<any>this)._hostname;
 	}
 	
-	// origin: "http://ngui.fun:81"
+	// origin: "http://ftr.fun:81"
 	get origin(): string {
 		parse_path(this);
 		return (<any>this)._origin;
