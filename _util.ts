@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-if (typeof __requireFtr__ == 'function') {
+if (typeof __require__ == 'function') {
 	require('ftr/_ext');
 } else {
 	require('./_ext');
@@ -41,7 +41,7 @@ const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
 const haveNode: boolean = !!globalThis.process;
-const haveFtr: boolean = !!globalThis.__requireFtr__;
+const haveFtr: boolean = !!globalThis.__require__;
 const haveWeb: boolean = !!globalThis.document;
 
 type Platform = 'darwin' | 'linux' | 'win32' | 'android'
@@ -97,7 +97,7 @@ var _processHandles = {
 };
 
 if (haveFtr) {
-	var _util = __requireFtr__('_util');
+	var _util = __require__('_util');
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
 	gc = _util.garbageCollection;

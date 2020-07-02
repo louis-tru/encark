@@ -34,7 +34,7 @@ import _keys from './_keys';
 var readFile: (path: string)=>string;
 
 if (util.haveFtr) {
-	let reader = __requireFtr__('_reader');
+	let reader = __require__('_reader');
 	readFile = function(path: string) {
 		return reader.readFileSync(path, 'utf8');
 	};

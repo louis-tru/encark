@@ -241,8 +241,8 @@ export {};
 
 // ======================== IMPL ========================
 
-if (typeof __requireFtr__ == 'function') { // ftr
-	Object.assign(exports, __requireFtr__('_event'));
+if (typeof __require__ == 'function') { // ftr
+	Object.assign(exports, __require__('_event'));
 } else {
 	Object.assign(exports, require('./_event'));
 }

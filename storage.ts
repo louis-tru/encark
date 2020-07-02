@@ -56,7 +56,7 @@ if (haveWeb) {
 
 } else {
 	if (haveFtr) {
-		var fs = __requireFtr__('_fs');
+		var fs = __require__('_fs');
 	} else if (haveNode) {
 		var fs = require('fs');
 	}

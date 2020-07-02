@@ -49,9 +49,9 @@ var _ftr_pkgutil: any;
 var debug = false;
 
 if (haveFtr) {
-	_ftr_pkgutil = __requireFtr__('_pkguitl');
-	_path = __requireFtr__('_path');
-	win32 = __requireFtr__('_util').platform == 'win32';
+	_ftr_pkgutil = __require__('_pkguitl');
+	_path = __require__('_path');
+	win32 = __require__('_util').platform == 'win32';
 	cwd = _path.cwd;
 	_cwd = cwd;
 	chdir = _path.chdir;
@@ -301,7 +301,7 @@ function initArgv() { // init
 	parseOptions(args, options);
 
 	if (haveFtr) {
-		debug = __requireFtr__('_util').debug;
+		debug = __require__('_util').debug;
 	} else if (haveNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
 			debug = true;

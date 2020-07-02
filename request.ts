@@ -39,7 +39,7 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 
 if (haveFtr) {
 	var user_agent = _user_agent;
-	var httpFtr = __requireFtr__('_http');
+	var httpFtr = __require__('_http');
 }
 else if (haveWeb) {
 	var user_agent = navigator.userAgent;
