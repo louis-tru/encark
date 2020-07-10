@@ -89,6 +89,7 @@ export interface InterfaceBuffer extends Uint8Array {
 	readFloatBE(offset?: number): number;
 	readDoubleBE(offset?: number): number;
 	readBigUIntBE(offset?: number, end?: number): bigint;
+	readBigUIntLE(offset?: number, end?: number): bigint;
 	// write
 	writeInt8(value: number, offset?: number): number;
 	writeUInt8(value: number, offset?: number): number;
@@ -405,8 +406,11 @@ class IBufferIMPL extends Uint8Array implements IBuffer {
 	readDoubleBE(offset: number = 0) {
 		return _IBuffer.readDoubleBE(this, offset);
 	}
-	readBigUIntBE(offset: number, end: number) {
+	readBigUIntBE(offset: number = 0, end: number = this.length) {
 		return _IBuffer.readBigUIntBE(this, offset, end);
+	}
+	readBigUIntLE(offset: number = 0, end: number = this.length) {
+		return _IBuffer.readBigUIntLE(this, offset, end);
 	}
 	// write
 	writeInt8(value: number, offset = 0) {

@@ -40,6 +40,16 @@ function _readBigUIntBE(self, offset, end) {
 	return num;
 }
 
+function _readBigUIntLE(self, offset, end) {
+	var num = 0n;
+	while (offset < end) {
+		end--;
+		num <<= 8n;
+		num |= BigInt(self[end]);
+	}
+	return num;
+}
+
 function _readBigInt64BE(self, offset) {
 	const hi = 
 		(self[offset++] << 24) + // Overflow
@@ -114,6 +124,7 @@ module.exports = {
 		checkInt = _checkInt;
 	},
 	_readBigUIntBE,
+	_readBigUIntLE,
 	_readBigInt64BE,
 	_readBigUInt64BE,
 	_writeBigIntLE,

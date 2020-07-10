@@ -36,6 +36,7 @@ const uInt8Float64Array = new Uint8Array(float64Array.buffer);
 var _bigint: any = null;
 
 var _readBigUIntBE: (self: Uint8Array, offset: number, end: number)=>bigint;
+var _readBigUIntLE: (self: Uint8Array, offset: number, end: number)=>bigint;
 var _writeBigIntLE: (bytes: number[], bigint: bigint)=>number;
 
 function readBigUIntBE(self: Uint8Array, offset: number, end: number): bigint {
@@ -44,6 +45,14 @@ function readBigUIntBE(self: Uint8Array, offset: number, end: number): bigint {
 	if (end > self.length)
 		boundsError(offset, self.length - (end - offset), 'end');
 	return _readBigUIntBE(self, offset, end);
+}
+
+function readBigUIntLE(self: Uint8Array, offset: number, end: number): bigint {
+	validateNumber(offset, 'offset');
+	validateNumber(end, 'end');
+	if (end > self.length)
+		boundsError(offset, self.length - (end - offset), 'end');
+	return _readBigUIntLE(self, offset, end);
 }
 
 function writeBigIntLE(bytes: number[], bigint: bigint): number {
@@ -61,6 +70,7 @@ if (!!globalThis.BigInt) {
 		_bigint = bigint;
 		_bigint._set(checkInt);
 		_readBigUIntBE = _bigint._readBigUIntBE;
+		_readBigUIntLE = _bigint._readBigUIntLE;
 		_writeBigIntLE = _bigint._writeBigIntLE;
 	}, require);
 }
@@ -694,6 +704,7 @@ export default {
 	readIntBE, readUIntBE,
 	readFloatBE, readDoubleBE,
 	readBigUIntBE,
+	readBigUIntLE,
 	// write
 	writeInt8, writeUInt8,
 	writeInt16BE, writeUInt16BE,
