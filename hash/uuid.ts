@@ -28,59 +28,8 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import utils from '../util';
-import buffer, {IBuffer, Bytes } from '../buffer';
-
-const rnds8 = buffer.alloc(16);
-// Math.random()-based (RNG)
-//
-// If all else fails, use Math.random().  It's fast, but is of unspecified
-// quality.
-var _rng: ()=>IBuffer = function() {
-	for (var i = 0, r = 0; i < 16; i++) {
-		if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
-		rnds8[i] = r >>> ((i & 0x03) << 3) & 0xff;
-	}
-	return rnds8;
-};
-
-if (utils.haveNode) { // node 
-	const crypto = require('crypto');
-	_rng = function() {
-		return buffer.from(crypto.randomBytes(16));
-	};
-} else if (utils.haveWeb) {
-
-	// Unique ID creation requires a high quality random # generator.  In the
-	// browser this is a little complicated due to unknown quality of Math.random()
-	// and inconsistent support for the `crypto` API.  We do the best we can via
-	// feature-detection
-
-	// getRandomValues needs to be invoked in a context where "this" is a Crypto
-	// implementation. Also, find the complete implementation of crypto on IE11.
-	let getRandomValues: (b: IBuffer)=>IBuffer =
-		(
-			typeof(crypto) != 'undefined' && 
-			crypto.getRandomValues && crypto.getRandomValues.bind(crypto)
-		) || 
-		(
-			typeof((<any>globalThis).msCrypto) != 'undefined' && 
-			typeof (<any>globalThis).msCrypto.getRandomValues == 'function' && 
-			(<any>globalThis).msCrypto.getRandomValues.bind((<any>globalThis).msCrypto)
-		);
-
-	if (getRandomValues) {
-		// WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
-			// eslint-disable-line no-undef
-		_rng = function() {
-			return buffer.from(getRandomValues(rnds8));
-		};
-	}
-}
-
-export function rng() {
-	return _rng();
-}
+import {IBuffer, Bytes } from '../buffer';
+import {rng16} from '../rng';
 
 /**
  * Convert array of 16 byte values to UUID string format of the form:
@@ -106,7 +55,7 @@ function bytesToUuid(buf: Bytes, offset?: number) {
 }
 
 export default function uuid_v4(random?: IBuffer) {
-	var rnds = random || rng();
+	var rnds = random || rng16();
 
 	// Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
 	rnds[6] = (rnds[6] & 0x0f) | 0x40;

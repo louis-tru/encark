@@ -171,6 +171,7 @@ export declare class EventNoticer<E = DefaultEvent> {
 	 */
 	off(listen?: string | Function | object, scope?: object): number;
 }
+export declare const VOID: any;
 /**
  * @class Notification
  */
