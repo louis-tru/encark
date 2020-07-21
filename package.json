@@ -1,9 +1,9 @@
 {
 	"name": "somes",
-	"version": "0.10.71",
+	"version": "0.10.72",
 	"description": "This is a collection of tools, independent of any other libraries",
-	"main": "util.js",
-	"types": "util.ts",
+	"main": "index.js",
+	"types": "index.ts",
 	"author": {
 		"name": "xuewen.chu",
 		"email": "louistru@hotmail.com",
