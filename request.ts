@@ -68,6 +68,7 @@ export interface Options {
 	urlencoded?: boolean;
 	userAgent?: string;
 	cacheTime?: number;
+	noRepeat?: boolean;
 }
 
 const defaultOptions: Options = {
@@ -497,6 +498,7 @@ export class Request {
 	private m_timeout = defaultOptions.timeout;
 	private m_signer?: Signer;
 	private m_cur_reqs = new Set<number>();
+	private m_no_repeat = false;
 
 	constructor(prefix: string) {
 		this.m_user_agent = user_agent;
@@ -521,6 +523,8 @@ export class Request {
 	set prefix(v) { this.m_prefix = v }
 	get timeout() { return this.m_timeout }
 	set timeout(value) { this.m_timeout = value }
+	get noRepeat() { return this.m_no_repeat }
+	set noRepeat(value: boolean) { this.m_no_repeat = value }
 
 	get signer() {
 		return this.m_signer || null;
@@ -547,7 +551,8 @@ export class Request {
 		var url = this.m_prefix + '/' + name;
 		var hashCode = [name, method, params].hashCode();
 
-		utils.assert(!this.m_cur_reqs.has(hashCode), errno.ERR_REPEAT_REQUEST);
+		if ('noRepeat' in opts ? opts.noRepeat: this.m_no_repeat)
+			utils.assert(!this.m_cur_reqs.has(hashCode), errno.ERR_REPEAT_REQUEST);
 		this.m_cur_reqs.add(hashCode);
 
 		headers = Object.assign({}, this.getRequestHeaders(), headers);
