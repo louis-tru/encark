@@ -491,25 +491,22 @@ export function parseJSON(json: string): any {
  */
 export class Request {
 	private m_user_agent: string;
-	private m_server_url: string;
-	private m_mock: Dict;
-	private m_mock_switch: Dict | null;
+	private m_prefix: string;
 	private m_data_type: string = 'urlencoded';
 	private m_cache = new Cache();
 	private m_timeout = defaultOptions.timeout;
 	private m_signer?: Signer;
+	private m_cur_reqs = new Set<number>();
 
-	constructor(serverURL: string, mock?: Dict, mockSwitch?: Dict) {
+	constructor(prefix: string) {
 		this.m_user_agent = user_agent;
-		this.m_server_url = serverURL || utils.config.web_service;
-		this.m_mock = mock || {};
-		this.m_mock_switch = mockSwitch || null;
+		this.m_prefix = prefix || utils.config.web_service;
 
-		if (!this.m_server_url) {
+		if (!this.m_prefix) {
 			if (haveWeb) {
-				this.m_server_url = location.origin;
+				this.m_prefix = location.origin;
 			} else {
-				this.m_server_url = 'http://localhost';
+				this.m_prefix = 'http://localhost';
 			}
 		}
 	}
@@ -520,12 +517,8 @@ export class Request {
 	set urlencoded(v) { this.m_data_type = v ? 'urlencoded': 'json' }
 	get dataType() { return this.m_data_type }
 	set dataType(v) { this.m_data_type = v }
-	get serverURL() { return this.m_server_url }
-	set serverURL(v) { this.m_server_url = v }
-	get mock() { return this.m_mock }
-	set mock(v) { this.m_mock = v }
-	get mockSwitch() { return this.m_mock_switch }
-	set mockSwitch(v) { this.m_mock_switch = v }
+	get prefix() { return this.m_prefix }
+	set prefix(v) { this.m_prefix = v }
 	get timeout() { return this.m_timeout }
 	set timeout(value) { this.m_timeout = value }
 
@@ -551,55 +544,52 @@ export class Request {
 	async request(name: string, method: string = 'GET', params?: Params, options?: Options): PromiseResult {
 		var opts = options || {};
 		var { headers } = opts;
-		var url = this.m_server_url + '/' + name;
+		var url = this.m_prefix + '/' + name;
+		var hashCode = [name, method, params].hashCode();
+
+		utils.assert(!this.m_cur_reqs.has(hashCode), errno.ERR_REPEAT_REQUEST);
+		this.m_cur_reqs.add(hashCode);
 
 		headers = Object.assign({}, this.getRequestHeaders(), headers);
 		params = params || opts.params;
 
-		if (this.m_mock[name] && (!this.m_mock_switch || this.m_mock_switch[name])) {
-			return { 
-				data: Object.create(this.m_mock[name]),
-				headers: {},
-				statusCode: 200,
-				httpVersion: '1.1',
-				requestHeaders: headers,
-				requestData: params,
-			} as Result;
-		} else {
-			var result: Result;
+		var result: Result;
 
-			try {
-				result = await request(url, {
-					method,
-					headers: headers,
-					params: params,
-					timeout: opts.timeout || this.m_timeout,
-					dataType: opts.dataType || this.m_data_type,
-					userAgent: opts.userAgent || this.m_user_agent,
-					signer: opts.signer || this.m_signer,
-				});
-			} catch(err) {
-				err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
-				err.url = url;
-				err.requestHeaders = headers;
-				err.requestData = params;
-				throw err;
-			}
-
-			try {
-				result.data = this.parseResponseData(result.data as IBuffer);
-				return result;
-			} catch(err) {
-				err.url = url;
-				err.headers = result.headers;
-				err.statusCode = result.statusCode;
-				err.httpVersion = result.httpVersion;
-				err.description = result.data.toString('utf-8');
-				err.requestHeaders = headers;
-				err.requestData = params;
-				throw err;
-			}
+		try {
+			result = await request(url, {
+				method,
+				headers: headers,
+				params: params,
+				timeout: opts.timeout || this.m_timeout,
+				dataType: opts.dataType || this.m_data_type,
+				userAgent: opts.userAgent || this.m_user_agent,
+				signer: opts.signer || this.m_signer,
+			});
+		} catch(err) {
+			this.m_cur_reqs.delete(hashCode);
+			err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
+			err.url = url;
+			err.requestHeaders = headers;
+			err.requestData = params;
+			throw err;
 		}
+
+		try {
+			result.data = this.parseResponseData(result.data as IBuffer);
+		} catch(err) {
+			err.url = url;
+			err.headers = result.headers;
+			err.statusCode = result.statusCode;
+			err.httpVersion = result.httpVersion;
+			err.description = result.data.toString('utf-8');
+			err.requestHeaders = headers;
+			err.requestData = params;
+			throw err;
+		} finally {
+			this.m_cur_reqs.delete(hashCode);
+		}
+
+		return result;
 	}
 
 	async get(name: string, params?: Params, options?: Options): PromiseResult {
