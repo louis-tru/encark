@@ -250,12 +250,18 @@ function from(
 	}
 }
 
-function alloc(size: number): IBuffer {
-	return new IBufferIMPL( Number(size) || 0);
+function alloc(size: number, initFill?: number): IBuffer {
+	var buf = new IBufferIMPL( Number(size) || 0);
+	if (initFill)
+		buf.fill(Number(initFill) || 0);
+	return buf;
 }
 
-function allocUnsafe(size: number): IBuffer {
-	return new IBufferIMPL( Number(size) || 0);
+function allocUnsafe(size: number, initFill?: number): IBuffer {
+	var buf = new IBufferIMPL( Number(size) || 0);
+	if (initFill)
+		buf.fill(Number(initFill) || 0);
+	return buf;
 }
 
 function concat(list: (Bytes | ArrayLike<number>)[], length?: number): IBuffer {
