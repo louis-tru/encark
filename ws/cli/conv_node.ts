@@ -78,7 +78,7 @@ export default class NodeConversation extends WSConversation {
 		});
 
 		if (this.m_signer) {
-			Object.assign(headers, await this.m_signer.sign(path));
+			Object.assign(headers, await this.m_signer.sign(path, ''));
 		}
 
 		var options: https.RequestOptions = {

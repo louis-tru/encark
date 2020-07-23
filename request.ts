@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import buffer,{IBuffer} from './buffer';
+import buffer,{IBuffer, Zero} from './buffer';
 import url from './path';
 import errno from './errno';
 
@@ -323,7 +323,7 @@ var _request_platform =
  * @class Signer
  */
 export interface Signer {
-	sign(path: string, data?: any): Dict<string> | Promise<Dict<string>>;
+	sign(path: string, data: string): Dict<string> | Promise<Dict<string>>;
 }
 
 /**
@@ -361,12 +361,11 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		uri.clearHash();
 
 		var headers: Dict<string> = {
-			'User-Agent': <string>options.userAgent,
+			'User-Agent': options.userAgent as string,
 			'Accept': 'application/json',
 		};
-		Object.assign(headers, options.headers);
 
-		var post_data = null;
+		var post_data: string | null = null;
 
 		if (method == 'POST') {
 			if (options.urlencoded || options.dataType == 'urlencoded') {
@@ -395,10 +394,12 @@ export function request(pathname: string, opts: Options): PromiseResult {
 			}
 		}
 
+		Object.assign(headers, options.headers);
+
 		var path = uri.path;
 
 		if (signer) {
-			Object.assign(headers, await signer.sign(path, post_data));
+			Object.assign(headers, await signer.sign(path, post_data ? post_data: ''));
 		}
 
 		if (!haveWeb) {

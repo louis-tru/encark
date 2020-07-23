@@ -292,7 +292,7 @@ function concat(list: (Bytes | ArrayLike<number>)[], length?: number): IBuffer {
 	return bf;
 }
 
-class IBufferIMPL extends Uint8Array implements IBuffer {
+export class IBufferIMPL extends Uint8Array implements IBuffer {
 
 	toString(encoding: IBufferEncoding = 'utf8', start = 0, end = this.length): string {
 		if (encoding) {
