@@ -251,8 +251,8 @@ export default {
 	},
 
 	set(name: string, cls: any) {
-		util.assert(util.equalsClass(Service, cls), '"{0}" is not a "Service" type', name);
-		util.assert(!(name in all_service_cls), 'service repeat definition, "{0}"', name);
+		util.assert(util.equalsClass(Service, cls), `"${name}" is not a "Service" type`);
+		util.assert(!(name in all_service_cls), `service repeat definition, "${name}"`);
 		all_service_cls[name] = cls;
 	},
 

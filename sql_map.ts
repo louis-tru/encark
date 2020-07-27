@@ -371,7 +371,7 @@ function get_db(self: SqlMap): Database {
 		default:
 			break;
 	}
-	utils.assert(db_class, 'Not supporting database, {0}', self.type);
+	utils.assert(db_class, `Not supporting database, ${self.type}`);
 	return new (<any>db_class)(self.config.db);
 }
 
