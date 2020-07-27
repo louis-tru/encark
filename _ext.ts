@@ -91,7 +91,7 @@ interface Array<T> {
 	hashCode(): number;
 	deleteOf(value: T): T[];
 	indexReverse(index: number): T;
-	index(index: number): T;
+	indexAt(index: number): T;
 }
 
 interface StringConstructor {
@@ -344,7 +344,7 @@ definePropertys(Array.prototype, {
 		return this[this.length - 1 - index];
 	},
 
-	index(index: number): any {
+	indexAt(index: number): any {
 		return this[index];
 	}
 
