@@ -216,7 +216,14 @@ function byteLength(
 	}
 }
 
-function from(
+interface From {
+	(data: string, encoding?: IBufferEncoding): IBuffer;
+	(data: ArrayBuffer | SharedArrayBuffer, byteOffset?: number, length?: number): IBuffer;
+	(data: TypedArray | DataView): IBuffer;
+	(data: Iterable<number> | ArrayLike<number>, mapfn?: (v: number, k: number) => number, thisArg?: any): IBuffer;
+}
+
+const from = function(
 	value: FromArg,
 	encodingOrMapfn?: IBufferEncoding | ((v: number, k: number) => number),
 	thisArg?: any): IBuffer 
@@ -236,19 +243,19 @@ function from(
 		} else {
 			return new IBufferIMPL(_codec.encodeUTF8(value));
 		}
-	} else if (value instanceof TypedArrayConstructor) {
+	} else if (value instanceof TypedArrayConstructor) { // 
 		var bf = value as Uint8Array;
 		return new IBufferIMPL(bf.buffer, bf.byteOffset, bf.byteLength);
 	} else if (value instanceof ArrayBuffer || value instanceof SharedArrayBuffer) {
-		return new IBufferIMPL(value);
-	} else if (value instanceof DataView) {
+		return new IBufferIMPL(value, Number(encodingOrMapfn) || 0, Number(thisArg) || value.byteLength);
+	} else if (value instanceof DataView) { // 
 		return new IBufferIMPL(value.buffer, value.byteOffset, value.byteLength);
 	} else {
-		var bf = Uint8Array.from(<any>value, <any>encodingOrMapfn, thisArg);
-		(<any>bf).__proto__ = IBufferIMPL.prototype;
-		return <IBufferIMPL>bf;
+		var bf = Uint8Array.from(value as any, encodingOrMapfn as any, thisArg);
+		(bf as any).__proto__ = IBufferIMPL.prototype;
+		return bf as IBufferIMPL;
 	}
-}
+} as From;
 
 function alloc(size: number, initFill?: number): IBuffer {
 	var buf = new IBufferIMPL( Number(size) || 0);
@@ -359,9 +366,9 @@ export class IBufferIMPL extends Uint8Array implements IBuffer {
 	}
 
 	write(arg0: FromArg, offset?: number, encoding?: IBufferEncoding): number {
-		var IBuffer = from(arg0, encoding);
-		this.set(IBuffer, offset);
-		return IBuffer.length;
+		var buf = from(arg0 as any, encoding);
+		this.set(buf, offset);
+		return buf.length;
 	}
 
 	readInt8(offset = 0) {
