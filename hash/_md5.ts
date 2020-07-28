@@ -11,7 +11,7 @@
 // compatible code
 
 import util from './util';
-import buffer, {Bytes} from '../buffer';
+import buffer, {Bytes, IBuffer} from '../buffer';
 
 const {chrsz,bin2binl,binl2bin} = util;
 
@@ -160,7 +160,9 @@ function bit_rol(num: number, cnt: number)
 	return (num << cnt) | (num >>> (32 - cnt));
 }
 
-export default function md5(s: string | Bytes) {
+const md5 = function(s: any) {
 	var b = buffer.from(s);
 	return binl2bin(core_md5(bin2binl(b), b.length * chrsz));
-}
+} as ((s: string | Bytes)=>IBuffer);
+
+export default md5;
