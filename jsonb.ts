@@ -66,7 +66,7 @@ var // FLAGS
 	F_INFINITY_MIN = 25,
 	F_INFINITY_MAX = 26;
 
-if (globalThis.BigInt) {
+if (typeof BigInt == 'function') {
 	var BIGINT_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 	var BIGINT_MIN_SAFE_INTEGER = BigInt(Number.MIN_SAFE_INTEGER);
 }

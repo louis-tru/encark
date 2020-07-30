@@ -90,7 +90,7 @@ export default class NodeConversation extends WSConversation {
 		};
 
 		if (isSSL) {
-			options.agent = new https.Agent(options);
+			options.agent = new https.Agent({ rejectUnauthorized: false });
 		}
 
 		var req = this.m_req = lib.request(options);
