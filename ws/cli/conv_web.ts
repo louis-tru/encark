@@ -48,7 +48,7 @@ export default class WebConversation extends WSConversation {
 	/**
 	 * @ovrewrite 
 	 */
-	async initialize() {
+	protected async initialize() {
 		utils.assert(!this.m_req, 'No need to repeat open');
 
 		var self = this;

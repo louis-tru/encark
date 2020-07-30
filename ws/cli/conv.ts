@@ -210,7 +210,7 @@ export abstract class WSConversation extends ConversationBasic {
 	/**
 	 * @fun init # init conversation
 	 */
-	abstract initialize(): void;
+	protected abstract initialize(): void;
 
 }
 

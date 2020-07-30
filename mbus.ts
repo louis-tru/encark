@@ -30,7 +30,7 @@
 
 import utils from './util';
 import {MqttClient, CreateOptions} from './mqtt';
-import {Notification,Event} from './event';
+import {Notification} from './event';
 
 /**
  * @class NotificationCenter
@@ -57,7 +57,7 @@ export class NotificationCenter extends Notification {
 			if (topic.indexOf(this.m_topic) == 0) {
 				var event = topic.substr(this.m_topic.length + 1);
 				data = data.length ? JSON.parse(data.toString('utf8')): undefined;
-				this.afterNotificationHandle(event, data);
+				utils.nextTick(()=>this.afterNotificationHandle(event, data));
 			}
 		});
 		cli.on('reconnect', e=>console.log(`MQTT, ${msg}, reconnect`));

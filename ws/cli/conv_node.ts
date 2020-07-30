@@ -47,7 +47,7 @@ export default class NodeConversation extends WSConversation {
 	private m_req: http.ClientRequest | null = null;
 	private m_socket: net.Socket | null = null; // web socket connection
 
-	async initialize() {
+	protected async initialize() {
 		utils.assert(!this.m_req, 'No need to repeat open');
 
 		if (_conv.USE_GZIP_DATA)
