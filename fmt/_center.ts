@@ -195,7 +195,7 @@ export class FastMessageTransferCenter_IMPL {
 					cfg.retry++;
 					// console.log('FastMessageTransferCenter_IMPL.run(), connect', cfg.url);
 					this.connect(cfg.url).catch(err=>{
-						if (err.code != errno.ERR_REPEAT_FNODE_CONNECT[0]) {
+						if (err.errno != errno.ERR_REPEAT_FNODE_CONNECT[0]) {
 							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
 								delete this.m_fnodesCfg[cfg.url];
 							}
@@ -275,7 +275,7 @@ export class FastMessageTransferCenter_IMPL {
 					return method ? await (<any>fnode)[method](id, ...args):
 						utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
 				} catch(err) {
-					if (err.code != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
+					if (err.errno != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
 						throw err;
 					}
 				}

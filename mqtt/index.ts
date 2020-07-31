@@ -1123,6 +1123,7 @@ export class MqttClient extends events.EventEmitter {
 		} else if (rc > 0) {
 			var err = new Error('Connection refused: ' + errors[rc]);
 			err.code = rc;
+			err.errno = rc;
 			this.emit('error', err);
 		}
 	}
