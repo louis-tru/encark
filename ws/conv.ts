@@ -106,10 +106,15 @@ export class WSConversation extends ConversationBasic  {
 			// self.token = '';
 			// self.onOpen.off();
 
-			try {
-				for (var s of Object.values(self.m_handles)) {
+			for (var s of Object.values(self.m_handles)) {
+				try {
 					(s as wsservice.WSService).destroy();
+				} catch(err) {
+					console.error(err);
 				}
+			}
+
+			try {
 				self.server.onWSConversationClose.trigger(self);
 			} catch(err) {
 				console.error(err);

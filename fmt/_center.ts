@@ -347,20 +347,26 @@ export class FastMessageTransferCenter_IMPL {
 	 * @func loginFrom() client login 
 	 */
 	async loginFrom(fmtservice: service.FMTService) {
-		utils.assert(fmtservice.id);
-		var fmt = this.m_fmtservice.get(fmtservice.id);
+		var id = fmtservice.id;
+		utils.assert(id);
+		var fmt = this.m_fmtservice.get(id);
 		if (fmt) {
-			utils.assert(fmtservice.time <= fmt.time, errno.ERR_REPEAT_LOGIN_FMTC);
+			utils.assert(fmtservice.time > fmt.time, errno.ERR_REPEAT_LOGIN_FMTC);
 			fmt.forceLogout(); // force offline
 			await this.logoutFrom(fmt);
 		}
-		this.m_fmtservice.set(fmtservice.id, fmtservice);
-		this.publish('_Login', {
-			id: fmtservice.id, uuid: fmtservice.uuid,
-			time: fmtservice.time, fnodeId: this.id, 
-		});
+		this.m_fmtservice.set(id, fmtservice);
+		try {
+			this.publish('_Login', {
+				id: id, uuid: fmtservice.uuid,
+				time: fmtservice.time, fnodeId: this.id,
+			});
+		} catch(err) {
+			this.m_fmtservice.delete(id); // Undo handle reference
+			throw err;
+		}
 		if (utils.debug)
-			console.log('Login', fmtservice.id);
+			console.log('Login', id);
 	}
 
 	/**
