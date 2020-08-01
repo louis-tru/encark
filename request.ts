@@ -203,7 +203,7 @@ function requestWeb(
 	url += soptions.hostname;
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
 	url += soptions.path;
-	url += `${soptions.path.indexOf('?')==-1?'?':'&'}_=${__id++}`;
+	// url += `${soptions.path.indexOf('?')==-1?'?':'&'}_=${__id++}`;
 
 	var xhr = new XMLHttpRequest();
 	xhr.open(method|| 'POST', url, true);
