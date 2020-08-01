@@ -54,6 +54,10 @@ export class Route {
 		uuid: string, 
 		time: number, fnodeId: string
 	) {
+		utils.assert(id);
+		utils.assert(fnodeId);
+		utils.assert(time);
+		utils.assert(uuid);
 		this.id = id;
 		this.fnodeId = fnodeId;
 		this.time = time;
@@ -264,21 +268,23 @@ export class FastMessageTransferCenter_IMPL {
 		this.m_markOffline.set(id, Date.now() + OFFLINE_CACHE_TIME);
 	}
 
-	async exec(id: string, args: any[] = [], method?: string) {
+	async exec(id: string, args: any[] = [], method?: string): Promise<any> {
 
-		var fnode: fnode.FNode | undefined;
+		var fnode: fnode.FNode | null = null;
 		var route = this.m_routeTable.get(id);
 		if (route) {
 			fnode = this.m_fnodes[route.fnodeId];
 			if (fnode) {
 				try {
-					return method ? await (<any>fnode)[method](id, ...args):
+					return method ?
+						await (fnode as any)[method](id, ...args):
 						utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
 				} catch(err) {
 					if (err.errno != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
 						throw err;
 					}
 				}
+				fnode = null;
 			}
 			// Trigger again:
 			this.m_host.getNoticer('_Logout').trigger({ id, uuid: route.uuid, fnodeId: route.fnodeId });
@@ -314,7 +320,7 @@ export class FastMessageTransferCenter_IMPL {
 		this.m_host.getNoticer('_Login').trigger({ id, uuid, time, fnodeId: fnode.id });
 
 		if (method) {
-			return await (<any>fnode)[method](id, ...args);
+			return await (fnode as any)[method](id, ...args);
 		}
 	}
 
