@@ -158,6 +158,8 @@ export class FastMessageTransferCenter_IMPL {
 		this.m_host.addEventListener('_Logout', e=>{ // client disconnect
 			var {id, uuid} = e.data;
 			var route = this.m_routeTable.get(id);
+			if (utils.debug)
+				console.log('this.m_host.addEventListener(_Logout)', route, route?.uuid, uuid);
 			if (route && route.uuid == uuid) {
 				this.m_routeTable.delete(id);
 				// trigger logout event
@@ -317,7 +319,7 @@ export class FastMessageTransferCenter_IMPL {
 			throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
 		}
 		// Trigger again
-		this.m_host.getNoticer('_Login').trigger({ id, uuid, fnodeId: fnode.id, time });
+		this.m_host.getNoticer('_Login').trigger({ id, uuid, fnodeId: (fnode as fnode.FNode).id, time });
 
 		if (method) {
 			return await (fnode as any)[method](id, ...args);
@@ -355,24 +357,24 @@ export class FastMessageTransferCenter_IMPL {
 	async loginFrom(fmtService: service.FMTService) {
 		utils.assert(fmtService.id);
 
-		var old = this._fmtService.get(fmtService.id);
-		if (old) {
+		// var retry = 5;
+		var old: service.FMTService | undefined;
+
+		if (old = this._fmtService.get(fmtService.id)) {
 			utils.assert(fmtService.time > old.time, errno.ERR_REPEAT_LOGIN_FMTC);
+			// if (retry-- === 0) {
 			old.forceLogout(); // force offline
 			await this.logoutFrom(old);
+			// }
 		}
 
 		utils.assert(!this._fmtService.has(fmtService.id));
 
 		this._fmtService.set(fmtService.id, fmtService);
-		try {
-			this.publish('_Login', {
-				id: fmtService.id, uuid: fmtService.uuid, fnodeId: this.id, time: fmtService.time,
-			});
-		} catch(err) {
-			this._fmtService.delete(fmtService.id); // Undo handle reference
-			throw err;
-		}
+
+		this.publish('_Login', {
+			id: fmtService.id, uuid: fmtService.uuid, fnodeId: this.id, time: fmtService.time,
+		});
 
 		if (utils.debug)
 			console.log('Login', fmtService.id);
@@ -384,9 +386,11 @@ export class FastMessageTransferCenter_IMPL {
 	async logoutFrom(fmtService: service.FMTService) {
 		utils.assert(fmtService.id);
 
-		if (!this._fmtService.has(fmtService.id)) return;
+		if (!this._fmtService.has(fmtService.id))
+			return;
 
 		this._fmtService.delete(fmtService.id);
+
 		this.publish('_Logout', {
 			id: fmtService.id, uuid: fmtService.uuid, fnodeId: this.id,
 		});

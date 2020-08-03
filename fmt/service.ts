@@ -129,7 +129,7 @@ export class FMTService extends wss.WSService {
 		this.trigger(`${event}-${id}`, data);
 	}
 
-	_repeatForceLogout() {
+	private _repeatForceLogout() {
 		return Promise.race([this._trigger('ForceLogout'), utils.sleep(200)]);
 	}
 

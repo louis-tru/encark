@@ -52,7 +52,7 @@ export class ServerIMPL extends Server {
 			if (this.interceptRequest(req, res)) 
 				return;
 
-			var url = decodeURI(req.url || '');       // 解码
+			var url = decodeURI(req.url || ''); // 解码
 			var info = this.router.find(url);   // 通过url查找目标服务信息
 			var name = info.service;
 			var cls = service.get(name) as unknown as typeof StaticService;

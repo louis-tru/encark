@@ -98,9 +98,10 @@ export class WSConversation extends ConversationBasic  {
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
 
-			console.log('WS conv close');
+			console.log('WS conv close', self.m_token);
 
 			self.m_isOpen = false;
+
 			// self.request = null;
 			// self.socket = null;
 			// self.token = '';
@@ -261,20 +262,25 @@ export class WSConversation extends ConversationBasic  {
 			console.log('SW requestAuth', this.request.url);
 
 			var ser = new cls(self);
-			var ok = await utils.timeout(ser.requestAuth({ service: name, action: '' }), 2e4);
+			var ok = await utils.timeout(ser.requestAuth({ service: name, action: '' }), 2e4, (e)=>console.warn(e));
 			utils.assert(ok, errno.ERR_REQUEST_AUTH_FAIL);
 			self.m_isGzip = ser.headers['use-gzip'] == 'on';
 
-			console.log('SER Loading', this.request.url);
+			console.log('SER Loading', this.request.url, this.m_token);
 
-			await utils.timeout(ser.load(), 2e4);
+			await utils.timeout(ser.load(), 2e4, function(e) {
+				if (e.errno == errno.ERR_EXECUTE_TIMEOUT_AFTER[0])
+					ser.destroy();
+				console.warn(e);
+			});
 
-			if (!self.m_default_service)
+			if (!self.m_default_service) {
 				self.m_default_service = name;
+			}
 			self.m_handles[name] = ser;
 			self.m_services_count++;
-			(<any>ser).m_loaded = true; // TODO ptinate visit
-			(<any>ser).name = name;     // TODO ptinate visit 设置服务名称
+			(ser as any).m_loaded = true; // TODO ptinate visit
+			(ser as any).name = name;     // TODO ptinate visit 设置服务名称
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
