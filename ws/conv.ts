@@ -65,7 +65,7 @@ export class WSConversation extends ConversationBasic  {
 		this.socket = req.socket;
 
 		// initialize
-		this._initialize(bind_services).catch(err=>{
+		this._initialize(bind_services).catch(()=>{
 			this.close();
 			this._safeDestroy();  // 关闭连接
 			// console.warn(err);
@@ -85,13 +85,12 @@ export class WSConversation extends ConversationBasic  {
 		var self = this;
 		var services = bind_services.split(',');
 		utils.assert(services[0], 'Bind Service undefined');
+		utils.assert(!self.m_isOpen);
 
 		self.socket.pause();
 
 		if (!self.__initialize())
 			return self._safeDestroy();  // 关闭连接
-
-		utils.assert(!self.m_isOpen);
 
 		self.m_isOpen = true;
 
@@ -134,6 +133,7 @@ export class WSConversation extends ConversationBasic  {
 			await utils.sleep(5e3); // delay 5s
 			throw err;
 		}
+
 		self.socket.resume();
 	}
 
@@ -274,13 +274,10 @@ export class WSConversation extends ConversationBasic  {
 				console.warn(e);
 			});
 
-			if (!self.m_default_service) {
+			if (!self.m_default_service)
 				self.m_default_service = name;
-			}
 			self.m_handles[name] = ser;
 			self.m_services_count++;
-			(ser as any).m_loaded = true; // TODO ptinate visit
-			(ser as any).name = name;     // TODO ptinate visit 设置服务名称
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
@@ -317,8 +314,7 @@ export class WSConversation extends ConversationBasic  {
 			socket.removeAllListeners('data');
 			socket.removeAllListeners('drain');
 			try {
-				if (socket.writable) 
-					socket.end();
+				socket.writable ? socket.end(): socket.destroy();
 			} catch(err) {
 				console.error(err);
 			}

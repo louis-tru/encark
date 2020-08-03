@@ -54,6 +54,7 @@ export class WSService extends Service implements conv.MessageHandle {
 	private m_calls = new Map<number, CallData>();
 	private m_loaded = false;
 	private m_Intervalid: any;
+	private _destroy = false;
 	
 	get conv() {
 		return this.m_conv;
@@ -68,6 +69,10 @@ export class WSService extends Service implements conv.MessageHandle {
 
 	get loaded() {
 		return this.m_loaded;
+	}
+
+	get isDestroy() {
+		return this._destroy;
 	}
 
 	constructor(conv: conv.WSConversation) {
@@ -85,8 +90,13 @@ export class WSService extends Service implements conv.MessageHandle {
 		});
 	}
 
-	async load() {}
-	async destroy() {}
+	async load() {
+		this.m_loaded = true;
+	}
+
+	async destroy() {
+		this._destroy = true;
+	}
 
 	private _checkMethodName(method: string) {
 		utils.assert(/^[a-z]/i.test(method), errno.ERR_FORBIDDEN_ACCESS);

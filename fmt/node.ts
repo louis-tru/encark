@@ -263,9 +263,11 @@ export class FNodeRemoteService extends wss.WSService {
 			console.error('FNodeRemoteService.load, err', err);
 			this.conv.close();
 		}
+		await super.load();
 	}
 
 	async destroy() {
+		await super.destroy();
 		try {
 			if (!this.m_fnode) return;
 			console.log('FNodeRemoteService.destroy()', this.m_fnode.id);

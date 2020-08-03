@@ -36,7 +36,7 @@ import * as net from 'net';
 import {Server} from './_server';
 import {RuleResult} from './router';
 
-const all_service_cls: Dict<typeof Service> = {};
+const _service_cls: Dict<typeof Service> = {};
 
 /**
  * base service abstract class
@@ -199,13 +199,13 @@ export default {
 	/**
 	 * 获取所有的服务名称列表
 	 */
-	get services() { return Object.keys(all_service_cls) },
+	get services() { return Object.keys(_service_cls) },
 	
 	/**
 	 * 通过名称获取服务class
 	 */
 	get(name: string): typeof Service {
-		return all_service_cls[name];
+		return _service_cls[name];
 	},
 
 	/**
@@ -213,7 +213,7 @@ export default {
 	 */
 	getServiceDescriptors() {
 		var r: Dict = {};
-		Object.entries(all_service_cls).forEach(([key, service])=>{
+		Object.entries(_service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
 
 				var type = 0;
@@ -252,11 +252,12 @@ export default {
 
 	set(name: string, cls: any) {
 		util.assert(util.equalsClass(Service, cls), `"${name}" is not a "Service" type`);
-		util.assert(!(name in all_service_cls), `service repeat definition, "${name}"`);
-		all_service_cls[name] = cls;
+		util.assert(!(name in _service_cls), `service repeat definition, "${name}"`);
+		cls.prototype.name = name;
+		_service_cls[name] = cls;
 	},
 
 	del(name: string) {
-		delete all_service_cls[ name ];
+		delete _service_cls[ name ];
 	},
 };

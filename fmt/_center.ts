@@ -134,13 +134,13 @@ export class FastMessageTransferCenter_IMPL {
 				if (uuid != fmt.uuid) {
 					if (fmt.time <= time)
 						fmt.forceLogout(); // force logout, offline
-					if (time <= fmt.time)
+					if (fmt.time >= time)
 						return // Invalid login
 				}
 			} else {
 				var route = this.m_routeTable.get(id);
 				if (route) {
-					if (time <= route.time)
+					if (route.time >= time)
 						return // Invalid login
 				}
 			}
@@ -159,7 +159,7 @@ export class FastMessageTransferCenter_IMPL {
 			var {id, uuid} = e.data;
 			var route = this.m_routeTable.get(id);
 			if (utils.debug)
-				console.log('this.m_host.addEventListener(_Logout)', route, route?.uuid, uuid);
+				console.log('this.m_host.addEventListener(_Logout)', route, uuid);
 			if (route && route.uuid == uuid) {
 				this.m_routeTable.delete(id);
 				// trigger logout event
@@ -357,15 +357,11 @@ export class FastMessageTransferCenter_IMPL {
 	async loginFrom(fmtService: service.FMTService) {
 		utils.assert(fmtService.id);
 
-		// var retry = 5;
-		var old: service.FMTService | undefined;
-
-		if (old = this._fmtService.get(fmtService.id)) {
+		var old = this._fmtService.get(fmtService.id);
+		if (old) {
 			utils.assert(fmtService.time > old.time, errno.ERR_REPEAT_LOGIN_FMTC);
-			// if (retry-- === 0) {
 			old.forceLogout(); // force offline
 			await this.logoutFrom(old);
-			// }
 		}
 
 		utils.assert(!this._fmtService.has(fmtService.id));

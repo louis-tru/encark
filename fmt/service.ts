@@ -76,6 +76,9 @@ export class FMTService extends wss.WSService {
 		this.m_id = String(this.params.id);
 	}
 
+	/**
+	 * @overwrite
+	 */
 	async requestAuth() {
 		var center = fmtc._fmtc(this.conv.server);
 		utils.assert(center, 'FMTService.requestAuth() fmt center No found');
@@ -87,6 +90,9 @@ export class FMTService extends wss.WSService {
 		return false;
 	}
 
+	/**
+	 * @overwrite
+	 */
 	async load() {
 		var center = fmtc._fmtc(this.conv.server) as IMPL;
 		utils.assert(center, 'FMTService.load() FMTC No found');
@@ -101,12 +107,14 @@ export class FMTService extends wss.WSService {
 			throw err;
 		}
 		this.m_center = center;
+		await super.load();
 	}
 
 	/**
 	 * @overwrite
 	 */
 	async destroy() {
+		await super.destroy();
 		var center = this.m_center;
 		if (center) {
 			this.m_center = null;
