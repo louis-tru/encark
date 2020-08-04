@@ -56,7 +56,7 @@ export class Service {
 	/**
 	 * @type {String} 服务名称
 	 */
-	readonly name: string = '';
+	readonly name: string;// = '';
 	
 	/**
 	 * server
