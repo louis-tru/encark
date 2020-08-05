@@ -281,7 +281,8 @@ export class WSConversation extends ConversationBasic  {
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
 			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
-			console.log('SER Load', this.request.url);
+
+			console.log('SER Load', this.request.url, this.m_token);
 		}
 	}
 
@@ -319,7 +320,7 @@ export class WSConversation extends ConversationBasic  {
 				console.error(err);
 			}
 			this.onClose.trigger({});
-			console.log('Hybi Conversation Close');
+			console.log('Hybi Conversation Close', this.m_token);
 		}
 	}
 

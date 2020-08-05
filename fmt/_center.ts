@@ -373,7 +373,7 @@ export class FastMessageTransferCenter_IMPL {
 		});
 
 		if (utils.debug)
-			console.log('Login', fmtService.id);
+			console.log('Login', fmtService.id, fmtService.uuid, fmtService.conv.token);
 	}
 
 	/**
@@ -385,6 +385,12 @@ export class FastMessageTransferCenter_IMPL {
 		if (!this._fmtService.has(fmtService.id))
 			return;
 
+		if (this._fmtService.get(fmtService.id) !== fmtService) {
+			if (utils.debug)
+				console.log('logoutFrom', fmtService.id);
+			return;
+		}
+
 		this._fmtService.delete(fmtService.id);
 
 		this.publish('_Logout', {
@@ -392,7 +398,7 @@ export class FastMessageTransferCenter_IMPL {
 		});
 
 		if (utils.debug)
-			console.log('Logout', fmtService.id);
+			console.log('Logout', fmtService.id, fmtService.uuid, fmtService.conv.token);
 	}
 
 	/**
