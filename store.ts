@@ -36,18 +36,16 @@ import { WSConversation, WSClient, METHOD_CALL_TIMEOUT } from './ws/cli';
 import {IBuffer} from './buffer';
 import * as log from './log';
 
-var serviceAPI = new path.URL(utils.config.serviceAPI || 'http://127.0.0.1:8091/service-api');
-
 if (utils.haveWeb) {
-	var default_host = path.getParam('D_SDK_HOST') || serviceAPI.hostname;
-	var default_port = path.getParam('D_SDK_PORT') || serviceAPI.port;
-	var default_ssl = !!Number(path.getParam('D_SDK_SSL')) || /^(http|ws)s/.test(serviceAPI.protocol);
-	var default_directory = path.getParam('D_SDK_VIRTUAL') || serviceAPI.filename;
+	var default_host = path.getParam('D_SDK_HOST') || '127.0.0.1';
+	var default_port = path.getParam('D_SDK_PORT') || '';
+	var default_ssl = !!Number(path.getParam('D_SDK_SSL')) || false;
+	var default_prefix = path.getParam('D_SDK_PREFIX') || 'service-api';
 } else {
-	var default_host = serviceAPI.hostname;
-	var default_port = serviceAPI.port;
-	var default_ssl = /^(http|ws)s/.test(serviceAPI.protocol);
-	var default_directory = serviceAPI.filename;
+	var default_host = '127.0.0.1';
+	var default_port = '';
+	var default_ssl = false;
+	var default_prefix = 'service-api';
 }
 
 interface Descriptors {
@@ -183,23 +181,23 @@ export default class APIStore extends Notification {
 	private m_name: string;
 	private m_conv: WSConversation2 | null;
 	private m_req: Request2 | null;
-	private m_desc: Dict<Descriptors> = {};
+	private m_descriptors: Dict<Descriptors> = {};
 	private m_timeoutid = 0;
 	private m_signer: any = null;
 	private m_request_headers: Dict = {};
 	private m_port = ''
 	private m_ssl = '';
 	private m_host = '';
-	private m_directory = '';
+	private m_prefix = '';
 	private m_core: Dict<WrapClient> = {};
-	private m_isloaded = false;
+	private m_isLoaded = false;
 
 	get name() {
 		return this.m_name;
 	}
 
 	get descriptors() {
-		return this.m_desc;
+		return this.m_descriptors;
 	}
 
 	get core() {
@@ -210,23 +208,25 @@ export default class APIStore extends Notification {
 		super();
 		this.m_name = name;
 	}
-		
-	private _get_wssocket_conv() {
+
+	private _getWssocketConv() {
 		var self = this;
 		if (!self.m_conv) {
 			var port = self.m_port != (self.m_ssl?'443':'80') ? ':'+self.m_port: '';
-			var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_directory);
+			var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_prefix);
 			var conv = self.m_conv = new WSConversation2(self, pathname);
 			if (self.m_signer)
 				conv.signer = self.m_signer;
-			conv.onClose.on(e=>console.error('Connection accidental disconnection'));
+			conv.onClose.on(()=>console.error('Connection accidental disconnection'));
 			conv.keepAliveTime = 5e3; // 5s;
 			// disconnect auto connect
-			conv.onClose.on(e=>{
-				utils.sleep(50).then(e=>conv.connect());
+			conv.onClose.on(()=>{
+				if (this.m_isLoaded)
+					utils.sleep(50).then(()=>conv.connect());
 			});
-			conv.onError.on(e=>{
-				utils.sleep(50).then(e=>conv.connect());
+			conv.onError.on(()=>{
+				if (this.m_isLoaded)
+					utils.sleep(50).then(()=>conv.connect());
 			});
 		}
 		return self.m_conv;
@@ -236,14 +236,14 @@ export default class APIStore extends Notification {
 		if (this.m_conv)
 			this.m_conv.close();
 		this.m_conv = null;
+		this.m_req = null;
 		this.m_core = {};
-		this.m_isloaded = false;
-		this.m_desc = {};
+		this.m_isLoaded = false;
 		clearInterval(this.m_timeoutid);
 	}
 
 	get isLoaded() {
-		return this.m_isloaded;
+		return this.m_isLoaded;
 	}
 
 	get requestHeaders() {
@@ -262,35 +262,44 @@ export default class APIStore extends Notification {
 			this.m_conv.signer = signer;
 	}
 
-	async initialize(
+	async initialize({
 		host = default_host,
 		port = default_port,
-		ssl = default_ssl, directory = default_directory
-	)
+		ssl = default_ssl,
+		prefix = default_prefix,
+		descriptors,
+	}: {
+		host?: string;
+		port?: string;
+		ssl?: boolean;
+		prefix?: string;
+		descriptors?: Dict<Descriptors>;
+	})
 	{
 		this.m_host = host;
 		this.m_port = port || (ssl?'443':'80');
 		this.m_ssl = ssl ? 's': '';
-		this.m_directory = directory;
+		this.m_prefix = prefix;
 
 		port = this.m_port != (ssl?'443':'80') ? ':'+this.m_port: '';
 
 		var service_api = path.resolve(
-			`http${this.m_ssl}://${host}${port}`, this.m_directory);
+			`http${this.m_ssl}://${host}${port}`, this.m_prefix);
 
 		this.m_req = new Request2(this, service_api);
 		this.m_req.urlencoded = false;
 		if (this.m_signer)
 			this.m_req.signer = this.m_signer;
 
-		var { data: desc } = await this.m_req.get('descriptors/descriptors', undefined, {timeout: 2e4});
+		var desc: Dict<Descriptors> = descriptors? descriptors:
+			(await this.m_req.get('descriptors/descriptors', undefined, {timeout: 2e4})).data;
 
-		delete this.m_desc.descriptors;
+		delete desc.descriptors;
 
 		for (var name in desc) {
 			var item = desc[name];
 			if (item.type == 'event') {
-				var ws = this._get_wssocket_conv();
+				var ws = this._getWssocketConv();
 				this.m_core[name] = new WrapClient(this, name, new WSClient(name, ws), desc[name]);
 			} else {
 				this.m_core[name] = new WrapRequest(this, name, this.m_req, desc[name]);
@@ -299,7 +308,8 @@ export default class APIStore extends Notification {
 
 		// log.log('fxkit/store', 'startup complete');
 
-		this.m_isloaded = true;
+		this.m_descriptors = desc;
+		this.m_isLoaded = true;
 	}
 
 	trigger(name: string, data: any) {
