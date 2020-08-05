@@ -48,7 +48,7 @@ if (utils.haveWeb) {
 	var default_prefix = 'service-api';
 }
 
-interface Descriptors {
+export interface Descriptors {
 	type: 'service' | 'event';
 	methods: string[];
 	events: string[];
