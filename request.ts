@@ -365,6 +365,8 @@ export function request(pathname: string, opts: Options): PromiseResult {
 			'Accept': 'application/json',
 		};
 
+		Object.assign(headers, options.headers);
+
 		var post_data: string | null = null;
 
 		if (method == 'POST') {
@@ -393,8 +395,6 @@ export function request(pathname: string, opts: Options): PromiseResult {
 				uri.params = Object.assign(uri.params, params);
 			}
 		}
-
-		Object.assign(headers, options.headers);
 
 		var path = uri.path;
 
