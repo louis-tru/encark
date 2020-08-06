@@ -107,8 +107,13 @@ export class Console extends Notification {
 				if (this.m_fd) {
 					var format = 'yyyyMMddhhmmss';
 					fs.closeSync(this.m_fd);
-					if (cut)
-						fs.renameSync(this.m_pathname, `${this.m_pathname}-${this.m_fd_open_time.toString(format)}-${now.toString(format)}`);
+					if (cut) {
+						try {
+							fs.renameSync(this.m_pathname, `${this.m_pathname}-${this.m_fd_open_time.toString(format)}-${now.toString(format)}`);
+						} catch(err) {
+							console.error(err);
+						}
+					}
 					this.m_fd = 0;
 				}
 				this.m_fd = fs.openSync(this.m_pathname, 'a');
