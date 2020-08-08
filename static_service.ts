@@ -308,7 +308,7 @@ function resultError(self: StaticService, statusCode: number, html?: string) {
 		'</h3><br/>' + (html || '') + '</body></html>');
 }
 
-function _returnFile(self: StaticService, filename: string, stat: fs.Stats) {
+function _returnFile(self: StaticService, filename: string, stat: fs.Stats, mime?: string) {
 
 	var req = self.request;
 	var res = self.response;
@@ -321,7 +321,7 @@ function _returnFile(self: StaticService, filename: string, stat: fs.Stats) {
 	var mtime = <Date>stat.mtime;
 	var ims = req.headers['if-modified-since'];
 	var range = <string>req.headers['range'];
-	var type = self.server.getMime(filename);
+	var type = mime || self.server.getMime(filename);
 	var gzip = isGzip(self, filename);
 	
 	setHeader(self);
@@ -377,7 +377,7 @@ function _returnFile(self: StaticService, filename: string, stat: fs.Stats) {
 	});
 }
 
-function returnFile(self: StaticService, filename: string) {
+function returnFile(self: StaticService, filename: string, mime?: string) {
 	if (util.debug || !return_cache(self, filename)) {  //high speed Cache
 		fs.stat(filename, function (err, stat) {
 			if (err) {
@@ -385,7 +385,7 @@ function returnFile(self: StaticService, filename: string) {
 			} else if (stat.isDirectory()) {  //dir
 				tryReturnDirectory(self, filename);
 			} else if (stat.isFile()) {
-				_returnFile(self, filename, stat);
+				_returnFile(self, filename, stat, mime);
 			} else {
 				returnErrorStatus(self, 404);
 			}
@@ -553,9 +553,9 @@ export class StaticService extends Service {
 	 * return file to browser
 	 * @param {String}       filename
 	 */	
-	returnFile(filename: string) {
+	returnFile(filename: string, mime?: string) {
 		this.markCompleteResponse();
-		return returnFile(this, filename);
+		return returnFile(this, filename, mime);
 	}
 	
 	/**
