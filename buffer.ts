@@ -252,7 +252,7 @@ const from = function(
 		return new IBufferIMPL(value.buffer, value.byteOffset, value.byteLength);
 	} else {
 			var bf = encodingOrMapfn ? 
-				Uint8Array.from(value as any, encodingOrMapfn as any, thisArg):
+				Uint8Array.from(value as any, encodingOrMapfn as any, thisArg): // encodingOrMapfn unedfined is not defined
 				Uint8Array.from(value as any);
 		(bf as any).__proto__ = IBufferIMPL.prototype;
 		return bf as IBufferIMPL;
