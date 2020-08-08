@@ -40,7 +40,7 @@ import req from './request';
 export interface Options {
 	renewal?: boolean;
 	limit?: number;
-	onProgress?(opts: { total: number, size: number, speed: number }): void;
+	onProgress?(opts: { total: number, size: number, speed: number, data: Buffer }): void;
 	timeout?: number;
 }
 
@@ -212,7 +212,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 						}
 
 						try {
-							progress({ total: download_total, size: download_size, speed });
+							progress({ total: download_total, size: download_size, speed, data: chunk });
 						} catch(e) {
 							console.error(e);
 						}
