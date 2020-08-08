@@ -251,7 +251,9 @@ const from = function(
 	} else if (value instanceof DataView) { // 
 		return new IBufferIMPL(value.buffer, value.byteOffset, value.byteLength);
 	} else {
-		var bf = Uint8Array.from(value as any, encodingOrMapfn as any, thisArg);
+			var bf = encodingOrMapfn ? 
+				Uint8Array.from(value as any, encodingOrMapfn as any, thisArg):
+				Uint8Array.from(value as any);
 		(bf as any).__proto__ = IBufferIMPL.prototype;
 		return bf as IBufferIMPL;
 	}
