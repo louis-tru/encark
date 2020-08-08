@@ -47,6 +47,7 @@ export interface Options {
 export interface Result {
 	total: number;
 	size: number; 
+	mime: string;
 }
 
 export interface WgetResult extends Promise<Result> {
@@ -115,6 +116,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 			var start_range = 0;
 			var download_total = 0;
 			var download_size = 0;
+			var file_mime = 'application/octet-stream';
 
 			if (renewal) {
 				if (!err) {
@@ -163,7 +165,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 					} else if (res_end) {
 						ok = true;
 						var _fd = fd; fd = 0;
-						fs.close(_fd, e=>resolve({ total: download_total, size: download_size }));
+						fs.close(_fd, e=>resolve({ total: download_total, size: download_size, mime: file_mime }));
 					}
 				}
 			}
@@ -250,6 +252,8 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 							download_total += download_size;
 						}
 					}
+
+					file_mime = (res.headers['content-type'] || file_mime).split(';')[0];
 					
 					fs.open(save, flag, function(err, _fd) {
 						if (err) {
