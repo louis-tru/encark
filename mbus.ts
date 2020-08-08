@@ -94,7 +94,7 @@ export class NotificationCenter extends Notification {
 
 	publish(event: string, data: any) {
 		data = Buffer.from(JSON.stringify(data) || '');
-		return this.m_mqtt.publish(this.m_topic + '/' + event, data);
+		this.m_mqtt.publish(this.m_topic + '/' + event, data);
 	}
 
 }
