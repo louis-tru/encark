@@ -143,12 +143,13 @@ export function stringifyXml(obj: any) {
 }
 
 export interface Result {
-	data: any,
-	headers: Dict<string>,
-	statusCode: number,
-	httpVersion: string,
-	requestHeaders: Dict<string>,
-	requestData: Dict,
+	data: any;
+	headers: Dict<string>;
+	statusCode: number;
+	httpVersion: string;
+	requestHeaders: Dict<string>;
+	requestData: Dict;
+	cached: boolean;
 }
 
 export type PromiseResult = Promise<Result>
@@ -184,6 +185,7 @@ function requestFtr(
 			httpVersion: res.httpVersion,
 			requestHeaders: soptions.headers,
 			requestData: options.params,
+			cached: false,
 		});
 	}).catch((err: any)=>{
 		reject(Error.new(err));
@@ -235,6 +237,7 @@ function requestWeb(
 			httpVersion: '1.1',
 			requestHeaders: soptions.headers,
 			requestData: options.params,
+			cached: false,
 		};
 		if (data instanceof ArrayBuffer) {
 			resolve(Object.assign(r, { data: buffer.from(data) }));
@@ -292,6 +295,7 @@ function requestNode(	options: Dict,
 				httpVersion: res.httpVersion,
 				requestHeaders: soptions.headers,
 				requestData: options.params,
+				cached: false,
 			});
 		});
 	});
@@ -435,9 +439,9 @@ export function request(pathname: string, opts: Options): PromiseResult {
 }
 
 interface CacheValue {
-	data: any;
+	data: Result;
 	time: number;
-	timeoutid: any;
+	timeend: number;
 }
 
 /**
@@ -451,23 +455,20 @@ class Cache {
 	}
 
 	get(key: string) {
-		return this.m_getscache[key];
+		var d = this.m_getscache[key];
+		if (d) {
+			if (d.timeend > Date.now()) {
+				return d;
+			}
+			delete this.m_getscache[key]
+		}
 	}
 
-	set(key: string, data: any, cacheTiem: number) {
-		var i = this.m_getscache[key];
-		if (i) {
-			var id = i.timeoutid;
-			if (id) {
-				clearTimeout(id);
-			}
-		}
+	set(key: string, data: Result, cacheTiem: number) {
 		this.m_getscache[key] = {
 			data: data,
 			time: cacheTiem,
-			timeoutid: cacheTiem ? setTimeout(e=>{
-				delete this.m_getscache[key];
-			}, cacheTiem): 0,
+			timeend: cacheTiem + Date.now(),
 		}
 	}
 
@@ -608,13 +609,13 @@ export class Request {
 			}
 			var data = await this.request(name, 'GET', params, options);
 			this.m_cache.set(key, data, cacheTime);
-			return data as Result;
+			return data;
 		} else {
 			var data = await this.request(name, 'GET', params, options);
 			if (cache) {
 				this.m_cache.set(key, data, cache.time);
 			}
-			return data as Result;
+			return data;
 		}
 	}
 
