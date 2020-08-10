@@ -145,6 +145,7 @@ export default class NodeConversation extends WSConversation {
 			self._error(e);
 			self.close();
 		});
+
 		console.log('CLI NodeConversation init', self.m_url.href, self.m_connecting);
 
 		req.end();
@@ -176,11 +177,8 @@ export default class NodeConversation extends WSConversation {
 			}
 		}
 		this.m_req = null;
-		this.m_socket = null;
 		super.close();
 	}
-
-	private m_count = 0;
 
 	/**
 	 * @ovrewrite

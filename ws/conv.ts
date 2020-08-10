@@ -88,16 +88,13 @@ export class WSConversation extends ConversationBasic  {
 		utils.assert(services[0], 'Bind Service undefined');
 		utils.assert(!self.m_isOpen);
 
-		self.socket.pause();
-
-		if (!self.__initialize())
+		if (!self._handshakes())
 			return self._safeDestroy();  // 关闭连接
 
 		self.m_isOpen = true;
 
 		self.onClose.on(function() {
 			utils.assert(self.m_isOpen);
-
 			console.log('WS conv close', self.m_token);
 
 			self.m_isOpen = false;
@@ -109,35 +106,14 @@ export class WSConversation extends ConversationBasic  {
 					console.error(err);
 				}
 			}
-
 			try {
 				self.server.onWSConversationClose.trigger(self);
 			} catch(err) {
 				console.error(err);
 			}
-
-			// utils.nextTick(()=>self.onClose.off());
 		});
 
-		self.onOpen.trigger({});
-		self.server.onWSConversationOpen.trigger(self);
-
-		try {
-			await self.bindServices(services);
-		} catch(err) {
-			await utils.sleep(5e3); // delay 5s
-			throw err;
-		}
-
-		self.socket.resume();
-	}
-
-	private __initialize() {
-		if (!this._handshakes()) {
-			return false;
-		}
-		var self = this;
-		var socket = this.socket;
+		var socket = self.socket;
 		var parser = new PacketParser();
 
 		socket.setNoDelay(true);
@@ -158,7 +134,17 @@ export class WSConversation extends ConversationBasic  {
 		parser.onClose.on(()=>self.close());
 		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
 
-		return true;
+		try {
+			self.socket.pause();
+			self.onOpen.trigger({});
+			self.server.onWSConversationOpen.trigger(self);	
+			await self.bindServices(services);
+		} catch(err) {
+			await utils.sleep(5e3); // delay 5s
+			throw err;
+		} finally {
+			self.socket.resume();
+		}
 	}
 
 	private _handshakes() {
@@ -172,7 +158,7 @@ export class WSConversation extends ConversationBasic  {
 			console.error('connection invalid');
 			return false;
 		}
-		
+
 		if (!this.verifyOrigin(origin)) {
 			console.error('connection invalid: origin mismatch');
 			return false;
@@ -183,19 +169,7 @@ export class WSConversation extends ConversationBasic  {
 			return false;
 		}
 
-		try {
-			this._upgrade();
-		} catch(err) {
-			console.error(err);
-			return false;
-		}
-
-		return true;
-	}
-
-	private _upgrade() {
-		// calc key
-		var key = this.request.headers['sec-websocket-key'];
+		// upgrade response
 		var shasum = crypto.createHash('sha1');
 		shasum.update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11');
 		key = shasum.digest('base64');
@@ -205,8 +179,11 @@ export class WSConversation extends ConversationBasic  {
 			'Connection: Upgrade',
 			'Session-Token: ' + this.token,
 			'Sec-WebSocket-Accept: ' + key,
+			'', '',
 		];
-		this.socket.write(headers.concat('', '').join('\r\n'));
+		this.socket.write(headers.join('\r\n'));
+
+		return true;
 	}
 
 	/**
