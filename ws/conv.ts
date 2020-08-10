@@ -75,7 +75,8 @@ export class WSConversation extends ConversationBasic  {
 	private _safeDestroy() {
 		try {
 			if (this.socket.writable)
-				this.socket.destroy(); // this.socket.end(); // 关闭连接
+				this.socket.end();
+			this.socket.destroy(); // 关闭连接
 		} catch(err) {
 			console.warn('_safeDestroy', err);
 		}
@@ -115,7 +116,7 @@ export class WSConversation extends ConversationBasic  {
 				console.error(err);
 			}
 
-			utils.nextTick(()=>self.onClose.off());
+			// utils.nextTick(()=>self.onClose.off());
 		});
 
 		self.onOpen.trigger({});
@@ -309,12 +310,9 @@ export class WSConversation extends ConversationBasic  {
 			socket.removeAllListeners('data');
 			socket.removeAllListeners('drain');
 			try {
-				if (socket.writable) {
+				if (socket.writable)
 					socket.end();
-				} else {
-					// TODO Calling the "destroy()" method causes the network listener to become unresponsive
-					// socket.destroy();
-				}
+				socket.destroy();
 			} catch(err) {
 				console.error(err);
 			}

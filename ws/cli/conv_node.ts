@@ -166,6 +166,7 @@ export default class NodeConversation extends WSConversation {
 			try {
 				if (socket.writable)
 					socket.end();
+				socket.destroy();
 			} catch(err) {
 				console.error(err);
 			}
