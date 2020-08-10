@@ -211,34 +211,36 @@ export default class APIStore extends Notification {
 
 	private _getWssocketConv() {
 		var self = this;
-		if (!self.m_conv) {
-			var port = self.m_port != (self.m_ssl?'443':'80') ? ':'+self.m_port: '';
-			var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_prefix);
-			var conv = self.m_conv = new WSConversation2(self, pathname);
-			if (self.m_signer)
-				conv.signer = self.m_signer;
-			conv.onClose.on(()=>console.error('Connection accidental disconnection'));
-			conv.keepAliveTime = 5e3; // 5s;
-			// disconnect auto connect
-			conv.onClose.on(()=>{
-				if (this.m_isLoaded)
-					utils.sleep(50).then(()=>conv.connect());
-			});
-			conv.onError.on(()=>{
-				if (this.m_isLoaded)
-					utils.sleep(50).then(()=>conv.connect());
-			});
+		if (self.m_conv) {
+			return self.m_conv;
 		}
+		var port = self.m_port != (self.m_ssl?'443':'80') ? ':'+self.m_port: '';
+		var pathname = path.resolve(`ws${self.m_ssl}://${self.m_host}${port}`, self.m_prefix);
+		var conv = self.m_conv = new WSConversation2(self, pathname);
+		if (self.m_signer)
+			conv.signer = self.m_signer;
+		conv.onClose.on(()=>console.error('Connection accidental disconnection'));
+		conv.keepAliveTime = 5e3; // 5s;
+		// disconnect auto connect
+		conv.onClose.on(()=>{
+			if (this.m_isLoaded)
+				utils.sleep(50).then(()=>conv.connect());
+		});
+		conv.onError.on(()=>{
+			if (this.m_isLoaded)
+				utils.sleep(50).then(()=>conv.connect());
+		});
+	
 		return self.m_conv;
 	}
 
 	destroy() {
+		this.m_isLoaded = false;
 		if (this.m_conv)
 			this.m_conv.close();
 		this.m_conv = null;
 		this.m_req = null;
 		this.m_core = {};
-		this.m_isLoaded = false;
 		clearInterval(this.m_timeoutid);
 	}
 
