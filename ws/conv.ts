@@ -67,17 +67,17 @@ export class WSConversation extends ConversationBasic  {
 		// initialize
 		this._initialize(bind_services).catch(()=>{
 			this.close();
-			this._safeDestroy();  // 关闭连接
+			this._safeDestroy(); // 关闭连接
 			// console.warn(err);
 		});
 	}
 
 	private _safeDestroy() {
 		try {
-			if (this.socket)
-				this.socket.destroy();  // 关闭连接
+			if (this.socket.writable)
+				this.socket.destroy(); // this.socket.end(); // 关闭连接
 		} catch(err) {
-			console.warn(err);
+			console.warn('_safeDestroy', err);
 		}
 	}
 
@@ -101,11 +101,6 @@ export class WSConversation extends ConversationBasic  {
 
 			self.m_isOpen = false;
 
-			// self.request = null;
-			// self.socket = null;
-			// self.token = '';
-			// self.onOpen.off();
-
 			for (var s of Object.values(self.m_handles)) {
 				try {
 					(s as wsservice.WSService).destroy();
@@ -120,7 +115,6 @@ export class WSConversation extends ConversationBasic  {
 				console.error(err);
 			}
 
-			// self.server = null;
 			utils.nextTick(()=>self.onClose.off());
 		});
 
@@ -160,7 +154,7 @@ export class WSConversation extends ConversationBasic  {
 		parser.onData.on(e=>self.handlePacket(e.data, false));
 		parser.onPing.on(e=>self.handlePing(e.data));
 		parser.onPong.on(e=>self.handlePong(e.data));
-		parser.onClose.on(e=>self.close());
+		parser.onClose.on(()=>self.close());
 		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
 
 		return true;
@@ -315,7 +309,12 @@ export class WSConversation extends ConversationBasic  {
 			socket.removeAllListeners('data');
 			socket.removeAllListeners('drain');
 			try {
-				socket.writable ? socket.end(): socket.destroy();
+				if (socket.writable) {
+					socket.end();
+				} else {
+					// TODO Calling the "destroy()" method causes the network listener to become unresponsive
+					// socket.destroy();
+				}
 			} catch(err) {
 				console.error(err);
 			}
