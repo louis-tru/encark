@@ -150,7 +150,7 @@ export class FastMessageTransferCenter_IMPL {
 			this.m_host.getNoticer('Login').trigger(e.data);
 
 			for (let [,fmt] of this._fmtService) {
-				if (fmt.id != e.data.id)
+				if (fmt.id != id)
 					fmt.reportState('Login', id);
 			}
 		});
