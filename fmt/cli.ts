@@ -207,6 +207,7 @@ export class FMTClient extends Notification {
 }
 
 export interface ThatClient {
+	readonly id: string;
 	hasOnline(): Promise<boolean>;
 	trigger(event: string, data?: any): Promise<void>;
 	call<T = any>(method: string, data?: any, timeout?: number): Promise<T>;

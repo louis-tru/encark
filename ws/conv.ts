@@ -54,18 +54,18 @@ export class WSConversation extends ConversationBasic  {
 
 	/**
 	 * @arg {http.ServerRequest} req
-	 * @arg {String}   bind_services
+	 * @arg {String}   bindServices
 	 */
-	constructor(req: http.IncomingMessage, upgradeHead: any, bind_services: string) {
+	constructor(req: http.IncomingMessage, upgradeHead: any, bindServices: string) {
 		super();
 
-		var server = <http.Server>(<any>req.socket).server;
-		this.server = <s.Server>(<any>server).__wrap__;
+		var server = (req.socket as any).server as http.Server;
+		this.server = (server as any).__wrap__ as s.Server;
 		this.request = req;
 		this.socket = req.socket;
 
 		// initialize
-		this._initialize(bind_services).catch(()=>{
+		this._initialize(bindServices).catch(()=>{
 			this.close();
 			this._safeDestroy(); // 关闭连接
 			// console.warn(err);
@@ -80,6 +80,18 @@ export class WSConversation extends ConversationBasic  {
 		} catch(err) {
 			console.warn('_safeDestroy', err);
 		}
+		this._safeDestroyService();
+	}
+
+	private _safeDestroyService() {
+		for (var s of Object.values(this.m_handles)) {
+			try {
+				(s as wsservice.WSService).destroy();
+			} catch(err) {
+				console.error(err);
+			}
+		}
+		this.m_handles = {};
 	}
 
 	private async _initialize(bind_services: string) {
@@ -91,6 +103,8 @@ export class WSConversation extends ConversationBasic  {
 		if (!self._handshakes())
 			return self._safeDestroy();  // 关闭连接
 
+		this._initializeSocket();
+
 		self.m_isOpen = true;
 
 		self.onClose.on(function() {
@@ -98,14 +112,7 @@ export class WSConversation extends ConversationBasic  {
 			console.log('WS conv close', self.m_token);
 
 			self.m_isOpen = false;
-
-			for (var s of Object.values(self.m_handles)) {
-				try {
-					(s as wsservice.WSService).destroy();
-				} catch(err) {
-					console.error(err);
-				}
-			}
+			self._safeDestroyService();
 			try {
 				self.server.onWSConversationClose.trigger(self);
 			} catch(err) {
@@ -113,6 +120,22 @@ export class WSConversation extends ConversationBasic  {
 			}
 		});
 
+		try {
+			self.socket.pause();
+			self.onOpen.trigger({});
+			self.server.onWSConversationOpen.trigger(self);
+			await self.bindServices(services);
+			utils.assert(self.m_isOpen, 'The connection has been closed');
+		} catch(err) {
+			await utils.sleep(5e3); // delay 5s
+			throw err;
+		} finally {
+			self.socket.resume();
+		}
+	}
+
+	private _initializeSocket() {
+		var self = this;
 		var socket = self.socket;
 		var parser = new PacketParser();
 
@@ -124,7 +147,7 @@ export class WSConversation extends ConversationBasic  {
 		socket.on('end', ()=>self.close());
 		socket.on('close', ()=>self.close());
 		socket.on('data', (e)=>parser.add(buffer.from(e)));
-		socket.on('error', e=>(console.error('web socket error:',e),self.close()));
+		socket.on('error', e=>(console.warn('web socket error:',e),self.close()));
 		socket.on('drain', ()=>(self.m_overflow = false,self.onDrain.trigger({})));
 
 		parser.onText.on(e=>self.handlePacket(e.data, true/*isText*/));
@@ -132,19 +155,7 @@ export class WSConversation extends ConversationBasic  {
 		parser.onPing.on(e=>self.handlePing(e.data));
 		parser.onPong.on(e=>self.handlePong(e.data));
 		parser.onClose.on(()=>self.close());
-		parser.onError.on(e=>(console.error('web socket parser error:',e.data),self.close()));
-
-		try {
-			self.socket.pause();
-			self.onOpen.trigger({});
-			self.server.onWSConversationOpen.trigger(self);	
-			await self.bindServices(services);
-		} catch(err) {
-			await utils.sleep(5e3); // delay 5s
-			throw err;
-		} finally {
-			self.socket.resume();
-		}
+		parser.onError.on(e=>(console.warn('web socket parser error:',e.data),self.close()));
 	}
 
 	private _handshakes() {
@@ -158,12 +169,10 @@ export class WSConversation extends ConversationBasic  {
 			console.error('connection invalid');
 			return false;
 		}
-
 		if (!this.verifyOrigin(origin)) {
 			console.error('connection invalid: origin mismatch');
 			return false;
 		}
-
 		if (!key) {
 			console.error('connection invalid: received no key');
 			return false;
@@ -231,7 +240,7 @@ export class WSConversation extends ConversationBasic  {
 			utils.assert(utils.equalsClass(wsservice.WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_handles), 'Service no need to repeat binding');
 
-			console.log('SW requestAuth', this.request.url);
+			console.log('SW requestAuth', this.request.url, this.m_token);
 
 			var ser = new cls(self);
 			var ok = await utils.timeout(ser.requestAuth({ service: name, action: '' }), 2e4, (e)=>console.warn(e));
