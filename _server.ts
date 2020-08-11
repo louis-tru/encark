@@ -101,7 +101,7 @@ export interface Options {
 	*/
 export abstract class Server extends Notification {
 
-	protected m_ws_conversations: Dict<_conv.ConversationBasic> = {};
+	protected m_ws_conversations = new Map<string, _conv.ConversationBasic>();// Dict<_conv.ConversationBasic> = {};
 	private m_server: http.Server;
 	protected m_isRun: boolean = false;
 	private m_host: string = '';
@@ -329,12 +329,12 @@ export abstract class Server extends Notification {
 
 		this.onWSConversationOpen.on(e=>{
 			var conv = e.data;
-			this.m_ws_conversations[conv.token] = conv; // TODO private visit
+			this.m_ws_conversations.set(conv.token, conv); // TODO private visit
 		});
 
 		this.onWSConversationClose.on(e=>{
 			var conv = e.data;
-			delete this.m_ws_conversations[conv.token]; // TODO private visit
+			this.m_ws_conversations.delete(conv.token); // TODO private visit
 		});
 
 		this.initializ(this.m_server);

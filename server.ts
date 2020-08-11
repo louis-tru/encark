@@ -107,7 +107,7 @@ export class ServerIMPL extends Server {
 		this.addEventListener('Startup', ()=>{
 			this.m_checkIntervalId = setInterval(()=>{
 				var time = Date.now();
-				for (var conv of Object.values(this.m_ws_conversations)) {
+				for (var [,conv] of this.m_ws_conversations) {
 					if (conv.keepAliveTime * 2 + conv.lastPacketTime < time) {
 						conv.close(); // disconnect
 					}
