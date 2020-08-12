@@ -56,7 +56,7 @@ export function isTypedArray(arr: TypedArray) {
 }
 
 export type IBufferEncoding = 
-	"ascii" | "utf8" | "utf-8" | "base64" | "latin1" | "binary" | "hex";
+	"ascii" | "utf8" | "utf-8" | "base64" | "base58" | "latin1" | "binary" | "hex";
 
 export interface InterfaceBuffer extends Uint8Array {
 	toString(encoding?: string, start?: number, end?: number): string;
@@ -236,6 +236,8 @@ const from = function(
 			return new IBufferIMPL(_codec.decodeHex(value));
 		} else if (encoding == 'base64') {
 			return new IBufferIMPL(_codec.decodeBase64(value));
+		} else if (encoding == 'base58') {
+			return new IBufferIMPL(_codec.decodeBase58(value));
 		} else if (encoding == 'latin1' || encoding == 'binary') {
 			return new IBufferIMPL(_codec.encodeLatin1From(value));
 		} else if (encoding == 'ascii') {
@@ -311,6 +313,8 @@ export class IBufferIMPL extends Uint8Array implements IBuffer {
 				return _codec.encodeHexFrom(this, start, end);
 			} else if (encoding == 'base64') {
 				return _codec.encodeBase64From(this, start, end);
+			} else if (encoding == 'base58') {
+				return _codec.encodeBase58From(this, start, end);
 			} else if (encoding == 'latin1' || encoding == 'binary') {
 				return _codec.decodeLatin1From(this, start, end);
 			} else if (encoding == 'ascii') {

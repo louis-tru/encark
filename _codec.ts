@@ -30,6 +30,7 @@
 
 import utils from './util';
 import errno from './errno';
+import base_x, {Encoder} from './_base-x';
 
 type ArrayNumber = ArrayLike<number>;
 
@@ -41,6 +42,15 @@ var base64_keys = new Map<string, number>([['=', 65 ]]);
 
 hex_tab.split('').forEach((e,i)=>(hex_keys.set(e, i), hex_keys.set(e.toUpperCase(), i)));
 base64_tab.split('').forEach((e,i)=>base64_keys.set(e, i));
+
+const base58 = function() {
+	var _base: Encoder;
+	return ()=>{
+		if (!_base)
+			_base = base_x('123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz');
+		return _base;
+	};
+}();
 
 // string => bytes
 // convert unicode to utf-8 codeing
@@ -162,13 +172,17 @@ function encodeBase64From(bytes: ArrayNumber, start: number, end: number): strin
 	return str;
 }
 
+function encodeBase58From(bytes: ArrayNumber, start: number, end: number): string {
+	return base58().encode(bytes, start, end);
+}
+
 // decode
 
 function checkOffset(bytes: ArrayNumber, start: number, end: number): void {
 	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
-	utils.assert(start <= end, errno.ERR_BAD_ARGUMENT);
+	// utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 }
 
 // convert utf8 bytes to unicode
@@ -323,6 +337,11 @@ function decodeBase64(str: string): number[] {
 	return bytes;
 }
 
+// base58 string => bytes
+function decodeBase58(str: string): Uint8Array {
+	return base58().decode(str);
+}
+
 /*
  * Convert an array of bytes to a hex string.
  */
@@ -337,6 +356,13 @@ function convertBase64String(bytes: ArrayNumber) {
 	return encodeBase64From(bytes, 0, bytes.length);
 }
 
+/*
+ * Convert an array of bytes to a base64 string.
+ */
+function convertBase58String(bytes: ArrayNumber) {
+	return encodeBase58From(bytes, 0, bytes.length);
+}
+
 export default {
 	// encode
 	encodeUTF8Word,
@@ -345,6 +371,7 @@ export default {
 	encodeAsciiFrom,
 	encodeHexFrom,
 	encodeBase64From,
+	encodeBase58From,
 	// decode
 	decodeUTF8Word,
 	decodeUTF8From,
@@ -353,9 +380,11 @@ export default {
 	decodeAsciiFrom,
 	decodeHex,
 	decodeBase64,
+	decodeBase58,
 	// ext
 	convertHexString,
 	convertBase64String,
+	convertBase58String,
 	// length
 	encodeUTF8WordLength,
 	encodeUTF8Length,
