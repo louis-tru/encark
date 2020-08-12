@@ -31,12 +31,12 @@
 import util from'./util';
 import {ReadCookie, Cookie} from './cookie';
 import {Service} from './service';
+import {HttpService} from './http_service';
 
-var   HttpService: any;
 const SESSIONS: Dict = {};
 const SESSION_TOKEN_NAME = '__SESSION_TOKEN';
 
-function deleteSession(token: number) {
+function deleteSession(token: string) {
 	var data = SESSIONS[token];
 	if (data) {
 		if (data.ws > 0) {
@@ -51,16 +51,16 @@ function getData(self: Session) {
 	var token = self.token;
 
 	if (!token) {
-		token = util.id;
-		var service = <Service>(<any>self).m_service;
+		token = String(util.getId());
+		var service = <Service>(self as any)._service;
 		if (service instanceof HttpService)  // http service
-			(<Cookie>(<any>service).cookie).set(SESSION_TOKEN_NAME, token);
+			((service as HttpService).cookie as Cookie).set(SESSION_TOKEN_NAME, token);
 		else  //ws service
 			throw new Error('Can not set the session, session must first be activated in HttpService');
-		(<any>self).token = token;
+		(self as any)._token = token;
 	}
-	
-	var expired = (<any>self).m_service.server.session * 6e4;
+
+	var expired = (self as any)._service.server.session * 6e4;
 	var value = SESSIONS[token];
 
 	if (!value) {
@@ -80,14 +80,15 @@ function getData(self: Session) {
  */
 export class Session {
 
-	//private:
-	private m_service: any | undefined;
+	private _service: any | undefined;
+	private _token = '';
 
 	/**
-	 * Conversation token
 	 * @type {Number}
 	 */
-	readonly token = 0
+	get token() {
+		return this._token;
+	}
 
 	/**
 	 * constructor
@@ -95,27 +96,23 @@ export class Session {
 	 * @constructor
 	 */
 	constructor(service: Service) {
-		this.m_service = service;
+		this._service = service;
 
-		if (!HttpService) {
-			HttpService = require('./http_service').HttpService;
-		}
-		
 		var is_http = service instanceof HttpService;
-		var cookie = is_http ? (<any>service).cookie : new ReadCookie(service.request);
+		var cookie = is_http ? (service as HttpService).cookie : new ReadCookie(service.request);
 		var token = cookie.get(SESSION_TOKEN_NAME);
 		
 		if (!token)
 			return;
-		
-		this.token = token;
+
+		this._token = token;
 
 		var data = SESSIONS[token];
 		if (data) {
 			clearTimeout(data.timeoutid);
 			data.timeoutid = deleteSession.setTimeout(service.server.session * 6e4, token);
 		}
-		
+
 		if (is_http)  // socket service
 			return;
 
