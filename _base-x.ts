@@ -33,9 +33,10 @@ export default function base(ALPHABET: string): Encoder {
 
 	function encode (source: ArrayLike<number>, start: number = 0, end: number = source.length): string {
 
-		if (start < 0) return '';
+		start = Math.max(start, 0);
+		end = Math.min(end, source.length);
+
 		if (end <= start) return '';
-		if (end >= source.length) return '';
 
 		// Skip & count leading zeroes.
 		let zeroes = 0
