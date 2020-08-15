@@ -543,7 +543,7 @@ export class Request {
 		return {};
 	}
 
-	parseResponseData(buf: IBuffer) {
+	parseResponseData(buf: IBuffer, result: Result) {
 		return buf;
 	}
 
@@ -582,7 +582,7 @@ export class Request {
 		}
 
 		try {
-			result.data = this.parseResponseData(result.data as IBuffer);
+			result.data = this.parseResponseData(result.data as IBuffer, result);
 		} catch(err) {
 			err.url = url;
 			err.headers = result.headers;
