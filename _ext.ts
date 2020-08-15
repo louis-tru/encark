@@ -236,8 +236,8 @@ if (Date.formatTimeSpan !== undefined)
 	return;
 
 if (typeof globalThis == 'undefined') {
-	var globa = arguments[0]('(global)');
-	if (typeof globa == 'object') {
+	var globa = arguments[0]('(typeof global == "object" ? global: 0)');
+	if (globa) {
 		(globa as any).globalThis = globa;
 	} else if (typeof window == 'object') {
 		(window as any).globalThis = window;

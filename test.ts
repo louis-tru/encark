@@ -17,3 +17,5 @@ a.onAA.on(function(e) {
 	var a = e.data
 	console.log(a);
 });
+
+a!.onAA.on(function() {});
