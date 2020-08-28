@@ -71,7 +71,7 @@ if (haveFtr) {
 	};
 	process.execArgv = process.execArgv || [];
 } else if (haveWeb) { // web
-	let origin = location.origin;
+	var origin = location.origin;
 	let pathname = location.pathname;
 	let dirname = pathname.substr(0, pathname.lastIndexOf('/'));
 	let cwdPath = origin + dirname;

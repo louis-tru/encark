@@ -245,7 +245,7 @@ const from = function(
 		} else {
 			return new IBufferIMPL(_codec.encodeUTF8(value));
 		}
-	} else if (value instanceof TypedArrayConstructor) { // 
+	} else if (value instanceof TypedArrayConstructor && (value as any).buffer) { // 
 		var bf = value as Uint8Array;
 		return new IBufferIMPL(bf.buffer, bf.byteOffset, bf.byteLength);
 	} else if (value instanceof ArrayBuffer || value instanceof SharedArrayBuffer) {
