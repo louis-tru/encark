@@ -448,6 +448,7 @@ interface CacheValue {
  * @class Cache
  */
 class Cache {
+
 	private m_getscache: Dict<CacheValue> = {};
 
 	has(key: string) {
@@ -470,10 +471,6 @@ class Cache {
 			time: cacheTiem,
 			timeend: cacheTiem + Date.now(),
 		}
-	}
-
-	static hash(object: any) {
-		return utils.hash(JSON.stringify(object));
 	}
 
 }
@@ -547,15 +544,10 @@ export class Request {
 		return buf;
 	}
 
-	async request(name: string, method: string = 'GET', params?: Params, options?: Options): PromiseResult {
+	private async __request(name: string, method: string, params?: Params, options?: Options): PromiseResult {
 		var opts = options || {};
 		var { headers } = opts;
 		var url = this.m_prefix + '/' + name;
-		var hashCode = [name, method, params].hashCode();
-
-		if ('noRepeat' in opts ? opts.noRepeat: this.m_no_repeat)
-			utils.assert(!this.m_cur_reqs.has(hashCode), errno.ERR_REPEAT_REQUEST);
-		this.m_cur_reqs.add(hashCode);
 
 		headers = Object.assign({}, this.getRequestHeaders(), headers);
 		params = params || opts.params;
@@ -573,7 +565,6 @@ export class Request {
 				signer: opts.signer || this.m_signer,
 			});
 		} catch(err) {
-			this.m_cur_reqs.delete(hashCode);
 			err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
 			err.url = url;
 			err.requestHeaders = headers;
@@ -592,31 +583,46 @@ export class Request {
 			err.requestHeaders = headers;
 			err.requestData = params;
 			throw err;
-		} finally {
-			this.m_cur_reqs.delete(hashCode);
 		}
 
 		return result;
 	}
 
-	async get(name: string, params?: Params, options?: Options): PromiseResult {
-		var { cacheTime } = options || {};
-		var key = Cache.hash({ name: name, params: params });
-		var cache = this.m_cache.get(key);
-		if (cacheTime) {
-			if (cache) {
-				return Object.assign({}, cache.data, { cached: true }) as Result;
+	async request(name: string, method: string = 'GET', params?: Params, options?: Options) {
+		var opts = options || {};
+		var hashCode = [name, method, params].hashCode();
+
+		if ('noRepeat' in opts ? opts.noRepeat: this.m_no_repeat)
+			utils.assert(!this.m_cur_reqs.has(hashCode), errno.ERR_REPEAT_REQUEST);
+
+		params = params || opts.params;
+
+		try {
+			this.m_cur_reqs.add(hashCode);
+			var { cacheTime } = opts;
+			var key = String(hashCode);
+			var cache = this.m_cache.get(key);
+			if (cacheTime) {
+				if (cache) {
+					return Object.assign({}, cache.data, { cached: true }) as Result;
+				}
+				var data = await this.__request(name, method, params, opts);
+				this.m_cache.set(key, data, cacheTime);
+				return data;
+			} else {
+				var data = await this.__request(name, method, params, opts);
+				if (cache) {
+					this.m_cache.set(key, data, cache.time);
+				}
+				return data;
 			}
-			var data = await this.request(name, 'GET', params, options);
-			this.m_cache.set(key, data, cacheTime);
-			return data;
-		} else {
-			var data = await this.request(name, 'GET', params, options);
-			if (cache) {
-				this.m_cache.set(key, data, cache.time);
-			}
-			return data;
+		} finally {
+			this.m_cur_reqs.delete(hashCode);
 		}
+	}
+
+	async get(name: string, params?: Params, options?: Options): PromiseResult {
+		return this.request(name, 'GET', params, options);
 	}
 
 	post(name: string, params?: Params, options?: Options) {
