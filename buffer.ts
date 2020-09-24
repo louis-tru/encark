@@ -248,7 +248,9 @@ const from = function(
 	} else if (value instanceof TypedArrayConstructor && (value as any).buffer) { // 
 		var bf = value as Uint8Array;
 		return new IBufferIMPL(bf.buffer, bf.byteOffset, bf.byteLength);
-	} else if (value instanceof ArrayBuffer || value instanceof SharedArrayBuffer) {
+	} else if (value instanceof ArrayBuffer ||
+		(globalThis.SharedArrayBuffer && value instanceof SharedArrayBuffer))
+	{
 		return new IBufferIMPL(value, Number(encodingOrMapfn) || 0, Number(thisArg) || value.byteLength);
 	} else if (value instanceof DataView) { // 
 		return new IBufferIMPL(value.buffer, value.byteOffset, value.byteLength);
