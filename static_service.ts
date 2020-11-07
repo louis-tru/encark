@@ -228,7 +228,7 @@ function result_data(
 	};
 	if ( self.server.fileCacheTime ) { // 创建内存缓存
 		g_static_cache[filename] = cache;
-		setTimeout(function () { delete cache.data; }, self.server.fileCacheTime * 1e3);
+		setTimeout(function () { delete (cache as any).data; }, self.server.fileCacheTime * 1e3);
 	}
 	if (gzip) {
 		res.setHeader('Content-Encoding', 'gzip');
