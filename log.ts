@@ -141,7 +141,11 @@ export class Console extends Notification {
 			if (cutTime && Date.now() - this.m_fd_open_time.valueOf() > cutTime) {
 				this.reopen(true);
 			}
-			fs.write(this.m_fd, data + '\n', function() {});
+			fs.write(this.m_fd, data + '\n', (err:any)=>{
+				if (err) {
+					this.reopen();
+				}
+			});
 		}
 		this.trigger('Log', { tag: TAG, data: data });
 		return data;
