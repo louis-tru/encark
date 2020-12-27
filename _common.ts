@@ -346,7 +346,7 @@ export function assert(condition: any, code?: number | ErrorNewArg): void {
 /**
  * @func sleep()
  */
-export function sleep<T>(time: number, defaultValue?: T): Promise<T> {
+export function sleep<T>(time: number, defaultValue?: T): Promise<T|undefined> {
 	return new Promise((ok, err)=>setTimeout(()=>ok(defaultValue), time));
 }
 
@@ -393,7 +393,7 @@ export class PromiseNx<T extends any> extends Promise<T> {
 		var _resolve: any;
 		var _reject: any;
 
-		super(function(resolve: (value?: T)=>void, reject: (reason?: any)=>void) {
+		super(function(resolve: (value: T)=>void, reject: (reason?: any)=>void) {
 			_resolve = resolve;
 			_reject = reject;
 		});
