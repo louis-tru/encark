@@ -46,7 +46,7 @@ export function readdir(dir: PathLike) {
 }
 
 export function rename(source: PathLike, target: PathLike) {
-	return new Promise((resolve, reject)=>{
+	return new Promise<void>(function(resolve, reject) {
 		fs.rename(source, target, (err)=>err ? reject(err): resolve());
 	});
 }
