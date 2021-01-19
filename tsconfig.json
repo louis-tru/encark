@@ -16,7 +16,7 @@
 		"noImplicitAny": true,
 		"noImplicitThis": true,
 		"strictNullChecks": true,
-		"strictPropertyInitialization": false,
+		"strictPropertyInitialization": true,
 		"emitDecoratorMetadata": false,
 		"experimentalDecorators": true,
 	},
