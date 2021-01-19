@@ -72,9 +72,7 @@ export declare class Event<Data, Sender extends object = object> {
 	get origin(): any;
 	set origin(value: any);
 	get noticer(): EventNoticer<Event<Data, Sender>> | null;
-	get returnValue(): number;
-	set returnValue(value: number);
-	constructor(data: Data, returnValue?: number);
+	constructor(data: Data);
 }
 declare type DefaultEvent = Event<any>;
 export interface Listen<Event = DefaultEvent, Scope extends object = object> {
@@ -157,19 +155,19 @@ export declare class EventNoticer<E = DefaultEvent> {
 	 * @arg data {Object} # 要发送的数据
 	 * @ret {Object}
 	 */
-	trigger(data?: any): number;
+	trigger(data?: any): void;
 	/**
 	 * @fun triggerWithEvent # 通知所有观察者
 	 * @arg data {Object} 要发送的event
 	 * @ret {Object}
 	 */
-	triggerWithEvent(evt: E): number;
+	triggerWithEvent(evt: E): void;
 	/**
 	 * @fun off # 卸载侦听器(函数)
 	 * @arg [func] {Object}   # 可以是侦听函数,id,如果不传入参数卸载所有侦听器
 	 * @arg [scope] {Object}  # scope
 	 */
-	off(listen?: string | Function | object, scope?: object): number;
+	off(listen?: string | Function | object, scope?: object): void;
 }
 export declare const VOID: any;
 /**
@@ -211,13 +209,13 @@ export declare class Notification<E = DefaultEvent> {
 	* @arg name {String}       事件名称
 	* @arg data {Object}       要发送的消数据
 	*/
-	trigger(name: string, data?: any): number;
+	trigger(name: string, data?: any): void;
 	/**
 	* @func triggerWithEvent 通知事监听器
 	* @arg name {String}       事件名称
 	* @arg event {Event}       Event
 	*/
-	triggerWithEvent(name: string, event: E): number;
+	triggerWithEvent(name: string, event: E): void;
 	/**
 	 * @func removeEventListener(name,[func[,scope]])
 	 */

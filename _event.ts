@@ -193,53 +193,41 @@ export class List<T> {
 	* @class Event
 	*/
 export class Event<Data, Sender extends object = object> {
-	private m_data: Data;
-	private m_return_value: number; // = 0
-	protected m_noticer: EventNoticer<Event<Data, Sender>> | null; // = null;
-	private m_origin: any; // = null;
+	private _data: Data;
+	protected _noticer: any; //EventNoticer<Event<Data, Sender>> | null; // = null;
+	private _origin: any; // = null;
 
 	get name() {
-		return (this.m_noticer as EventNoticer<Event<Data, Sender>>).name;
+		return (this._noticer as EventNoticer<Event<Data, Sender>>).name;
 	}
 
 	get data () {
-		return this.m_data;
+		return this._data;
 	}
 
 	get sender(): Sender {
-		return (this.m_noticer as EventNoticer<Event<Data, Sender>>).sender as Sender;
+		return (this._noticer as EventNoticer<Event<Data, Sender>>).sender as Sender;
 	}
 
 	get origin () {
-		return this.m_origin;
+		return this._origin;
 	}
 
 	set origin(value: any) {
-		this.m_origin = value;
+		this._origin = value;
 	}
 
 	get noticer () {
-		return this.m_noticer;
+		return this._noticer;
 	}
 
-	get returnValue() {
-		return this.m_return_value;
-	}
-
-	set returnValue(value) {
-		this.m_return_value = value;
-	}
-
-	constructor(data: Data, returnValue?: number) {
-		this.m_data = data;
-		if (returnValue !== undefined)
-			this.m_return_value = returnValue;
+	constructor(data: Data) {
+		this._data = data;
 	}
 }
 
-(Event as any).prototype.m_return_value = 0;
-(Event as any).prototype.m_noticer = null;
-(Event as any).prototype.m_origin = null;
+(Event as any).prototype._noticer = null;
+(Event as any).prototype._origin = null;
 
 type DefaultEvent = Event<any>;
 
@@ -453,21 +441,19 @@ export class EventNoticer<E = DefaultEvent> {
 	/**
 	 * @fun trigger # 通知所有观察者
 	 * @arg data {Object} # 要发送的数据
-	 * @ret {Object}
 	 */
-	trigger(data?: any): number {
-		return this.triggerWithEvent(new Event(data) as unknown as E);
+	trigger(data?: any) {
+		this.triggerWithEvent(new Event(data) as unknown as E);
 	}
 
 	/**
 	 * @fun triggerWithEvent # 通知所有观察者
-	 * @arg data {Object} 要发送的event
-	 * @ret {Object}
+	 * @arg evt {Object} 要发送的event
 	 */
-	triggerWithEvent(evt: E): number {
+	triggerWithEvent(evt: E) {
 		if ( this.m_enable && this.m_length ) {
 			(evt as any).m_noticer = this;
-			var listens = <List<ListenItem>>this.m_listens;
+			var listens = this.m_listens as List<ListenItem>;
 			var item = listens.first;
 			while ( item ) {
 				var value = item.value;
@@ -480,7 +466,6 @@ export class EventNoticer<E = DefaultEvent> {
 			}
 			(evt as any).m_noticer = null;
 		}
-		return (evt as unknown as DefaultEvent).returnValue;
 	}
 
 	/**
@@ -662,9 +647,9 @@ export class Notification<E = DefaultEvent> {
 	}
 
 	addEventForwardOnce(noticer: EventNoticer<E>, id?: string) {
-		var del = this.getNoticer(name);
+		var del = this.getNoticer(noticer.name);
 		var r = del.forwardOnce(noticer, id);
-		this.triggerListenerChange(name, del.length, 1);
+		this.triggerListenerChange(noticer.name, del.length, 1);
 		return r;
 	}
 
@@ -685,9 +670,8 @@ export class Notification<E = DefaultEvent> {
 	triggerWithEvent(name: string, event: E) {
 		var noticer = (this as any)[PREFIX + name] as EventNoticer<E>;
 		if (noticer) {
-			return noticer.triggerWithEvent(event);
+			noticer.triggerWithEvent(event);
 		}
-		return (event as unknown as DefaultEvent).returnValue;
 	}
 
 	/**
@@ -708,7 +692,7 @@ export class Notification<E = DefaultEvent> {
 	removeEventListenerWithScope(scope: object) {
 		for ( let noticer of this.allNoticers() ) {
 			noticer.off(scope);
-			this.triggerListenerChange(name, noticer.length, -1);
+			this.triggerListenerChange(noticer.name, noticer.length, -1);
 		}
 	}
 

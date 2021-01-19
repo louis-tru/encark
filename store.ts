@@ -179,8 +179,8 @@ class WSConversation2 extends WSConversation {
  */
 export default class APIStore extends Notification {
 	private m_name: string;
-	private m_conv: WSConversation2 | null;
-	private m_req: Request2 | null;
+	private m_conv: WSConversation2 | null = null;
+	private m_req: Request2 | null = null;
 	private m_descriptors: Dict<Descriptors> = {};
 	private m_timeoutid = 0;
 	private m_signer: any = null;

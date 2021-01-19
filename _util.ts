@@ -83,16 +83,16 @@ export var _process: IProcess;
 
 var _processHandles = {
 	BeforeExit: (noticer: EventNoticer, code = 0)=>{
-		return noticer.triggerWithEvent(new Event(code, code));
+		noticer.triggerWithEvent(new Event(code));
 	},
 	Exit: (noticer: EventNoticer, code = 0)=>{
-		return noticer.triggerWithEvent(new Event(code, code));
+		noticer.triggerWithEvent(new Event(code));
 	},
 	UncaughtException: (noticer: EventNoticer, err: Error)=>{
-		return noticer.length && noticer.triggerWithEvent(new Event(err, 0)) === 0;
+		noticer.length && noticer.triggerWithEvent(new Event(err));
 	},
 	UnhandledRejection: (noticer: EventNoticer, reason: Error, promise: Promise<any>)=>{
-		return noticer.length && noticer.triggerWithEvent(new Event({ reason, promise }, 0)) === 0;
+		noticer.length && noticer.triggerWithEvent(new Event({ reason, promise }));
 	},
 };
 

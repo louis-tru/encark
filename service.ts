@@ -56,7 +56,12 @@ export class Service {
 	/**
 	 * @type {String} 服务名称
 	 */
-	readonly name: string;// = '';
+	static readonly id: string = '';
+
+	/**
+	 * @type {String} 服务名称
+	 */
+	get name() { return (this.constructor as typeof Service).id }
 	
 	/**
 	 * server
@@ -253,7 +258,7 @@ export default {
 	set(name: string, cls: any) {
 		util.assert(util.equalsClass(Service, cls), `"${name}" is not a "Service" type`);
 		util.assert(!(name in _service_cls), `service repeat definition, "${name}"`);
-		cls.prototype.name = name;
+		cls.id = name;
 		_service_cls[name] = cls;
 	},
 

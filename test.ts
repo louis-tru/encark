@@ -8,7 +8,7 @@ function Hacker<Data = any, Sender extends object = object>(): EventNoticer<Even
 }
 
 export default class A {
-	@event onAA: EventNoticer<Event<number>>;
+	@event onAA: EventNoticer<Event<number>> = new EventNoticer<Event<number>>('AA', {});
 }
 
 var a = new A();
