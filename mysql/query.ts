@@ -194,7 +194,7 @@ export class Query {
 					
 					if (self._rowIndex == fields.length) {
 						delete self._row;
-						delete self._rowIndex;
+						delete (self as any)._rowIndex;
 						self.onRow.trigger(row);
 						return;
 					}

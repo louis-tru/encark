@@ -237,7 +237,7 @@ export class Parser {
 				self.packet = null;
 				self.state = state = Constants.PACKET_LENGTH;
 				self.greeted = true;
-				delete packet.index;
+				delete (packet as any).index;
 				self.onPacket.trigger(packet);
 				(<any>packet) = null;
 			}

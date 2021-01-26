@@ -42,7 +42,8 @@ var Node_removeChild = Node.prototype.removeChild;
 
 export class Document extends Node {
 
-	readonly nodeName = '#document';
+	// readonly nodeName = '#document';
+	get nodeName() { return "#document" }
 	readonly nodeType = NODE_TYPE.DOCUMENT_NODE;
 	readonly childNodes = new NodeList();
 	readonly ownerDocument: Document;

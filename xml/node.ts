@@ -186,13 +186,13 @@ export class Node {
 	readonly nodeType?: NODE_TYPE;
 	readonly childNodes?: NodeList;
 	readonly attributes?: nnm.NamedNodeMap;
-	readonly nodeName?: string;
+	get nodeName(): string | undefined { return };
+	get nodeValue(): string | undefined { return };
 	firstChild?: Node;
 	lastChild?: Node;
 	previousSibling?: Node;
 	nextSibling?: Node;
 	parentNode?: Node;
-	nodeValue?: string;
 	namespaceURI?: string;
 	localName?: string;
 	prefix?: string;
@@ -494,21 +494,21 @@ export class Attribute extends CharacterData {
 
 export class CDATASection extends CharacterData {
 	readonly nodeType = NODE_TYPE.CDATA_SECTION_NODE;
-	readonly nodeName = "#cdata-section";
+	get nodeName() { return "#cdata-section" };
 }
 
 export class Comment extends CharacterData {
 	readonly nodeType = NODE_TYPE.COMMENT_NODE;
-	readonly nodeName = "#comment";
+	get nodeName() { return "#comment" };
 }
 
 export class DocumentFragment extends Node {
-	readonly nodeName = '#document-fragment';
+	get nodeName() { return '#document-fragment' }
 	readonly childNodes = new NodeList();
 }
 
 export class DocumentType extends Node {
-	readonly nodeName: string;
+	get nodeName() { return this.name }
 	readonly nodeType = NODE_TYPE.DOCUMENT_TYPE_NODE;
 	readonly name: string;
 	readonly publicId: string;
@@ -529,7 +529,6 @@ export class DocumentType extends Node {
 		// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
 		super(doc);
 		this.name = qualifiedName;
-		this.nodeName = qualifiedName;
 		this.publicId = publicId;
 		this.systemId = systemId;
 		this.internalSubset = internalSubset;
@@ -538,23 +537,26 @@ export class DocumentType extends Node {
 
 export class Entity extends Node {
 	readonly nodeType = NODE_TYPE.ENTITY_NODE;
-	readonly nodeName = "#entity";
+	get nodeName() { return '#entity' }
 }
 
 export class EntityReference extends Node {
 	readonly nodeType = NODE_TYPE.ENTITY_REFERENCE_NODE;
-	readonly nodeName: string;
+	private readonly _nodeName: string;
+	private readonly _nodeValue?: string;
+	get nodeName() { return this._nodeName }
+	get nodeValue() { return this._nodeValue }
 	get text() { return this.nodeValue }
 	constructor(doc: doc.Document, nodeName: string, nodeValue?: string) {
 		super(doc);
-		this.nodeName = nodeName;
-		this.nodeValue = nodeValue;
+		this._nodeName = nodeName;
+		this._nodeValue = nodeValue;
 	}
 }
 
 export class Notation extends Node {
 	readonly nodeType = NODE_TYPE.NOTATION_NODE;
-	readonly nodeName = "#notation";
+	get nodeName() { return "#notation" }
 }
 
 export class ProcessingInstruction extends Node {
@@ -570,7 +572,7 @@ export class ProcessingInstruction extends Node {
 }
 
 export class Text extends CharacterData {
-	readonly nodeName = "#text";
+	get nodeName() { return "#text" }
 	readonly nodeType = NODE_TYPE.TEXT_NODE;
 
 	splitText(offset: number) {

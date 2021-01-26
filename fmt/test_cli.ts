@@ -49,11 +49,11 @@ async function test() {
 			if (limit) {
 				if (_resolve)
 					return reject('err');
-				_resolve = resolve;
+				_resolve = resolve as any;
 			} else {
 				await utils.sleep(10);
 			}
-			that.trigger(event, data).then(()=>limit||resolve()).catch(reject);
+			that.trigger(event, data).then(()=>limit||resolve(0)).catch(reject);
 		});
 	}
 

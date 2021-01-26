@@ -151,7 +151,7 @@ export class DataAccessObject extends Proxy<Dict<DataAccessShortcuts>> {
 				if (!shortcuts) {
 					var methodsInfo = info[tableName];
 					utils.assert(methodsInfo, `Dao table not defined, ${tableName}`);
-					target[tableName] = new DataAccessShortcuts(ds, name, methodsInfo);
+					target[tableName] = new DataAccessShortcuts(ds, tableName, methodsInfo);
 				}
 				return shortcuts;
 			}
