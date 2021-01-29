@@ -346,10 +346,15 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 				data = [`-d '${JSON.stringify(params)}'`];
 			}
 		}
+		headers = Object.assign({
+			// 'User-Agent': options.userAgent,
+			// 'Accept': 'application/json',
+			'Content-Type': 'application/json',
+		}, headers);
 		var logs = [
 			"'" + pathname + "'",
 			'-X ' + method,
-			...(method == 'POST' ? ["-H 'Content-Type: application/json'"]: []),
+			// ...(method == 'POST' ? ["-H 'Content-Type: application/json'"]: []),
 			...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
 			...data,
 		];
