@@ -562,7 +562,7 @@ export function mkdirp(path: string, mode?: MkdirOptopns | NoParamCallback, cb?:
 		cb = mode;
 		mode2 = null;
 	}
-	var cb2 = cb || function (err: any) { 
+	var cb2 = cb || function (err: any) {
 		if (err) throw Error.new(err);
 	}
 	path = Path.resolve(path);

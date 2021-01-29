@@ -36,12 +36,7 @@ type PathLike = fs.PathLike;
 
 export function readdir(dir: PathLike) {
 	return new Promise<string[]>((resolve, reject)=>{
-		fs.readdir(dir, (err, ls)=>{
-			if (err)
-				reject(err);
-			else 
-				resolve(ls);
-		});
+		fs.readdir(dir, (err, ls)=>err? reject(err): resolve(ls));
 	});
 }
 
@@ -53,12 +48,7 @@ export function rename(source: PathLike, target: PathLike) {
 
 export function remove(path: PathLike): Promise<void> {
 	return new Promise(function(resolve, reject) {
-		fs.unlink(path, function(err) {
-			if (err)
-				reject(err)
-			else
-				resolve();
-		});
+		fs.unlink(path, (err)=>err? reject(err): resolve());
 	})
 }
 
@@ -67,19 +57,23 @@ export interface RemoverResult extends Promise<void> {
 }
 
 export function remover(path: string) {
-	return utils.promise((resolve, reject, promise)=>{
+	return utils.promise(function(resolve, reject, promise) {
 		(promise as RemoverResult).cancel = fs.remover(path, (err)=>err ? reject(err): resolve()).cancel;
 	}) as RemoverResult;
 }
 
 export function exists(path: PathLike) {
-	return new Promise<boolean>((resolve)=>{
-		fs.exists(path, (ok)=>resolve(ok));
+	return new Promise<boolean>((resolve)=>fs.exists(path, resolve));
+}
+
+export function readFile(path: PathLike | number, options?: { encoding?: null; flag?: string; } | null) {
+	return new Promise<Buffer>(function(resolve, reject) {
+		fs.readFile(path, options, (e,b)=>e ? reject(e): resolve(b));
 	});
 }
 
 export function mkdirp(path: string, mode?: fs.MkdirOptopns) {
-	return new Promise<void>((resolve, reject)=>{
+	return new Promise<void>(function(resolve, reject) {
 		fs.mkdirp(path, mode, (err)=>err ? reject(err): resolve());
 	});
 }
