@@ -54,7 +54,7 @@ else if (haveNode) {
 }
 
 var shared: any = null;
-var __id = 1;
+// var __id = 1;
 
 export type Params = Dict | null;
 
@@ -241,10 +241,10 @@ function requestWeb(
 		};
 		if (data instanceof ArrayBuffer) {
 			resolve(Object.assign(r, { data: buffer.from(data) }));
-		} else if (data instanceof Blob && (<any>data).arrayBuffer) {
-			(<any>data).arrayBuffer().then((e:any)=>resolve(Object.assign(r, { data: buffer.from(e) })));
+		} else if (data instanceof Blob && data.arrayBuffer) {
+			data.arrayBuffer().then(e=>resolve(Object.assign(r, { data: buffer.from(e) })));
 		} else {
-			resolve(Object.assign(r, { data }))
+			resolve(Object.assign(r, { data }));
 		}
 	};
 	xhr.onerror = (e: any)=>{
@@ -280,10 +280,10 @@ function requestNode(	options: Dict,
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
-		var buffers: IBuffer[] = [];
+		var buffers: Buffer[] = [];
 		res.on('data', (chunk: Buffer)=> {
 			// console.log(`BODY: ${chunk}`);
-			buffers.push(buffer.from(chunk));
+			buffers.push(chunk);
 		});
 		res.on('end', ()=> {
 			// console.log('No more data in response.');
@@ -449,24 +449,24 @@ interface CacheValue {
  */
 class Cache {
 
-	private m_getscache: Dict<CacheValue> = {};
+	private _getscache: Dict<CacheValue> = {};
 
 	has(key: string) {
-		return key in this.m_getscache;
+		return key in this._getscache;
 	}
 
 	get(key: string) {
-		var d = this.m_getscache[key];
+		var d = this._getscache[key];
 		if (d) {
 			if (d.timeend > Date.now()) {
 				return d;
 			}
-			delete this.m_getscache[key]
+			delete this._getscache[key]
 		}
 	}
 
 	set(key: string, data: Result, cacheTiem: number) {
-		this.m_getscache[key] = {
+		this._getscache[key] = {
 			data: data,
 			time: cacheTiem,
 			timeend: cacheTiem + Date.now(),
