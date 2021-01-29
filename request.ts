@@ -142,8 +142,8 @@ export function stringifyXml(obj: any) {
 	return result.join('');
 }
 
-export interface Result {
-	data: any;
+export interface Result<T = any> {
+	data: T;
 	headers: Dict<string>;
 	statusCode: number;
 	httpVersion: string;
@@ -152,7 +152,7 @@ export interface Result {
 	cached: boolean;
 }
 
-export type PromiseResult = Promise<Result>
+export type PromiseResult<T = any> = Promise<Result<T>>
 
 // Ftr implementation
 function requestFtr(
@@ -333,7 +333,7 @@ export interface Signer {
 /**
  * @func request
  */
-export function request(pathname: string, opts: Options): PromiseResult {
+export function request(pathname: string, opts: Options): PromiseResult<IBuffer> {
 	var options = Object.assign({}, defaultOptions, opts);
 	var { params, method, headers = {}, signer } = options;
 
@@ -356,7 +356,7 @@ export function request(pathname: string, opts: Options): PromiseResult {
 		console.log('curl', logs.join(' \\\n'));
 	}
 
-	return utils.promise<Result>(async (resolve, reject)=> {
+	return utils.promise<Result<IBuffer>>(async (resolve, reject)=> {
 		var uri = new url.URL(pathname);
 		var is_https = uri.protocol == 'https:';
 		var hostname = uri.hostname;
@@ -544,7 +544,7 @@ export class Request {
 		return buf;
 	}
 
-	private async __request(name: string, method: string, params?: Params, options?: Options): PromiseResult {
+	private async __request<T>(name: string, method: string, params?: Params, options?: Options): PromiseResult<T> {
 		var opts = options || {};
 		var { headers } = opts;
 		var url = this.m_prefix + '/' + name;
@@ -588,7 +588,7 @@ export class Request {
 		return result;
 	}
 
-	async request(name: string, method: string = 'GET', params?: Params, options?: Options) {
+	async request<T = any>(name: string, method: string = 'GET', params?: Params, options?: Options) {
 		var opts = options || {};
 		var hashCode = [name, method, params].hashCode();
 
@@ -604,13 +604,13 @@ export class Request {
 			var cache = this.m_cache.get(key);
 			if (cacheTime) {
 				if (cache) {
-					return Object.assign({}, cache.data, { cached: true }) as Result;
+					return Object.assign({}, cache.data, { cached: true }) as Result<T>;
 				}
-				var data = await this.__request(name, method, params, opts);
+				var data = await this.__request<T>(name, method, params, opts);
 				this.m_cache.set(key, data, cacheTime);
 				return data;
 			} else {
-				var data = await this.__request(name, method, params, opts);
+				var data = await this.__request<T>(name, method, params, opts);
 				if (cache) {
 					this.m_cache.set(key, data, cache.time);
 				}
@@ -621,19 +621,19 @@ export class Request {
 		}
 	}
 
-	async get(name: string, params?: Params, options?: Options): PromiseResult {
-		return this.request(name, 'GET', params, options);
+	async get<T = any>(name: string, params?: Params, options?: Options): PromiseResult {
+		return this.request<T>(name, 'GET', params, options);
 	}
 
-	post(name: string, params?: Params, options?: Options) {
-		return this.request(name, 'POST', params, options);
+	post<T = any>(name: string, params?: Params, options?: Options) {
+		return this.request<T>(name, 'POST', params, options);
 	}
 
-	call(name: string, params?: Params, options?: Options) {
+	async call<T = any>(name: string, params?: Params, options?: Options) {
 		if (params) {
-			return this.post(name, params, options);
+			return (await this.post<T>(name, params, options)).data;
 		} else {
-			return this.get(name, params, options);
+			return (await this.get<T>(name, params, options)).data;
 		}
 	}
 }

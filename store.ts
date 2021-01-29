@@ -62,12 +62,16 @@ export interface Methods {
 	[method: string]: (args?: any, opts?: Options)=>Promise<any>;
 }
 
+interface Client {
+	call<T>(method: string, ...data: any[]): Promise<T>;
+}
+
 export class WrapClient extends Notification {
 
 	private m_desc: Descriptors;
 	protected m_name = '';
 	private m_host: APIStore;
-	private m_cli: WSClient | Request;
+	private m_cli: Client; // WSClient | Request;
 	private m_methods: Methods = {};
 
 	constructor(host: APIStore, name: string, cli: any, desc: Descriptors) {
@@ -134,9 +138,9 @@ export class WrapClient extends Notification {
 }
 
 class WrapRequest extends WrapClient {
-	async call(name: string, ...args: any[]) {
+	call(name: string, ...args: any[]) {
 		name = this.m_name + '/' + name;
-		return (await this._call(name, name, ...args)).data;
+		return this._call(name, name, ...args);
 	}
 }
 

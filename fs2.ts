@@ -66,7 +66,7 @@ export function exists(path: PathLike) {
 	return new Promise<boolean>((resolve)=>fs.exists(path, resolve));
 }
 
-export function readFile(path: PathLike | number, options?: { encoding?: null; flag?: string; } | null) {
+export function readFile(path: PathLike | number, options?: { flag?: string; } | null) {
 	return new Promise<Buffer>(function(resolve, reject) {
 		fs.readFile(path, options, (e,b)=>e ? reject(e): resolve(b));
 	});
