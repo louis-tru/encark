@@ -354,7 +354,6 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 		var logs = [
 			"'" + pathname + "'",
 			'-X ' + method,
-			// ...(method == 'POST' ? ["-H 'Content-Type: application/json'"]: []),
 			...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
 			...data,
 		];
