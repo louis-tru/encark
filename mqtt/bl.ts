@@ -240,7 +240,7 @@ export default class BufferList extends DuplexStream {
 		return new BufferList(buffers)
 	}
 	
-	toString(encoding?: string, start?: number, end?: number) {
+	toString(encoding?: BufferEncoding, start?: number, end?: number) {
 		return this.slice(start, end).toString(encoding)
 	}
 	

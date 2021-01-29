@@ -46,7 +46,7 @@ export function xor(a: string, b: string): Buffer {
 export function sha1(msg: string): string {
 	var hash = crypto.createHash('sha1');
 	hash.update(msg, 'latin1');
-	return hash.digest('latin1');
+	return hash.digest().toString('latin1');
 }
 
 // This is a port of sql/password.c:hash_password which needs to be used for

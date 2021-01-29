@@ -158,7 +158,7 @@ export class Console extends Notification {
 		console.warn = this.warn.bind(this);
 		console.time = this.time.bind(this);
 		console.timeLog = this.timeLog.bind(this);
-		console.timeline = this.timeline.bind(this);
+		(console as any).timeline = this.timeline.bind(this);
 		console.timeEnd = this.timeEnd.bind(this);
 		(<any>console)._log = (<any>this)._log = log;
 		(<any>console)._error = (<any>this)._error = error;

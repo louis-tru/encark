@@ -61,7 +61,7 @@ export function ip(): Dict<string[]> {
 	var address: Dict<string[]> = {}; // '127.0.0.1';
 	
 	for (var i in ifaces) {
-		for (var j of ifaces[i]) {
+		for (var j of ifaces[i] as os.NetworkInterfaceInfo[]) {
 			if (j.family == 'IPv4' && !j.internal && j.address != '127.0.0.1') {
 				var addr = j.address;
 				if (!address[i])

@@ -563,7 +563,7 @@ export class IncomingForm {
 	
 	keepExtensions = false;
 	uploadDir = '';
-	encoding = 'utf-8';
+	encoding: BufferEncoding = 'utf-8';
 	headers: http.IncomingHttpHeaders = {};
 	type: string = '';
 
