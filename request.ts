@@ -347,8 +347,8 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 			}
 		}
 		headers = Object.assign({
-			// 'User-Agent': options.userAgent,
-			// 'Accept': 'application/json',
+			'User-Agent': options.userAgent,
+			'Accept': 'application/json',
 			'Content-Type': 'application/json',
 		}, headers);
 		var logs = [
