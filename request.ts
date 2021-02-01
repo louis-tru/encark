@@ -388,19 +388,6 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 		}
 
 		if (utils.config.moreLog) {
-			// var data: string[] = [];
-			// if (params) {
-			// 	if (method == 'GET') {
-			// 		pathname += '?' + querystringStringify(params);
-			// 	} else {
-			// 		data = [`-d '${JSON.stringify(params)}'`];
-			// 	}
-			// }
-			// headers = Object.assign({
-			// 	// 'User-Agent': options.userAgent,
-			// 	// 'Accept': 'application/json',
-			// 	'Content-Type': 'application/json',
-			// }, headers);
 			var logs = [
 				"'" + path + "'",
 				'-X ' + method,
