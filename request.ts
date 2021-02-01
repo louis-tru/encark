@@ -389,10 +389,10 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 
 		if (utils.config.moreLog) {
 			var logs = [
-				"'" + path + "'",
+				"'" + uri.href + "'",
 				'-X ' + method,
 				...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
-				...(post_data? [post_data]: []),
+				...(post_data? [`-d '${post_data}'`]: []),
 			];
 			console.log('curl', logs.join(' \\\n'));
 		}
