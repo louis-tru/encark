@@ -335,30 +335,7 @@ export interface Signer {
  */
 export function request(pathname: string, opts: Options): PromiseResult<IBuffer> {
 	var options = Object.assign({}, defaultOptions, opts);
-	var { params, method, headers = {}, signer } = options;
-
-	if (utils.config.moreLog) {
-		var data: string[] = [];
-		if (params) {
-			if (method == 'GET') {
-				pathname += '?' + querystringStringify(params);
-			} else {
-				data = [`-d '${JSON.stringify(params)}'`];
-			}
-		}
-		headers = Object.assign({
-			// 'User-Agent': options.userAgent,
-			// 'Accept': 'application/json',
-			'Content-Type': 'application/json',
-		}, headers);
-		var logs = [
-			"'" + pathname + "'",
-			'-X ' + method,
-			...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
-			...data,
-		];
-		console.log('curl', logs.join(' \\\n'));
-	}
+	var { params, method, signer } = options;
 
 	return utils.promise<Result<IBuffer>>(async (resolve, reject)=> {
 		var uri = new url.URL(pathname);
@@ -408,6 +385,29 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 
 		if (signer) {
 			Object.assign(headers, await signer.sign(path, post_data ? post_data: ''));
+		}
+
+		if (utils.config.moreLog) {
+			// var data: string[] = [];
+			// if (params) {
+			// 	if (method == 'GET') {
+			// 		pathname += '?' + querystringStringify(params);
+			// 	} else {
+			// 		data = [`-d '${JSON.stringify(params)}'`];
+			// 	}
+			// }
+			// headers = Object.assign({
+			// 	// 'User-Agent': options.userAgent,
+			// 	// 'Accept': 'application/json',
+			// 	'Content-Type': 'application/json',
+			// }, headers);
+			var logs = [
+				"'" + path + "'",
+				'-X ' + method,
+				...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
+				...(post_data? [post_data]: []),
+			];
+			console.log('curl', logs.join(' \\\n'));
 		}
 
 		if (!haveWeb) {
