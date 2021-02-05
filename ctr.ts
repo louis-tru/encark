@@ -49,7 +49,8 @@ function makeRequireFunction(mod: any) {
 		if (typeof request !== 'string') {
 			var actual = request;
 			var str = `The "request" argument must be of type string`;
-			str += `. Received type ${actual !== null ? typeof actual : 'null'}`;
+			var s = actual !== null ? typeof actual : 'null';
+			str += `. Received type ${s}`;
 			throw new Error(str);
 		}
 		return (<any>Module)._resolveFilename(request, mod, false, options);
