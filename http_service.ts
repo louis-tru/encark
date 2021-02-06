@@ -186,10 +186,14 @@ export class HttpService extends StaticService {
 			} catch(e) {
 				err = e;
 			}
-			if (!self.isCompleteResponse) {
+			if (!self.isCompleteResponse || err) {
 				if (err) {
 					if (self.server.printLog) {
 						console.error(err);
+					}
+					if (self.isCompleteResponse) {
+						console.error('Unexpected exception??', err);
+						(self as any).m_markCompleteResponse = false;
 					}
 					self.returnError(err);
 				} else {
