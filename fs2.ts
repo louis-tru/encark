@@ -72,6 +72,12 @@ export function readFile(path: PathLike | number, options?: { flag?: string; } |
 	});
 }
 
+export function writeFile(path: PathLike | number, data: any, options?: fs.WriteFileOptions) {
+	return new Promise<void>(function(resolve, reject) {
+		fs.writeFile(path, data, options || {}, e=>e ? reject(e): resolve());
+	});
+}
+
 export function mkdirp(path: string, mode?: fs.MkdirOptopns) {
 	return new Promise<void>(function(resolve, reject) {
 		fs.mkdirp(path, mode, (err)=>err ? reject(err): resolve());
