@@ -240,10 +240,16 @@ export {};
 
 // ======================== IMPL ========================
 
+var _ex: any;
+
+declare var __webpack_exports__: any;
+
 if (typeof __require__ == 'function') { // ftr
-	Object.assign(exports, __require__('_event'));
+	_ex = Object.assign(exports, __require__('_event'));
+} else if (typeof __webpack_exports__ == 'object') {
+	_ex = Object.assign(__webpack_exports__, require('./_event'));
 } else {
-	Object.assign(exports, require('./_event'));
+	_ex = Object.assign(exports, require('./_event'));
 }
 
-export default (exports.event as (target: any, name: string)=>void);
+export default (_ex.event as (target: any, name: string)=>void);
