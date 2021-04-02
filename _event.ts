@@ -218,7 +218,7 @@ export class Event<Data, Sender extends object = object> {
 	}
 
 	get noticer () {
-		return this._noticer;
+		return this._noticer as EventNoticer<Event<Data, Sender>>;
 	}
 
 	constructor(data: Data) {
@@ -259,10 +259,10 @@ function check_fun(origin: any) {
 
 function forwardNoticeNoticer<E>(forward_noticer: EventNoticer<E>, evt: E) {
 	try {
-		var noticer = (evt as any).m_noticer;
+		var noticer = (evt as any)._noticer;
 		forward_noticer.triggerWithEvent(evt);
 	} finally {
-		(evt as any).m_noticer = noticer;
+		(evt as any)._noticer = noticer;
 	}
 }
 
@@ -452,7 +452,7 @@ export class EventNoticer<E = DefaultEvent> {
 	 */
 	triggerWithEvent(evt: E) {
 		if ( this.m_enable && this.m_length ) {
-			(evt as any).m_noticer = this;
+			(evt as any)._noticer = this;
 			var listens = this.m_listens as List<ListenItem>;
 			var item = listens.first;
 			while ( item ) {
@@ -464,7 +464,7 @@ export class EventNoticer<E = DefaultEvent> {
 					item = listens.del(item);
 				}
 			}
-			(evt as any).m_noticer = null;
+			(evt as any)._noticer = null;
 		}
 	}
 
@@ -659,7 +659,7 @@ export class Notification<E = DefaultEvent> {
 	* @arg data {Object}       要发送的消数据
 	*/
 	trigger(name: string, data?: any) {
-		return this.triggerWithEvent(name, new Event(data) as unknown as E);
+		this.triggerWithEvent(name, new Event(data) as unknown as E);
 	}
 
 	/**
