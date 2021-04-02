@@ -62,10 +62,9 @@ export declare class List<T> {
 	* @class Event
 	*/
 export declare class Event<Data, Sender extends object = object> {
-	private m_data;
-	private m_return_value;
-	protected m_noticer: EventNoticer<Event<Data, Sender>> | null;
-	private m_origin;
+	private _data;
+	protected _noticer: EventNoticer<Event<Data, Sender>> | null;
+	private _origin;
 	get name(): string;
 	get data(): Data;
 	get sender(): Sender;
