@@ -35,7 +35,7 @@ import * as https from 'https';
 import * as url from 'url';
 import * as fs from 'fs';
 import errno from './errno';
-import req from './request';
+import request from './request';
 
 export interface Options {
 	renewal?: boolean;
@@ -59,18 +59,19 @@ interface Wget {
 	LIMIT: number;
 }
 
-const wget: Wget = function wget(www: string, save: string, options?: Options): WgetResult { // 206
+const wget: Wget = function _wget(www: string, save: string, options_?: Options): WgetResult { // 206
 	var { renewal = false,
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
 				onProgress,
-				timeout = 12e4, } = options || {};
+				timeout = 12e4, } = options_ || {};
 
 	limit = Number(limit) || 0;
 	renewal = renewal || false;
 	var progress = onProgress || util.noop;
 
 	var _reject: (err: Error)=>void, _req: http.ClientRequest;
+	var _resolve: (value: Result) => void;
 	var ok = false;
 
 	function abort() {
@@ -87,65 +88,74 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 
 	var promise = new Promise<Result>((resolve, reject)=>{
 		_reject = reject;
-		if (ok) // abort
-			return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
+		_resolve = resolve;
+	}) as WgetResult;
 
-		var uri = url.parse(String(www));
-		var isSSL = uri.protocol == 'https:';
-		var lib =	isSSL ? https: http;
+	//if (ok) // abort
+	//	return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
 
-		var options: http.RequestOptions & https.AgentOptions = {
-			hostname: uri.hostname,
-			port: Number(uri.port) || (isSSL ? 443: 80),
-			path: <string>uri.path,
-			method: 'GET',
-			headers: {
-				'User-Agent': req.userAgent,
-			},
-			timeout: timeout || 12e4,
-			rejectUnauthorized: false,
-		};
+	fs.stat(save, function(err, stat) {
+		var start_range = 0;
+		var download_total = 0;
+		var download_size = 0;
+		var file_mime = 'application/octet-stream';
+		var range = '';
 
-		(<any>options).rejectUnauthorized = false;
-
-		if (isSSL) {
-			options.agent = new https.Agent(options);
-		}
-
-		fs.stat(save, function(err, stat) {
-			var start_range = 0;
-			var download_total = 0;
-			var download_size = 0;
-			var file_mime = 'application/octet-stream';
-
-			if (renewal) {
-				if (!err) {
-					if (stat.isFile()) {
-						start_range = stat.size;
-						download_size = start_range;
-					} else {
-						ok = true; // abort
-						return reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
-					}
-				}
-				if (start_range) {
-					(<http.OutgoingHttpHeaders>options.headers).range = 'bytes=' + start_range + '-';
+		if (renewal) {
+			if (!err) {
+				if (stat.isFile()) {
+					start_range = stat.size;
+					download_size = start_range;
+				} else {
+					ok = true; // abort
+					return _reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
 				}
 			}
+			if (start_range) {
+				range = 'bytes=' + start_range + '-';
+				// (options.headers as http.OutgoingHttpHeaders).range = 'bytes=' + start_range + '-';
+			}
+		}
+
+		function requ_(www: string, redirect: number) {
 
 			var fd = 0;
 			var res_end = false;
 			var buffers = new List<Buffer>();
 
+			var uri = url.parse(String(www));
+			var isSSL = uri.protocol == 'https:';
+			var lib =	isSSL ? https: http;
+		
+			var options: http.RequestOptions & https.AgentOptions = {
+				hostname: uri.hostname,
+				port: Number(uri.port) || (isSSL ? 443: 80),
+				path: uri.path as string,
+				method: 'GET',
+				headers: {
+					'User-Agent': request.userAgent,
+					...(range ? {
+					range: range}: {}),
+				},
+				timeout: timeout || 12e4,
+				rejectUnauthorized: false,
+			};
+		
+			(options as any).rejectUnauthorized = false;
+
+			if (isSSL) {
+				options.agent = new https.Agent(options);
+			}
+		
 			function error(err: any) {
 				if (!ok) {
 					ok = true;
 					var e = Error.new(err);
 					if (fd) {
 						var _fd = fd; fd = 0;
-						fs.close(_fd, e=>reject(e));
+						fs.close(_fd, ()=>_reject(e));
 					} else {
-						reject(e);
+						_reject(e);
 					}
 				}
 			}
@@ -153,10 +163,11 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 			function write() {
 				if (fd) {
 					if (buffers.length) {
-						fs.write(fd, (<ListItem<Buffer>>buffers.first).value, function(err) {
+						fs.write(fd, (buffers.first as ListItem<Buffer>).value, function(err) {
 							if (err) {
 								error(err);
-								req.abort();
+								if (_req)
+									_req.abort();
 							} else {
 								buffers.shift();
 								write();
@@ -165,7 +176,7 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 					} else if (res_end) {
 						ok = true;
 						var _fd = fd; fd = 0;
-						fs.close(_fd, e=>resolve({ total: download_total, size: download_size, mime: file_mime }));
+						fs.close(_fd, ()=>_resolve({ total: download_total, size: download_size, mime: file_mime }));
 					}
 				}
 			}
@@ -264,7 +275,12 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 							res.resume();
 						}
 					});
+				}
+				else if ((res.statusCode == 301 || res.statusCode == 302) && res.headers.location && redirect < 10) {
+					// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
+					requ_(res.headers.location, redirect + 1);
 				} else {
+					// err
 					var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
 					err.url = www;
 					err.save = save;
@@ -283,8 +299,11 @@ const wget: Wget = function wget(www: string, save: string, options?: Options): 
 				req.abort();
 			});
 			req.end(); // send
-		});
-	}) as WgetResult;
+
+		}
+
+		requ_(www, 0);
+	});
 
 	promise.abort = abort;
 
