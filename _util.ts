@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 if (typeof __require__ == 'function') {
-	require('ftr/_ext');
+	require('flare/_ext');
 } else {
 	require('./_ext');
 }
@@ -41,7 +41,7 @@ const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
 const haveNode: boolean = !!globalThis.process;
-const haveFtr: boolean = !!globalThis.__require__;
+const haveFlare: boolean = !!globalThis.__require__;
 const haveWeb: boolean = !!globalThis.document;
 
 type Platform = 'darwin' | 'linux' | 'win32' | 'android'
@@ -96,12 +96,12 @@ var _processHandles = {
 	},
 };
 
-if (haveFtr) {
+if (haveFlare) {
 	var _util = __require__('_util');
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
 	gc = _util.garbageCollection;
-	_process = require('ftr/_util')._process;
+	_process = require('flare/_util')._process;
 }
 else if (haveNode) {
 	let _nodeProcess = (globalThis as any).process;
@@ -207,7 +207,7 @@ const nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void 
 haveNode ? process.nextTick: function(cb, ...args): void {
 	if (typeof cb != 'function')
 		throw new Error('callback must be a function');
-	if (haveFtr) {
+	if (haveFlare) {
 		_util.nextTick(()=>cb(...args));
 	} else {
 		setImmediate(()=>cb(...args));
@@ -229,7 +229,7 @@ export default {
 	nextTick: nextTick,
 	platform: platform,
 	haveNode: haveNode,
-	haveFtr: haveFtr,
+	haveFlare: haveFlare,
 	haveWeb: haveWeb,
 	argv: argv,
 	webFlags: webFlags,

@@ -32,9 +32,9 @@ import utils from './util';
 import path from './path';
 import { Notification } from './event';
 
-const { haveNode, haveFtr, haveWeb } = utils;
+const { haveNode, haveFlare, haveWeb } = utils;
 
-if (haveFtr) {
+if (haveFlare) {
 	var fs = __require__('_fs');
 } else if (haveNode) {
 	var fs = require('./fs');

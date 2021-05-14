@@ -243,7 +243,7 @@ var _ex: any;
 
 declare var __webpack_exports__: any;
 
-if (typeof __require__ == 'function') { // ftr
+if (typeof __require__ == 'function') { // flare
 	_ex = Object.assign(exports, __require__('_event'));
 } else if (typeof __webpack_exports__ == 'object') {
 	_ex = Object.assign(__webpack_exports__, require('./_event'));

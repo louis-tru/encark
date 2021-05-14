@@ -162,7 +162,7 @@ export class URL {
 		(<any>this)._value = path;
 	}
 	
-	// href: "http://xxxx.xxx:81/v1.1.0/ftr/path.js?sasasas&asasasa#sdsdsd"
+	// href: "http://xxxx.xxx:81/v1.1.0/flare/path.js?sasasas&asasasa#sdsdsd"
 	get href(): string {
 		parse_path(this);
 		return (<any>this)._origin + (<any>this)._filename + (<any>this)._search + (<any>this)._hash;
@@ -206,19 +206,19 @@ export class URL {
 		return (<any>this)._hash;
 	}
 	
-	// host: "fasttr.org:81"
+	// host: "flare.cool:81"
 	get host(): string {
 		parse_path(this);
 		return (<any>this)._hostname + ((<any>this)._port ? ':' + (<any>this)._port : '');
 	}
 	
-	// hostname: "fasttr.org"
+	// hostname: "flare.cool"
 	get hostname(): string {
 		parse_path(this);
 		return (<any>this)._hostname;
 	}
 	
-	// origin: "http://fasttr.org:81"
+	// origin: "http://flare.cool:81"
 	get origin(): string {
 		parse_path(this);
 		return (<any>this)._origin;

@@ -33,13 +33,13 @@ import buffer,{IBuffer, Zero} from './buffer';
 import url from './path';
 import errno from './errno';
 
-const { haveFtr, haveNode, haveWeb } = utils;
+const { haveFlare, haveNode, haveWeb } = utils;
 const _user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 
-if (haveFtr) {
+if (haveFlare) {
 	var user_agent = _user_agent;
-	var httpFtr = __require__('_http');
+	var httpFlare = __require__('_http');
 }
 else if (haveWeb) {
 	var user_agent = navigator.userAgent;
@@ -154,8 +154,8 @@ export interface Result<T = any> {
 
 export type PromiseResult<T = any> = Promise<Result<T>>
 
-// Ftr implementation
-function requestFtr(
+// Flare implementation
+function requestFlare(
 	options: Dict,
 	soptions: Dict, 
 	resolve: (e: Result)=>void,
@@ -169,7 +169,7 @@ function requestFtr(
 	url += soptions.port != (is_https? 443: 80) ? ':'+soptions.port: '';
 	url += soptions.path;
 
-	httpFtr.request({
+	httpFlare.request({
 		url: url,
 		method: method == 'POST'? http.HTTP_METHOD_POST: http.HTTP_METHOD_GET,
 		headers: soptions.headers,
@@ -318,7 +318,7 @@ function requestNode(	options: Dict,
 
 // request implementation
 var _request_platform = 
-	haveFtr ? requestFtr:
+	haveFlare ? requestFlare:
 	haveWeb ? requestWeb:
 	haveNode ? requestNode:
 	utils.unrealized;

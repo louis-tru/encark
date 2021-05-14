@@ -33,7 +33,7 @@ import _util from './_util' ;
 
 export type Optopns = Dict<string|string[]>;
 
-const {haveNode, haveFtr, haveWeb} = _util;
+const {haveNode, haveFlare, haveWeb} = _util;
 const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
@@ -45,11 +45,11 @@ var _cwd:()=>string;
 var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
-var _ftr_pkgutil: any;
+var _flare_pkgutil: any;
 var debug = false;
 
-if (haveFtr) {
-	_ftr_pkgutil = __require__('_pkguitl');
+if (haveFlare) {
+	_flare_pkgutil = __require__('_pkguitl');
 	_path = __require__('_path');
 	win32 = __require__('_util').platform == 'win32';
 	cwd = _path.cwd;
@@ -211,7 +211,7 @@ function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-if (haveNode && !haveFtr) {
+if (haveNode && !haveFlare) {
 	var fs = require('fs');
 	require('module').Module._extensions['.keys'] = 
 		function(module: NodeModule, filename: string): any {
@@ -271,8 +271,8 @@ function readConfigFile(pathname: string, pathname2: string) {
 }
 
 function getConfig(): Dict {
-	if (haveFtr) {
-		return _ftr_pkgutil.config;
+	if (haveFlare) {
+		return _flare_pkgutil.config;
 	}
 	if (!config) {
 		if (haveNode) {
@@ -300,7 +300,7 @@ function initArgv() { // init
 	}
 	parseOptions(args, options);
 
-	if (haveFtr) {
+	if (haveFlare) {
 		debug = __require__('_util').debug;
 	} else if (haveNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
