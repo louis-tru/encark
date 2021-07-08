@@ -386,20 +386,23 @@ export abstract class Server extends Notification {
 	 * 启动服务
 	 */
 	start() {
-		var complete = ()=>{
-			var addr = <net.AddressInfo>(this.m_server).address();
-			this.m_host = addr.address;
-			this.m_port = addr.port;
-			this.m_isRun = true;
-			this.trigger('Startup', {});
-		}
-		if (this.m_port) {
-			this.m_server.listen(this.m_port, this.m_host, complete);
-		} else if ( this.m_host ) {
-			this.m_server.listen(String(this.m_host), complete);
-		} else {
-			this.m_server.listen(complete);
-		}
+		return util.promise<void>((resolve)=>{
+			var complete = ()=>{
+				var addr = <net.AddressInfo>(this.m_server).address();
+				this.m_host = addr.address;
+				this.m_port = addr.port;
+				this.m_isRun = true;
+				this.trigger('Startup', {});
+				resolve();
+			}
+			if (this.m_port) {
+				this.m_server.listen(this.m_port, this.m_host, complete);
+			} else if ( this.m_host ) {
+				this.m_server.listen(String(this.m_host), complete);
+			} else {
+				this.m_server.listen(complete);
+			}
+		});
 	}
 
 	/**
