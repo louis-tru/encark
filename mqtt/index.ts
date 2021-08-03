@@ -177,8 +177,8 @@ function parseAuthOptions(opts: CreateOptions) {
  */
 function resolveOptions(opts?: CreateOptions) {
 	// Default options
-	var options = Object.assign({
-		url: 'mqtt://127.0.0.1:1883',
+	var options: CreateOptions = {
+		url: typeof opts == 'string' ? opts: opts?.url,
 		keepalive: 60,
 		reschedulePings: true,
 		protocolId: 'MQTT',
@@ -192,17 +192,20 @@ function resolveOptions(opts?: CreateOptions) {
 		outgoingStore: new Store(),
 		incomingStore: new Store(),
 		queueQoSZero: true,
-	}, typeof opts == 'string' ? {url: opts}: opts);
+	};
 
 	if (options.url) {
-		opts = Object.assign(url.parse(options.url, true), opts);
-		if (!options.protocol) {
-			throw new Error('Missing protocol');
-		}
-		options.protocol = <Protocol>options.protocol.replace(/:$/, '');
+		var _url = url.parse(options.url, true);
+		options.hostname = _url.hostname || undefined;
+		options.port = Number(_url.port) || undefined;
+		options.protocol = _url.protocol?.replace(/:$/, '') as Protocol;
 	}
 
+	Object.assign(options, opts);
+
+	options.protocol = options.protocol || 'mqtt';
 	options.port = Number(options.port) || 1883;
+	options.hostname = options.hostname || '127.0.0.1';
 
 	// merge in the auth options if supplied
 	parseAuthOptions(options);
