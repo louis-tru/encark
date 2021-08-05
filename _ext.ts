@@ -45,7 +45,7 @@ interface NodeModule {
 	id: string;
 	filename: string;
 	loaded: boolean;
-	parent: NodeModule | null;
+	parent: NodeModule | null | undefined;
 	children: NodeModule[];
 	paths: string[];
 	package?: any;

@@ -28,19 +28,45 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import uuid from './uuid';
-import md5 from './md5';
-import sha1 from './sha1';
-import sha256 from './sha256';
+import utils from '../util';
+import util from './util';
+import buffer, {IBuffer, Bytes} from '../buffer';
 
-export * from './uuid';
-export * from './md5';
-export * from './sha1';
-export * from './sha256';
+const {bin2str,bin2hex,bin2b64} = util;
 
-export default {
-	uuid,
-	md5,
-	sha1,
-	sha256,
-};
+/*
+ * These are the functions you'll usually want to call
+ * They take string arguments and return either hex or base-64 encoded strings
+ */
+export function sha256_hex(s: string | Bytes) { return bin2hex(sha256(s)) }
+export function sha256_b64(s: string | Bytes) { return bin2b64(sha256(s)) }
+export function sha256_str(s: string | Bytes) { return bin2str(sha256(s)) }
+
+export var sha256: (s: string | Bytes)=>IBuffer;
+
+if (utils.haveNode) {
+	let crypto = require('crypto');
+	sha256 = (s: string | Bytes)=>buffer.from(crypto.createHash('sha256').update(s).digest());
+} else {
+	sha256 = require('./_sha256').default;
+}
+
+export default sha256;
+
+/*
+ * Perform a simple self-test to see if the VM is working
+ */
+function sha256_vm_test()
+{
+	var crypto = require('crypto');
+	var sha1_ = crypto.createHash('sha256');
+	sha1_.update('abc');
+	console.log(sha1_.digest());
+	console.log(buffer.from(sha256('abc')));
+
+	var hash = sha256_hex("abc");
+	console.log(hash, '\nba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+	return hash == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+}
+
+// sha256_vm_test();

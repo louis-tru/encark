@@ -42,6 +42,17 @@ export function sha1_hex(s: string | Bytes) { return bin2hex(sha1(s)) }
 export function sha1_b64(s: string | Bytes) { return bin2b64(sha1(s)) }
 export function sha1_str(s: string | Bytes) { return bin2str(sha1(s)) }
 
+export var sha1: (s: string | Bytes)=>IBuffer;
+
+if (utils.haveNode) {
+	let crypto = require('crypto');
+	sha1 = (s: string | Bytes)=>buffer.from(crypto.createHash('sha1').update(s).digest());
+} else {
+	sha1 = require('./_sha1').default;
+}
+
+export default sha1;
+
 /*
  * Perform a simple self-test to see if the VM is working
  */
@@ -59,14 +70,3 @@ function sha1_vm_test()
 }
 
 // sha1_vm_test();
-
-var sha1: (s: string | Bytes)=>IBuffer;
-
-if (utils.haveNode) {
-	let crypto = require('crypto');
-	sha1 = (s: string | Bytes)=>buffer.from(crypto.createHash('sha1').update(s).digest());
-} else {
-	sha1 = require('./_sha1').default;
-}
-
-export default sha1;

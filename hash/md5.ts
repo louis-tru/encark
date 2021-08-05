@@ -42,6 +42,17 @@ export function md5_hex(s: string | Bytes) { return bin2hex(md5(s)) }
 export function md5_b64(s: string | Bytes) { return bin2b64(md5(s)) }
 export function md5_str(s: string | Bytes) { return bin2str(md5(s)) }
 
+export var md5: (s: string | Bytes)=>IBuffer;
+
+if (utils.haveNode) {
+	let crypto = require('crypto');
+	md5 = (s: string | Bytes)=>buffer.from(crypto.createHash('md5').update(s).digest());
+} else {
+	md5 = require('./_md5').default;
+}
+
+export default md5;
+
 /*
  * Perform a simple self-test to see if the VM is working
  */
@@ -59,14 +70,3 @@ function md5_vm_test()
 }
 
 // md5_vm_test();
-
-var md5: (s: string | Bytes)=>IBuffer;
-
-if (utils.haveNode) {
-	let crypto = require('crypto');
-	md5 = (s: string | Bytes)=>buffer.from(crypto.createHash('md5').update(s).digest());
-} else {
-	md5 = require('./_md5').default;
-}
-
-export default md5;
