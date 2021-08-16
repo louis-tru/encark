@@ -41,8 +41,6 @@ export function isAsync(func: any): boolean {
 	return func && func.constructor === AsyncFunctionConstructor;
 }
 
-class obj_constructor {}
-
 function clone_object(new_obj: any, obj: any): any {
 	for (var name of Object.getOwnPropertyNames(obj)) {
 		var property = <PropertyDescriptor>Object.getOwnPropertyDescriptor(obj, name);
@@ -84,9 +82,7 @@ export function clone(obj: any): any {
 			case Date:
 				return new Date(obj.valueOf());
 			default:
-				obj_constructor.prototype = obj.constructor.prototype;
-				new_obj = new obj_constructor();
-				return clone_object(new_obj, obj);
+				return clone_object(Object.create(obj.constructor.prototype), obj);
 		}
 	}
 	return obj;
