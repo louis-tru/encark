@@ -42,6 +42,7 @@ export interface Options {
 	limit?: number;
 	onProgress?(opts: { total: number, size: number, speed: number, data: Buffer }): void;
 	timeout?: number;
+	proxy?: string;
 }
 
 export interface Result {
@@ -64,7 +65,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
 				onProgress,
-				timeout = 12e4, } = options_ || {};
+				timeout = 12e4, proxy } = options_ || {};
 
 	limit = Number(limit) || 0;
 	renewal = renewal || false;
@@ -126,27 +127,48 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 			var uri = url.parse(String(www));
 			var isSSL = uri.protocol == 'https:';
 			var lib =	isSSL ? https: http;
+			var hostname = uri.hostname;
+			var port = Number(uri.port) || (isSSL ? 443: 80);
+			var path = uri.path as string;
+			var headers = {
+				'User-Agent': request.userAgent,
+				...(range ? {
+				range: range}: {}),
+			} as Dict;
 		
+			var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
+			var _proxy = proxy || GLOBAL_PROXY;
+	
+			if (_proxy) {
+				// set proxy
+				if (/^https?:\/\//.test(_proxy)) {
+					var proxyUrl = new url.URL(_proxy);
+					isSSL = proxyUrl.protocol == 'https:';
+					hostname = proxyUrl.hostname;
+					port = Number(proxyUrl.port) || (isSSL ? 443: 80);
+					path = uri.href;
+					// set headers
+					headers.host = uri.hostname;
+					if (uri.port) {
+						headers.host += ':' + uri.port;
+					}
+				}
+			}
+
 			var options: http.RequestOptions & https.AgentOptions = {
-				hostname: uri.hostname,
-				port: Number(uri.port) || (isSSL ? 443: 80),
-				path: uri.path as string,
+				hostname,
+				port,
+				path,
 				method: 'GET',
-				headers: {
-					'User-Agent': request.userAgent,
-					...(range ? {
-					range: range}: {}),
-				},
+				headers,
 				timeout: timeout || 12e4,
 				rejectUnauthorized: false,
 			};
-		
-			(options as any).rejectUnauthorized = false;
 
 			if (isSSL) {
 				options.agent = new https.Agent(options);
 			}
-		
+
 			function error(err: any) {
 				if (!ok) {
 					ok = true;

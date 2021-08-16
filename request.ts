@@ -69,6 +69,7 @@ export interface Options {
 	userAgent?: string;
 	cacheTime?: number;
 	noRepeat?: boolean;
+	proxy?: string;
 }
 
 const defaultOptions: Options = {
@@ -397,10 +398,12 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 			console.log('curl', logs.join(' \\\n'));
 		}
 
-		if (!haveWeb) {
+		var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
+		var proxy = opts.proxy || GLOBAL_PROXY;
+
+		if (proxy && (!haveWeb || proxy != GLOBAL_PROXY)) {
 			// set proxy
-			var proxy = process.env.HTTP_PROXY || process.env.http_proxy;
-			if (proxy && /^https?:\/\//.test(proxy)) {
+			if (/^https?:\/\//.test(proxy)) {
 				var proxyUrl = new url.URL(proxy);
 				is_https = proxyUrl.protocol == 'https:';
 				hostname = proxyUrl.hostname;
