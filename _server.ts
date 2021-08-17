@@ -94,6 +94,7 @@ export interface Options {
 	gzip?: RegExp | string | false;
 	staticService?: string;
 	router?: Rule[];
+	tryFiles?: string;
 }
 
 /**
@@ -196,6 +197,11 @@ export abstract class Server extends Notification {
 	readonly textEncoding: string = 'utf-8';
 
 	/**
+	 * 错误文件指向
+	*/
+	readonly tryFiles = '';
+
+	/**
 	 * 请求超时时间(毫秒)
 	 * @type {Number}
 	 */
@@ -288,6 +294,7 @@ export abstract class Server extends Notification {
 			'textEncoding',
 			'defaults',
 			'formHash',
+			'tryFiles',
 		]));
 
 		this.m_port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;

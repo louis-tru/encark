@@ -394,7 +394,14 @@ function returnFile(self: StaticService, filename: string, mime?: string) {
 }
 
 function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
+
 	var filename = self.server.errorStatus[statusCode];
+
+	if (!filename) {
+		if (statusCode == 404) {
+			filename = self.server.tryFiles;
+		}
+	}
 
 	if (filename) {
 		filename = (self as any)._root[0] + filename;
