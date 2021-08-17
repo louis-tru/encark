@@ -329,18 +329,24 @@ export function equalsClass(baseclass: any, subclass: any): boolean {
 /**
  * @fun assert
  */
-export function assert(condition: any, code?: number | ErrorNewArg, desc?: string): void {
-	if (condition)
+export function assert(condition: any, code?: number | ErrorNewArg, desc?: string | ErrorDescribe): void {
+	if (condition) {
 		return;
-	if (typeof code == 'number') {
-		throw Error.new([code, desc || 'assert fail, unforeseen exceptions']);
-	} else {
-		var err = Error.new(code || [-30009, 'ERR_ASSERT_ERROR']);
-		if (desc) {
-			err.description = desc;
-		}
-		throw err;
 	}
+	var err;
+	if (typeof code == 'number') {
+		err = Error.new([code, 'assert fail, unforeseen exceptions']);
+	} else {
+		err = Error.new(code || [-30009, 'ERR_ASSERT_ERROR']);
+	}
+	if (desc) {
+		if (typeof desc == 'string') {
+			err.description = desc;
+		} else {
+			Object.assign(err, desc);
+		}
+	}
+	throw err;
 }
 
 /**
