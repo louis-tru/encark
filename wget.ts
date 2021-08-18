@@ -56,11 +56,11 @@ export interface WgetResult extends Promise<Result> {
 }
 
 interface Wget {
-	(www: string, save: string, options?: Options): WgetResult;
+	(www: string, save: string | null, options?: Options): WgetResult;
 	LIMIT: number;
 }
 
-const wget: Wget = function _wget(www: string, save: string, options_?: Options): WgetResult { // 206
+const wget: Wget = function _wget(www: string, save: string | null, options_?: Options): WgetResult { // 206
 	var { renewal = false,
 				limit = wget.LIMIT, // limit rate byte/second
 				// limitTime = 0, // limt network use time
@@ -95,7 +95,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 	//if (ok) // abort
 	//	return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
 
-	fs.stat(save, function(err, stat) {
+	fs.stat(save || '', function(err, stat) {
 		var start_range = 0;
 		var download_total = 0;
 		var download_size = 0;
@@ -189,7 +189,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 							if (err) {
 								error(err);
 								if (_req)
-									_req.abort();
+									_req.destroy();
 							} else {
 								buffers.shift();
 								write();
@@ -200,6 +200,9 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 						var _fd = fd; fd = 0;
 						fs.close(_fd, ()=>_resolve({ total: download_total, size: download_size, mime: file_mime }));
 					}
+				} else if (res_end && !ok) {
+					ok = true;
+					_resolve({ total: download_total, size: download_size, mime: file_mime });
 				}
 			}
 
@@ -239,7 +242,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 								}
 								if (ptime > 0) {
 									res.pause();
-									util.sleep(ptime).then(e=>res.resume()).catch(e=>{});
+									util.sleep(ptime).then(e=>res.resume());//.catch(e=>{});
 								}
 							}
 							time = st;
@@ -288,15 +291,19 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 
 					file_mime = (res.headers['content-type'] || file_mime).split(';')[0];
 					
-					fs.open(save, flag, function(err, _fd) {
-						if (err) {
-							error(err);
-							req.abort();
-						} else {
-							fd = _fd;
-							res.resume();
-						}
-					});
+					if (save) {
+						fs.open(save, flag, function(err, _fd) {
+							if (err) {
+								error(err);
+								req.destroy();
+							} else {
+								fd = _fd;
+								res.resume();
+							}
+						});
+					} else {
+						res.resume();
+					}
 				}
 				else if ((res.statusCode == 301 || res.statusCode == 302) && res.headers.location && redirect < 10) {
 					// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
@@ -310,7 +317,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 					err.httpVersion = res.httpVersion;
 					err.headers = res.headers;
 					error(err);
-					req.abort();
+					req.destroy();
 				}
 			});
 
@@ -318,7 +325,7 @@ const wget: Wget = function _wget(www: string, save: string, options_?: Options)
 			req.on('error', e=>error(e));
 			req.on('timeout', ()=>{
 				error(errno.ERR_HTTP_REQUEST_TIMEOUT);
-				req.abort();
+				req.destroy();
 			});
 			req.end(); // send
 

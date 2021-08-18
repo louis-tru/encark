@@ -250,7 +250,6 @@ function resultFileData(
 ) 
 {
 	var res = self.response;
-	var end = false;
 	var read: fs.ReadStream;
 	res.setHeader('Content-Type', getContentType(self, type));
 
@@ -268,31 +267,7 @@ function resultFileData(
 		read = fs.createReadStream(filename);
 	}
 
-	read.on('data', function (buff) {
-		res.write(buff);
-	});
-	read.on('end', function () {
-		end = true;
-		res.end();
-	});
-	read.on('error', function (e) {
-		read.destroy();
-		console.error(e);
-		end = true;
-		res.end();
-	});
-	res.on('error', function () {
-		if(!end){ // 意外断开
-			end = true;
-			read.destroy();
-		}
-	});
-	res.on('close', function () { // 监控连接是否关闭
-		if(!end){ // 意外断开
-			end = true;
-			read.destroy();
-		}
-	});
+	read.pipe(res);
 }
 
 //返回异常状态
