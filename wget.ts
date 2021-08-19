@@ -172,7 +172,7 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 			function error(err: any) {
 				if (!ok) {
 					ok = true;
-					var e = Error.new(err);
+					var e = Object.assign(Error.new(err), { www, save });
 					if (fd) {
 						var _fd = fd; fd = 0;
 						fs.close(_fd, ()=>_reject(e));
