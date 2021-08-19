@@ -105,8 +105,10 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 		if (renewal) {
 			if (!err) {
 				if (stat.isFile()) {
-					start_range = stat.size;
-					download_size = start_range;
+					if (stat.size) {
+						start_range = stat.size - 1;
+						download_size = start_range;
+					}
 				} else {
 					ok = true; // abort
 					return _reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
@@ -123,6 +125,7 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 			var fd = 0;
 			var res_end = false;
 			var buffers = new List<Buffer>();
+			var fd_offset = 0;
 
 			var uri = url.parse(String(www));
 			var isSSL = uri.protocol == 'https:';
@@ -185,12 +188,14 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 			function write() {
 				if (fd) {
 					if (buffers.length) {
-						fs.write(fd, (buffers.first as ListItem<Buffer>).value, function(err) {
+						var buf = (buffers.first as ListItem<Buffer>).value;
+						fs.write(fd, buf, 0, buf.length, fd_offset, function(err) {
 							if (err) {
 								error(err);
 								if (_req)
 									_req.destroy();
 							} else {
+								fd_offset += buf.length;
 								buffers.shift();
 								write();
 							}
@@ -215,8 +220,6 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 				function fail(msg?: string) {
 					var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
 					err.description = msg;
-					err.url = www;
-					err.save = save;
 					err.statusCode = res.statusCode;
 					err.httpVersion = res.httpVersion;
 					err.headers = res.headers;
@@ -274,17 +277,22 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 					});
 
 					res.on('end', ()=>{
-						res_end = true;
-						if (buffers.length == 0)
-							write();
+						if (download_size >= download_total) {
+							res_end = true;
+							if (buffers.length == 0)
+								write();
+						} else {
+							fail(`Bad size, download_size < download_total, ${download_size} < ${download_total}`);
+						}
 					});
 
 					var flag = 'w';
 
 					// set file open flag
-					if (start_range && 
-							res.statusCode == 206 && 
-							res.headers['accept-ranges'] == 'bytes') 
+					if (start_range 
+							&& res.statusCode == 206 
+							// && res.headers['accept-ranges'] == 'bytes'
+						)
 					{
 						var content_range = <string>res.headers['content-range'];
 						var m = content_range.match(/^bytes\s(\d+)-/);
@@ -294,10 +302,11 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 							}
 						}
 						flag = 'a';
+						fd_offset = start_range;
 					}
 
 					// set content total size
-					download_total = Number(res.headers['content-length']) || 0;
+					download_total = Number(res.headers['content-length']) || 0/* stream */;
 					if (download_total) {
 						if (flag == 'a') {
 							download_total += download_size;
@@ -312,8 +321,12 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 								error(err);
 								req.destroy();
 							} else {
-								fd = _fd;
-								res.resume();
+								if (ok) { // error end
+									fs.close(_fd, util.noop);
+								} else {
+									fd = _fd;
+									res.resume();
+								}
 							}
 						});
 					} else {
