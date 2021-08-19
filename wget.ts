@@ -212,6 +212,18 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 					return;
 				_req = req;
 
+				function fail(msg?: string) {
+					var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
+					err.description = msg;
+					err.url = www;
+					err.save = save;
+					err.statusCode = res.statusCode;
+					err.httpVersion = res.httpVersion;
+					err.headers = res.headers;
+					error(err);
+					req.destroy();
+				}
+
 				if (res.statusCode == 200 || res.statusCode == 206) {
 					res.pause();
 					res.socket.setNoDelay(true);
@@ -276,9 +288,12 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 					{
 						var content_range = <string>res.headers['content-range'];
 						var m = content_range.match(/^bytes\s(\d+)-/);
-						if (m && Number(m[1]) == start_range) {
-							flag = 'a';
+						if (m) {
+							if (Number(m[1]) != start_range) {
+								return fail('bad content range');
+							}
 						}
+						flag = 'a';
 					}
 
 					// set content total size
@@ -309,15 +324,7 @@ const wget: Wget = function _wget(www: string, save: string | null, options_?: O
 					// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
 					requ_(res.headers.location, redirect + 1);
 				} else {
-					// err
-					var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
-					err.url = www;
-					err.save = save;
-					err.statusCode = res.statusCode;
-					err.httpVersion = res.httpVersion;
-					err.headers = res.headers;
-					error(err);
-					req.destroy();
+					fail(); // err
 				}
 			});
 
