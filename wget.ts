@@ -51,327 +51,376 @@ export interface Result {
 	mime: string;
 }
 
-export interface WgetResult extends Promise<Result> {
-	abort(): void;
-}
+export class WgetIMPL extends Promise<Result> {
+	private _ok = false;
+	private _req: http.ClientRequest | undefined;
+	private _res: http.IncomingMessage| undefined;
+	private _reject: ((err: Error)=>void) = util.noop;
+	private _resolve: ((value: Result) => void) = util.noop;
+	private _fd = 0;
+	private _www = '';
+	private _save = '';
+	private _buffers = new List<Buffer>();
+	private _res_end = false;
+	private _download_total = 0;
+	private _download_size = 0;
+	private _file_mime = 'application/octet-stream';
+	private _start_range = 0;
+	private _range = '';
+	private _proxy = '';
+	private _timeout = 0;
+	private _limit = 0;
+	private _progress = util.noop as any;
+	private _time = Date.now();
+	private _timeStr = new Date().toString('yyyy-MM-dd hh:mm:ss');
 
-interface Wget {
-	(www: string, save: string | null, options?: Options): WgetResult;
-	LIMIT: number;
-}
+	private constructor(arg: any) {
+		super(arg);
+	}
 
-const wget: Wget = function _wget(www: string, save: string | null, options_?: Options): WgetResult { // 206
-	var { renewal = false,
-				limit = wget.LIMIT, // limit rate byte/second
-				// limitTime = 0, // limt network use time
-				onProgress,
-				timeout = 12e4, proxy } = options_ || {};
+	get time() {
+		return { time: this._time, timeStr: this._timeStr };
+	}
 
-	limit = Number(limit) || 0;
-	renewal = renewal || false;
-	var progress = onProgress || util.noop;
+	get req(): http.ClientRequest | undefined {
+		return this._req;
+	}
+	get res(): http.IncomingMessage | undefined {
+		return this._res;
+	}
 
-	var _reject: (err: Error)=>void, _req: http.ClientRequest;
-	var _resolve: (value: Result) => void;
-	var ok = false;
-
-	function abort() {
-		if (!ok) { // abrot
-			ok = true;
-			if (_reject) {
-				_reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
+	abort(): void {
+		if (!this._ok) { // abrot
+			this._ok = true;
+			if (this._reject) {
+				this._reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
 			}
-			if (_req) {
-				_req.abort();
+			if (this._req) {
+				this._req.destroy();
 			}
 		}
 	}
 
-	var promise = new Promise<Result>((resolve, reject)=>{
-		_reject = reject;
-		_resolve = resolve;
-	}) as WgetResult;
-
-	//if (ok) // abort
-	//	return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
-
-	fs.stat(save || '', function(err, stat) {
-		var start_range = 0;
-		var download_total = 0;
-		var download_size = 0;
-		var file_mime = 'application/octet-stream';
-		var range = '';
-
-		if (renewal) {
-			if (!err) {
-				if (stat.isFile()) {
-					if (stat.size) {
-						start_range = stat.size - 1; // To avoid returning to the 416 state
-						download_size = start_range;
-					}
-				} else {
-					ok = true; // abort
-					return _reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
-				}
+	private _error(err: any) {
+		if (!this._ok) {
+			this._ok = true;
+			var e = Object.assign(Error.new(err), { www: this._www, save: this._save });
+			if (this._fd) {
+				var _fd = this._fd; this._fd = 0;
+				fs.close(_fd, util.noop);
+				this._reject(e)
+			} else {
+				this._reject(e);
 			}
-			if (start_range) {
-				range = 'bytes=' + start_range + '-';
-				// (options.headers as http.OutgoingHttpHeaders).range = 'bytes=' + start_range + '-';
+		}
+	}
+
+	private _write() {
+		if (this._fd) {
+			if (this._buffers.length) {
+				var buf = (this._buffers.first as ListItem<Buffer>).value;
+				fs.write(this._fd, buf, (err)=>{
+					if (err) {
+						this._error(err);
+						if (this._req)
+							this._req.destroy();
+					} else {
+						this._buffers.shift();
+						this._write();
+					}
+				});
+			} else if (this._res_end) {
+				this._ok = true;
+				var _fd = this._fd; this._fd = 0;
+				this._resolve({
+					total: this._download_total,
+					size: this._download_size, mime: this._file_mime,
+				});
+				fs.close(_fd, util.noop);
+			}
+		} else if (this._res_end && !this._ok) {
+			this._ok = true;
+			this._resolve({ total: this._download_total, size: this._download_size, mime: this._file_mime });
+		}
+	}
+
+	private _request(www: string, redirect: number) {
+		var first_offset = 0;
+		var uri = url.parse(String(www));
+		var isSSL = uri.protocol == 'https:';
+		var lib =	isSSL ? https: http;
+		var hostname = uri.hostname;
+		var port = Number(uri.port) || (isSSL ? 443: 80);
+		var path = uri.path as string;
+		var headers = {
+			'User-Agent': request.userAgent,
+			...(this._range ? {
+			range: this._range}: {}),
+		} as Dict;
+	
+		var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
+		var proxy = this._proxy || GLOBAL_PROXY;
+
+		if (proxy) {
+			// set proxy
+			if (/^https?:\/\//.test(proxy)) {
+				var proxyUrl = new url.URL(proxy);
+				isSSL = proxyUrl.protocol == 'https:';
+				hostname = proxyUrl.hostname;
+				port = Number(proxyUrl.port) || (isSSL ? 443: 80);
+				path = uri.href;
+				// set headers
+				headers.host = uri.hostname;
+				if (uri.port) {
+					headers.host += ':' + uri.port;
+				}
 			}
 		}
 
-		function requ_(www: string, redirect: number) {
+		var options: http.RequestOptions & https.AgentOptions = {
+			hostname,
+			port,
+			path,
+			method: 'GET',
+			headers,
+			timeout: this._timeout || 12e4,
+			rejectUnauthorized: false,
+		};
 
-			var fd = 0;
-			var res_end = false;
-			var buffers = new List<Buffer>();
-			var first_offset = 0;
+		if (isSSL) {
+			options.agent = new https.Agent(options);
+		}
 
-			var uri = url.parse(String(www));
-			var isSSL = uri.protocol == 'https:';
-			var lib =	isSSL ? https: http;
-			var hostname = uri.hostname;
-			var port = Number(uri.port) || (isSSL ? 443: 80);
-			var path = uri.path as string;
-			var headers = {
-				'User-Agent': request.userAgent,
-				...(range ? {
-				range: range}: {}),
-			} as Dict;
-		
-			var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
-			var _proxy = proxy || GLOBAL_PROXY;
-	
-			if (_proxy) {
-				// set proxy
-				if (/^https?:\/\//.test(_proxy)) {
-					var proxyUrl = new url.URL(_proxy);
-					isSSL = proxyUrl.protocol == 'https:';
-					hostname = proxyUrl.hostname;
-					port = Number(proxyUrl.port) || (isSSL ? 443: 80);
-					path = uri.href;
-					// set headers
-					headers.host = uri.hostname;
-					if (uri.port) {
-						headers.host += ':' + uri.port;
-					}
-				}
-			}
+		// new request 
+		var req = lib.request(options, (res: http.IncomingMessage)=> {
+			if (this._ok) // abort
+				return;
+			this._req = req;
+			this._res = res;
 
-			var options: http.RequestOptions & https.AgentOptions = {
-				hostname,
-				port,
-				path,
-				method: 'GET',
-				headers,
-				timeout: timeout || 12e4,
-				rejectUnauthorized: false,
+			var error = (err: any) => {
+				this._error(err);
 			};
 
-			if (isSSL) {
-				options.agent = new https.Agent(options);
-			}
-
-			function error(err: any) {
-				if (!ok) {
-					ok = true;
-					var e = Object.assign(Error.new(err), { www, save });
-					if (fd) {
-						var _fd = fd; fd = 0;
-						fs.close(_fd, ()=>_reject(e));
-					} else {
-						_reject(e);
-					}
-				}
-			}
-
-			function write() {
-				if (fd) {
-					if (buffers.length) {
-						var buf = (buffers.first as ListItem<Buffer>).value;
-						fs.write(fd, buf, function(err) {
-							if (err) {
-								error(err);
-								if (_req)
-									_req.destroy();
-							} else {
-								buffers.shift();
-								write();
-							}
-						});
-					} else if (res_end) {
-						ok = true;
-						var _fd = fd; fd = 0;
-						fs.close(_fd, ()=>_resolve({ total: download_total, size: download_size, mime: file_mime }));
-					}
-				} else if (res_end && !ok) {
-					ok = true;
-					_resolve({ total: download_total, size: download_size, mime: file_mime });
-				}
-			}
-
-			// new request 
-			var req = lib.request(options, (res: http.IncomingMessage)=> {
-				if (ok) // abort
-					return;
-				_req = req;
-
-				function fail(msg?: string) {
-					var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
-					err.description = msg;
-					err.statusCode = res.statusCode;
-					err.httpVersion = res.httpVersion;
-					err.headers = res.headers;
-					error(err);
-					req.destroy();
-				}
-
-				if (res.statusCode == 200 || res.statusCode == 206) {
-					res.pause();
-					res.socket.setNoDelay(true);
-					res.socket.setKeepAlive(true, 3e4); // 30s
-					res.socket.on('error', e=>error(e));
-					res.on('error', e=>error(e));
-
-					var speed = 0; // speed / 3 second
-					var time = 0;
-					var ptime = 0; // pause time
-
-					res.on('data', (chunk: Buffer)=>{
-
-						if (first_offset && chunk.length) {
-							chunk = Buffer.from(chunk.buffer, chunk.byteOffset + first_offset, chunk.length - first_offset);
-							first_offset = 0;
-						}
-
-						if (!chunk.length)
-							return;
-
-						download_size += chunk.length;
-
-						var st = Date.now();
-						var ts = st - time; // time span
-						if (ts) {
-							var ispeed = chunk.length / ts * 1e3; // instantaneous speed/second
-							// speed = (speed + ispeed * 0.11) * 0.901; // (100 + 100 * 0.11) * 0.901, Finally converges to ispeed
-							speed = (speed + ispeed * 0.25) * 0.8; // (100 + 100 * 0.25) * 0.8, Finally converges to ispeed
-
-							// limit flow, byte/second
-							if (limit && time) {
-								if (speed > limit) {
-									ptime = Math.min(1e4, ptime + 5); // increase
-								} else {
-									ptime = Math.max(0, ptime - 5); // lessen
-								}
-								if (ptime > 0) {
-									res.pause();
-									util.sleep(ptime).then(e=>res.resume());//.catch(e=>{});
-								}
-							}
-							time = st;
-							// console.log(Math.floor(speed / 1024), Math.floor(ispeed / 1024));
-						}
-
-						try {
-							progress({ total: download_total, size: download_size, speed, data: chunk });
-						} catch(e) {
-							console.error(e);
-						}
-
-						buffers.push(chunk);
-
-						if (buffers.length == 1)
-							write();
-					});
-
-					res.on('end', ()=>{
-						if (!download_total || download_size == download_total) {
-							res_end = true;
-							if (buffers.length == 0)
-								write();
-						} else {
-							fail(`Bad size, download_size != download_total, ${download_size} != ${download_total}`);
-						}
-					});
-
-					res.on('error', error);
-
-					var flag = 'w';
-
-					// set file open flag
-					if (start_range 
-							&& res.statusCode == 206 
-							// && res.headers['accept-ranges'] == 'bytes'
-						)
-					{
-						// var ranges = res.headers['accept-ranges'];
-						// if (ranges != 'bytes') {
-						// 	throw 'bad ranges';
-						// }
-						var content_range = <string>res.headers['content-range'];
-						var m = content_range.match(/^bytes\s(\d+)-/);
-						if (m) {
-							if (Number(m[1]) != start_range) {
-								return fail('Bad content range');
-							}
-						}
-						flag = 'a';
-						first_offset = 1;
-					}
-
-					// set content total size
-					download_total = Number(res.headers['content-length']) || 0/* stream */;
-					if (download_total) {
-						if (flag == 'a') {
-							download_total += download_size - 1;
-						}
-					}
-
-					file_mime = (res.headers['content-type'] || file_mime).split(';')[0];
-					
-					if (save) {
-						fs.open(save, flag, function(err, _fd) {
-							if (err) {
-								error(err);
-								req.destroy();
-							} else {
-								if (ok) { // error end
-									fs.close(_fd, util.noop);
-								} else {
-									fd = _fd;
-									res.resume();
-								}
-							}
-						});
-					} else {
-						res.resume();
-					}
-				}
-				else if ((res.statusCode == 301 || res.statusCode == 302) && res.headers.location && redirect < 10) {
-					// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
-					requ_(res.headers.location, redirect + 1);
-				} else {
-					fail(); // err
-				}
-			});
-
-			req.on('abort', ()=>error(errno.ERR_HTTP_REQUEST_ABORT));
-			req.on('error', e=>error(e));
-			req.on('timeout', ()=>{
-				error(errno.ERR_HTTP_REQUEST_TIMEOUT);
+			var fail = (msg?: string)=>{
+				var err = Error.new(errno.ERR_DOWNLOAD_FAIL);
+				err.description = msg;
+				err.statusCode = res.statusCode;
+				err.httpVersion = res.httpVersion;
+				err.headers = res.headers;
+				this._error(err);
 				req.destroy();
-			});
-			req.end(); // send
+			}
 
-		}
+			var end = () => {
+				if (!this._res_end) {
+					this._res_end = true;
+					if (!this._download_total || this._download_size == this._download_total) {
+						if (this._buffers.length == 0)
+							this._write();
+					} else {
+						fail(`Bad size, download_size != download_total, ${this._download_size} != ${this._download_total}`);
+					}
+				}
+			};
 
-		requ_(www, 0);
-	});
+			if (res.statusCode == 200 || res.statusCode == 206) {
+				res.pause();
+				res.socket.setNoDelay(true);
+				res.socket.setKeepAlive(true, 3e4); // 30s
 
-	promise.abort = abort;
+				res.socket.on('error', e=>error(e));
+				res.socket.on('end', ()=>{end()});
+				res.socket.on('close', ()=>end());
+				res.on('error', e=>error(e));
+				res.on('close', ()=>end());
+				res.on('end', ()=>{end()});
 
-	return promise;
+				var speed = 0; // speed / 3 second
+				var time = 0;
+				var ptime = 0; // pause time
+
+				res.on('data', (chunk: Buffer)=>{
+
+					if (first_offset && chunk.length) {
+						chunk = Buffer.from(chunk.buffer, chunk.byteOffset + first_offset, chunk.length - first_offset);
+						first_offset = 0;
+					}
+
+					if (!chunk.length)
+						return;
+
+						this._download_size += chunk.length;
+
+					var st = Date.now();
+					var ts = st - time; // time span
+					if (ts) {
+						var ispeed = chunk.length / ts * 1e3; // instantaneous speed/second
+						// speed = (speed + ispeed * 0.11) * 0.901; // (100 + 100 * 0.11) * 0.901, Finally converges to ispeed
+						speed = (speed + ispeed * 0.25) * 0.8; // (100 + 100 * 0.25) * 0.8, Finally converges to ispeed
+
+						// limit flow, byte/second
+						if (this._limit && time) {
+							if (speed > this._limit) {
+								ptime = Math.min(1e4, ptime + 5); // increase
+							} else {
+								ptime = Math.max(0, ptime - 5); // lessen
+							}
+							if (ptime > 0) {
+								res.pause();
+								util.sleep(ptime).then(e=>res.resume());//.catch(e=>{});
+							}
+						}
+						time = st;
+						// console.log(Math.floor(speed / 1024), Math.floor(ispeed / 1024));
+					}
+
+					try {
+						this._progress({ total: this._download_total, size: this._download_size, speed, data: chunk });
+					} catch(e) {
+						console.error(e);
+					}
+
+					this._buffers.push(chunk);
+
+					if (this._buffers.length == 1)
+					this._write();
+				});
+
+				var flag = 'w';
+
+				// set file open flag
+				if (this._start_range 
+						&& res.statusCode == 206 
+						// && res.headers['accept-ranges'] == 'bytes'
+					)
+				{
+					// var ranges = res.headers['accept-ranges'];
+					// if (ranges != 'bytes') {
+					// 	throw 'bad ranges';
+					// }
+					var content_range = <string>res.headers['content-range'];
+					var m = content_range.match(/^bytes\s(\d+)-/);
+					if (m) {
+						if (Number(m[1]) != this._start_range) {
+							return fail('Bad content range');
+						}
+					}
+					flag = 'a';
+					first_offset = 1;
+				}
+
+				// set content total size
+				this._download_total = Number(res.headers['content-length']) || 0/* stream */;
+				if (this._download_total) {
+					if (flag == 'a') {
+						this._download_total += this._download_size - 1;
+					}
+				}
+
+				this._file_mime = (res.headers['content-type'] || this._file_mime).split(';')[0];
+				
+				if (this._save) {
+					fs.open(this._save, flag, (err, _fd)=>{
+						if (err) {
+							this._error(err);
+							req.destroy();
+						} else {
+							if (this._ok) { // error end
+								fs.close(_fd, util.noop);
+							} else {
+								this._fd = _fd;
+								res.resume();
+							}
+						}
+					});
+				} else {
+					res.resume();
+				}
+			}
+			else if ((res.statusCode == 301 || res.statusCode == 302) && res.headers.location && redirect < 10) {
+				// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
+				this._req = undefined;
+				this._res = undefined;
+				req.destroy();
+				this._request(res.headers.location, redirect + 1);
+			} else {
+				fail(); // err
+			}
+		});
+
+		req.on('abort', ()=>this._error(errno.ERR_HTTP_REQUEST_ABORT));
+		req.on('error', e=>this._error(e));
+		req.on('timeout', ()=>{
+			this._error(errno.ERR_HTTP_REQUEST_TIMEOUT);
+			req.destroy();
+		});
+		req.end(); // send
+	}
+
+	static wget(www: string, save: string | null, options?: Options): WgetIMPL {
+		var _reject: ((err: Error)=>void) = util.noop;
+		var _resolve: ((value: Result) => void) = util.noop;
+
+		var wget = new WgetIMPL(function (resolve: any, reject: any) {
+			_reject = reject;
+			_resolve = resolve;
+		});
+
+		wget._reject = _reject;
+		wget._resolve = _resolve;
+		wget._exec(www, save, options);
+
+		return wget;
+	}
+
+	private _exec(www: string, save: string | null, options_?: Options) { // 206
+		var { renewal = false,
+					limit = wget.LIMIT, // limit rate byte/second
+					// limitTime = 0, // limt network use time
+					onProgress,
+					timeout = 12e4, proxy } = options_ || {};
+
+		this._limit = Number(limit) || 0;
+		this._progress = onProgress || util.noop;
+		this._timeout = timeout;
+		this._proxy = proxy || '';
+		this._www = www;
+		this._save = save || '';
+
+		//if (ok) // abort
+		//	return _reject(Error.new(errno.ERR_WGET_FORCE_ABORT));
+
+		fs.stat(this._save, (err, stat)=>{
+			if (renewal) {
+				if (!err) {
+					if (stat.isFile()) {
+						if (stat.size) {
+							this._start_range = stat.size - 1; // To avoid returning to the 416 state
+							this._download_size = this._start_range;
+						}
+					} else {
+						this._ok = true; // abort
+						return this._reject(Error.new(errno.ERR_WGET_RENEWAL_FILE_TYPE_ERROR));
+					}
+				}
+				if (this._start_range) {
+					this._range = 'bytes=' + this._start_range + '-';
+					// (options.headers as http.OutgoingHttpHeaders).range = 'bytes=' + start_range + '-';
+				}
+			}
+
+			this._request(www, 0);
+		});
+	}
 }
+
+export interface Wget {
+	(www: string, save: string | null, options?: Options): WgetIMPL;
+	LIMIT: number;
+}
+
+var wget = WgetIMPL.wget as Wget;
 
 wget.LIMIT = 0;
 

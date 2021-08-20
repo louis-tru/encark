@@ -277,7 +277,33 @@ function requestNode(	options: Dict,
 		soptions.headers['Content-Length'] = post_data ? buffer.byteLength(post_data) : 0;
 	}
 
+	var ok = false;
+
+	function error(err: any) {
+		if (!ok) {
+			ok = true;
+			reject(Error.new(err));
+		}
+	}
+
 	var req = lib.request(soptions, (res: any)=> {
+
+		function end() {
+			if (!ok) {
+				ok = true;
+				// console.log('No more data in response.');
+				// console.log('---requestNode', data + '');
+				resolve({
+					data: buffer.concat(buffers),
+					headers: res.headers,
+					statusCode: res.statusCode,
+					httpVersion: res.httpVersion,
+					requestHeaders: soptions.headers,
+					requestData: options.params,
+					cached: false,
+				});
+			}
+		}
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
@@ -286,25 +312,18 @@ function requestNode(	options: Dict,
 			// console.log(`BODY: ${chunk}`);
 			buffers.push(chunk);
 		});
-		res.on('end', ()=> {
-			// console.log('No more data in response.');
-			// console.log('---requestNode', data + '');
-			resolve({
-				data: buffer.concat(buffers),
-				headers: res.headers,
-				statusCode: res.statusCode,
-				httpVersion: res.httpVersion,
-				requestHeaders: soptions.headers,
-				requestData: options.params,
-				cached: false,
-			});
-		});
+		res.on('error', (e:any)=>error(e));
+		res.on('end', ()=>end());
+		res.on('close', ()=>end());
+		res.socket.on('error', (e:any)=>error(e));
+		res.socket.on('end', ()=>end());
+		res.socket.on('close', ()=>end());
 	});
 
-	req.on('abort', ()=>reject(Error.new(errno.ERR_HTTP_REQUEST_ABORT)));
-	req.on('error', (e: any)=>reject(Error.new(e)));
+	req.on('abort', ()=>error(errno.ERR_HTTP_REQUEST_ABORT));
+	req.on('error', (e:any)=>error(e));
 	req.on('timeout', ()=>{
-		reject(Error.new(errno.ERR_HTTP_REQUEST_TIMEOUT));
+		error(errno.ERR_HTTP_REQUEST_TIMEOUT);
 		req.abort();
 	});
 
