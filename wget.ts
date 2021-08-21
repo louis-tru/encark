@@ -78,6 +78,18 @@ export class WgetIMPL extends Promise<Result> {
 		super(arg);
 	}
 
+	get readyState() {
+		return (this._res?.socket as any).readyState || '';
+	}
+
+	get total() {
+		return this._download_total;
+	}
+
+	get size() {
+		return this._download_size;
+	}
+
 	get time() {
 		return { time: this._time, timeStr: this._timeStr };
 	}
