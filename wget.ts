@@ -79,7 +79,11 @@ export class WgetIMPL extends Promise<Result> {
 	}
 
 	get readyState() {
-		return (this._res?.socket as any).readyState || '';
+		if (this._res) {
+			return (this._res.socket as any).readyState as string;
+		} else {
+			return '';
+		}
 	}
 
 	get total() {
