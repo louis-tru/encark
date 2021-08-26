@@ -422,7 +422,7 @@ export class WgetIMPL extends Promise<Result> {
 					if (stat.isFile()) {
 						if (stat.size) {
 							this._start_range = stat.size - 1; // To avoid returning to the 416 state
-							this._download_size = this._start_range;
+							this._download_size = stat.size;
 						}
 					} else {
 						this._ok = true; // abort
