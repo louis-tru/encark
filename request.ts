@@ -577,7 +577,7 @@ export class Request {
 				userAgent: opts.userAgent || this.m_user_agent,
 				signer: opts.signer || this.m_signer,
 			});
-		} catch(err) {
+		} catch(err: any) {
 			err = Error.new(errno.ERR_HTTP_REQUEST_FAIL, err);
 			err.url = url;
 			err.requestHeaders = headers;
@@ -587,7 +587,7 @@ export class Request {
 
 		try {
 			result.data = this.parseResponseData(result.data as IBuffer, result);
-		} catch(err) {
+		} catch(err: any) {
 			err.url = url;
 			err.headers = result.headers;
 			err.statusCode = result.statusCode;

@@ -136,7 +136,7 @@ export class ViewController extends HttpService {
 			// fs.writeFileSync(__dirname + '/test.js', func + '');
 			var str = func(data);
 			this.returnHtml(str);
-		} catch(err) {
+		} catch(err: any) {
 			this.returnErrorStatus(500, '<pre>' + err.message + '\n' + err.stack + '</pre>');
 		}
 	}

@@ -392,7 +392,7 @@ export default function template(string: string, opts: Options | number | string
 
 	try {
 		result = Function(<any>importsKeys, sourceURL + 'return ' + source).apply(undefined, importsValues)
-	} catch (e) {
+	} catch (e: any) {
 		e = Error.new(e);
 		e.source = source;
 		throw e;

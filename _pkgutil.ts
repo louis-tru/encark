@@ -218,7 +218,7 @@ if (haveNode && !haveFlare) {
 		var content = fs.readFileSync(filename, 'utf8');
 		try {
 			module.exports = _keys(stripBOM(content));
-		} catch (err) {
+		} catch (err: any) {
 			err.message = filename + ': ' + err.message;
 			throw err;
 		}

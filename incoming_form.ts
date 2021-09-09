@@ -660,7 +660,7 @@ export class IncomingForm {
 	pause() {
 		try {
 			this._service.request.pause();
-		} catch (err) {
+		} catch (err: any) {
 			// the stream was destroyed
 			if (!this._ended) {
 				// before it was completed, crash & burn
@@ -674,7 +674,7 @@ export class IncomingForm {
 	resume() {
 		try {
 			this._service.request.resume();
-		} catch (err) {
+		} catch (err: any) {
 			// the stream was destroyed
 			if (!this._ended) {
 				// before it was completed, crash & burn

@@ -47,7 +47,7 @@ function each_directory(root: string, dir: string, cb: Callback) {
 		var stat;
 		try {
 			stat = fs.lstatSync(root + '/' + pathname);
-		} catch(e) {
+		} catch(e: any) {
 			console.error(e.message);
 			return;
 		}
