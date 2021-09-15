@@ -221,6 +221,7 @@ interface Error {
 	description?: string;
 	child?: Error[];
 	[prop: string]: any;
+	ext: (desc: ErrorDescribe)=>this;
 }
 
 declare function setTimeout<A extends any[]>(cb: (...args: A)=>void, timeout?: number, ...args: A): TimeoutResult;
@@ -590,6 +591,11 @@ definePropertys(Error, {
 });
 
 definePropertys(Error.prototype, {
+
+	ext(desc: ErrorDescribe) {
+		Object.assign(this, desc);
+		return this;
+	},
 
 	hashCode(): number {
 		var _hash = Object.prototype.hashCode.call(this);
