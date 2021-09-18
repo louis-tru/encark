@@ -28,94 +28,10 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import {EventNoticer} from './event';
-import {PacketData} from './mysql/parser';
-import {Field} from './mysql/query';
-
-export interface Result extends PacketData {
-	rows?: Dict[];
-	fields?: Dict<Field>;
-}
-
-export interface Callback {
-	(err: Error | null, data?: Result[]): void;
-}
-
-export interface Options {
-	port?: number;
-	host?: string;
-	user?: string;
-	password?: string;
-	database?: string;
-}
-
-export const defaultOptions: Options = {
-	port: 3306,
-	host: 'localhost',
-	user: 'root',
-	password: '',
-	database: '',
-};
-
-/**
- * @class Database
- */
-export abstract class Database {
-	
-	readonly options: Options;
-	readonly onError = new EventNoticer<Error>('Error', this);
-
-	constructor(options?: Options) {
-		this.options = Object.assign({}, defaultOptions, options);
-	}
-
-	/**
-	 * database statistics
-	 */
-	abstract statistics(cb: Callback): void;
-
-	/**
-	 * @func query()
-	 */
-	abstract query(sql: string, cb: Callback): void;
-
-	/**
-	 * close database connection
-	 */
-	abstract close(): void;
-	
-	/**
-	 * srart transaction
-	 */
-	abstract transaction(): void;
-	
-	/**
-	 * commit transaction
-	 */
-	abstract commit(): void;
-	
-	/**
-	 * rollback transaction and clear sql command queue
-	 */
-	abstract rollback(): void;
-
-	/**
-	 * exec query database
-	 */
-	exec(sql: string): Promise<any> {
-		return new Promise((resolve, reject)=>{
-			this.query(sql, function(err: any, data: any) {
-				err ? reject(err): resolve(data);
-			});
-		});
-	}
-
-}
-
 /**
  * escape sql param
  */
-export function escape(param: any) {
+ export function escape(param: any) {
 	if (param === undefined || param === null)
 		return 'NULL';
 
@@ -139,6 +55,68 @@ export function escape(param: any) {
 	}) + "'";
 }
 
-export default {
-	Database, escape,
-};
+export interface Result extends Dict {
+	rows?: Dict[];
+	fields?: Dict<{ name: string, type: number }>;
+	affectedRows?: number;
+	insertId?: number;
+}
+
+/**
+ * @class Client
+ */
+export interface Client {
+
+	/**
+	 * database statistics
+	 */
+	statistics(): Promise<Result[]>;
+
+	/**
+	 * exec query database
+	 */
+	exec<T = any>(sql: string): Promise<T>;
+
+	/**
+	 * close database connection
+	 */
+	close(): void;
+	
+	/**
+	 * srart transaction
+	 */
+	transaction(): void;
+	
+	/**
+	 * commit transaction
+	 */
+	commit(): void;
+	
+	/**
+	 * rollback transaction and clear sql command queue
+	 */
+	rollback(): void;
+
+}
+
+export type Where = Dict | string;
+
+export interface SelectOptions {
+	group?: string;
+	order?: string;
+	limit?: number | number[];
+}
+
+export interface DatabaseAction {
+	exec<T = any>(sql: string): Promise<T>;
+	insert(table: string, row: Dict): Promise<number>;
+	delete(table: string, where?: Where): Promise<number>;
+	update(table: string, row: Dict, where?: Where): Promise<number>;
+	select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]>;
+}
+
+export interface SQLDB extends DatabaseAction {
+	load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[]): Promise<void>;
+	scope<T = any>(cb: (db: DatabaseAction, self: SQLDB)=>Promise<T>): Promise<T>;
+	transaction<T = any>(cb: (db: DatabaseAction, self: SQLDB)=>Promise<T>): Promise<T>;
+}

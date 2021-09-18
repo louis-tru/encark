@@ -28,19 +28,14 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import utils from './util';
+import utils from '../util';
 import * as path from 'path';
-import Document, {
-	NODE_TYPE, Element, Node, Attribute, CDATASection,
-} from './xml';
-import db, {
-	Database, Result,
-	defaultOptions as mysqlDefaultOptions,
-	Options as MysqlOptions,
-} from './db';
-import * as fs from './fs';
+import Document, { NODE_TYPE, Element, Node, Attribute, CDATASection } from '../xml';
+import { Database, Result, escape } from '.';
+import { defaultOptions as mysqlDefaultOptions, Options as MysqlOptions } from '../mysql'
+import * as fs from '../fs';
 import {Model,Collection, FetchOptions, ModelBasic, ID} from './model';
-import {Mysql} from './mysql';
+import {Mysql} from '../mysql';
 
 const original_handles: Dict<_MethodInfo> = {};
 const original_files: Dict<Date> = {};
@@ -96,8 +91,8 @@ export interface DataSource {
 	map: SqlMap;
 	readonly dao: DataAccessObject;
 	primaryKey(table: string): string;
-	get(name: string, param?: Params, opts?: Options): Promise<Model | null>;
-	gets(name: string, param?: Params, opts?: Options): Promise<Collection>;
+	get<T = Dict>(name: string, param?: Params, opts?: Options): Promise<Model<T> | null>;
+	gets<T = Dict>(name: string, param?: Params, opts?: Options): Promise<Collection<T>>;
 	post(name: string, param?: Params, opts?: Options): Promise<Result>;
 	exec(name: string, param?: Params, opts?: Options): Promise<Result[]>;
 }
@@ -172,7 +167,7 @@ class Transaction implements DataSource {
 
 	constructor(host: SqlMap) {
 		this.map = host;
-		this.db = get_db(host);
+		this.db = host.build();
 		this.db.transaction(); // start transaction
 		this.m_on = true;
 		this.dao = new DataAccessObject(this, host.tablesInfo);
@@ -185,15 +180,15 @@ class Transaction implements DataSource {
 	/**
 	 * @func get(name, param)
 	 */
-	get(name: string, param?: Params, opts?: Options) {
-		return funcs.get(this.map, this.db, this.m_on, name, param, opts);
+	get<T = Dict>(name: string, param?: Params, opts?: Options) {
+		return funcs.get<T>(this.map, this.db, this.m_on, name, param, opts);
 	}
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets(name: string, param?: Params, opts?: Options) {
-		return funcs.gets(this.map, this.db, this.m_on, name, param, opts);
+	gets<T = Dict>(name: string, param?: Params, opts?: Options) {
+		return funcs.gets<T>(this.map, this.db, this.m_on, name, param, opts);
 	}
 
 	/**
@@ -298,7 +293,7 @@ function read_original_mapinfo(self: SqlMap, original_path: string, table: strin
 
 	var ns = doc.getElementsByTagName('map');
 	if (!ns.length)
-		throw new Error(name + ' : not map the root element');
+		throw new Error(original_path + ' : not map the root element');
 
 	var map = <Element>ns.item(0); 
 	if (!map /*|| map.nodeType != NODE_TYPE.ELEMENT_NODE*/)
@@ -361,7 +356,7 @@ function get_original_mapinfo(self: SqlMap, name: string) {
 }
 
 //get db
-function get_db(self: SqlMap): Database {
+function NewDB(self: SqlMap): Database {
 	var db_class = null;
 	switch (self.type) {
 		case 'mysql' : 
@@ -383,7 +378,7 @@ function execExp(self: SqlMap, exp: string, param: INLParams) {
 //format sql
 function format_sql(self: SqlMap, sql: string, param: INLParams) {
 	return sql.replace(REG, function (all, exp) {
-		return db.escape(execExp(self, exp, param));
+		return escape(execExp(self, exp, param));
 	});
 }
 
@@ -397,7 +392,7 @@ function parse_sql_join(self: SqlMap, item: _El, param: INLParams, asql: Abstrac
 	var ls = Array.toArray(value);
 	
 	for (var i = 0, l = ls.length; i < l; i++) {
-		ls[i] = db.escape(ls[i]);
+		ls[i] = escape(ls[i]);
 	}
 	asql.sql.push(ls.join(item.props.value || ','));
 }
@@ -439,9 +434,9 @@ function parse_if_sql(self: SqlMap, el: _El, param: INLParams,
 		utils.assert(name, 'name prop cannot be empty')
 		var val = param[<string>name];
 		if (Array.isArray(val)) {
-			asql.sql.push(` ${name} in (${val.map(e=>db.escape(e)).join(',')}) `);
+			asql.sql.push(` ${name} in (${val.map(e=>escape(e)).join(',')}) `);
 		} else {
-			val = db.escape(val);
+			val = escape(val);
 			if (val == "'NULL'" || val == "NULL") {
 				asql.sql.push(` ${name} is NULL `);
 			} else {
@@ -749,20 +744,21 @@ function exec(
 			console.log(sql);
 		}
 
-		function handle(err: Error | null, data?: Result[]) {
-			if (!is_transaction) {
-				db.close(); // Non transaction, shut down immediately after the query
-			}
-			if (err) {
-				cb(err, []);
-			} else {
+		function handlePromise(p: Promise<any>) {
+			p.then(function (data: Result[]) {
 				if (type == 'get') {
 					if (cacheTime > 0) {
 						self.cache.set(key, <Result[]>data, cacheTime);
 					}
 				}
 				cb(null, <Result[]>data, table);
-			}
+			}).catch(function (err) {
+				cb(err, [], table);
+			}).finally(function () {
+				if (!is_transaction) {
+					db.close(); // Non transaction, shut down immediately after the query
+				}
+			});
 		}
 
 		if (type == 'get') { // use cache
@@ -772,19 +768,19 @@ function exec(
 					if (e) {
 						cb(null, e, table);
 					} else {
-						db.query(sql, handle);
+						handlePromise(db.exec(sql));
 					}
 				}).catch(e=>{
 					console.error(e);
-					db.query(sql, handle);
+					handlePromise(db.exec(sql));
 				});
 			} else {
-				db.query(sql, handle);
+				handlePromise(db.exec(sql));
 			}
 		} else {
-			db.query(sql, handle);
+			handlePromise(db.exec(sql));
 		}
-	} catch (err) {
+	} catch (err: any) {
 		if (db) {
 			if (!is_transaction) {
 				db.close();
@@ -918,9 +914,14 @@ export class SqlMap implements DataSource {
 	private m_original_mapinfo: Dict<_MethodInfo> = {};
 	private m_tables: Dict = {};
 	private m_cache: Cache;
+	private _builder: typeof NewDB;
 	readonly config: Config;
 	readonly tablesInfo: TablesInfo;
 	readonly map: SqlMap = this;
+
+	build() {
+		return this._builder(this);
+	}
 
 	/**
 	 * @field {Cache} is use cache
@@ -941,7 +942,7 @@ export class SqlMap implements DataSource {
 	}
 
 	get type() {
-		return this.config.type || 'mysql'
+		return this.config.type || 'mysql';
 	}
 
 	readonly dao: DataAccessObject;
@@ -950,10 +951,11 @@ export class SqlMap implements DataSource {
 	 * @constructor
 	 * @arg [conf] {Object} Do not pass use center server config
 	 */ 
-	constructor(conf?: Config) {
+	constructor(conf?: Config, builder?: typeof NewDB) {
 		this.config = Object.assign({}, defaultConfig, conf);
 		this.config.db = Object.assign({}, defaultConfig.db, conf?.db);
 		this.tablesInfo = {};
+		this._builder = builder || NewDB;
 
 		fs.readdirSync(this.original).forEach(e=>{
 			if (path.extname(e) == '.xml') {
@@ -983,29 +985,29 @@ export class SqlMap implements DataSource {
 	/**
 	 * @func get(name, param)
 	 */
-	get(name: string, param?: Params, opts?: Options) {
-		return funcs.get(this, get_db(this), false, name, param, opts);
+	get<T = Dict>(name: string, param?: Params, opts?: Options) {
+		return funcs.get<T>(this, this.build(), false, name, param, opts);
 	}
 
 	/**
 	 * @func gets(name, param)
 	 */
-	gets(name: string, param?: Params, opts?: Options) {
-		return funcs.gets(this, get_db(this), false, name, param, opts);
+	gets<T = Dict>(name: string, param?: Params, opts?: Options) {
+		return funcs.gets<T>(this, this.build(), false, name, param, opts);
 	}
 
 	/**
 	 * @func post(name, param)
 	 */
 	post(name: string, param?: Params, opts?: Options) {
-		return funcs.post(this, get_db(this), false, name, param, opts);
+		return funcs.post(this, this.build(), false, name, param, opts);
 	}
 
 	/**
 	 * @func query(name, param, cb)
 	 */
 	exec(name: string, param?: Params, opts?: Options) {
-		return funcs.exec(this, get_db(this), false, name, param, opts);
+		return funcs.exec(this, this.build(), false, name, param, opts);
 	}
 
 	/**

@@ -28,8 +28,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import utils from './util';
-import * as sql from './sql_map';
+import utils from '../util';
+import * as sql from './map';
 
 function pkeyValue(self: ModelBasic, keyPath: string[]): string {
 	var m: any = self;

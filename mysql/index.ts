@@ -29,13 +29,14 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import {Database, Callback, Options, Result} from '../db';
+import {Database, Result} from '../db';
 import constants from './constants';
 import {Query, Field} from './query';
 import {OutgoingPacket} from './outgoing_packet';
 import { Connection } from './connection';
 import { Constants, Packet } from './parser';
 import util from '../util';
+import {EventNoticer} from '../event';
 
 interface After {
 	(packet: Packet): void;
@@ -45,6 +46,22 @@ interface Queue {
 	exec(): void;
 	after?: After;
 }
+
+export interface Options {
+	port?: number;
+	host?: string;
+	user?: string;
+	password?: string;
+	database?: string;
+}
+
+export const defaultOptions: Options = {
+	port: 3306,
+	host: 'localhost',
+	user: 'root',
+	password: '',
+	database: '',
+};
 
 export class ErrorPacket extends Packet {
 	error: Error;
@@ -56,8 +73,12 @@ export class ErrorPacket extends Packet {
 	toJSON() { return this.error }
 }
 
+interface Callback {
+	(err: Error | null, data?: Result[]): void;
+}
+
 //public:
-export class Mysql extends Database {
+export class Mysql implements Database {
 
 	private _queue: Queue[];
 	private _connection: Connection | null = null;
@@ -165,7 +186,7 @@ export class Mysql extends Database {
 		utils.assert(self._queue.length, 'self._queue.length == 0 ??');
 		try {
 			self._queue[0].exec();
-		} catch(err) {
+		} catch(err: any) {
 			self._handlError(err);
 		}
 	}
@@ -205,21 +226,28 @@ export class Mysql extends Database {
 		return !!this._connection;
 	}
 
-	/**
+	readonly options: Options;
+	readonly onError = new EventNoticer<Error>('Error', this);
+
+		/**
 		* constructor function
 		*/
 	constructor(options?: Options) {
-		super(options);
+		this.options = {...defaultOptions, ...options};
 		this._queue = [];
 	}
 
-	statistics(cb: Callback) {
+	statistics() {
 		var self = this;
-		self._enqueue(function() {
-			var packet = new OutgoingPacket(1);
-			packet.writeNumber(1, constants.COM_STATISTICS);
-			self._write(packet);
-		}, self._after(cb));
+		return new Promise<Result[]>(function(resolve, reject){
+			self._enqueue(function() {
+				var packet = new OutgoingPacket(1);
+				packet.writeNumber(1, constants.COM_STATISTICS);
+				self._write(packet);
+			}, self._after(function (err, data) {
+				err ? reject(err): resolve(data as Result[]);
+			}));
+		})
 	}
 
 	query(sql: string, cb?: Callback) {
@@ -303,5 +331,20 @@ export class Mysql extends Database {
 		this._transaction = false;
 		this.query('ROLLBACK');
 	}
+
+	/**
+	 * exec query database
+	 */
+	 exec<T = any>(sql: string): Promise<T> {
+		return new Promise((resolve, reject)=>{
+			this.query(sql, function(err: any, data: any) {
+				err ? reject(err): resolve(data);
+			});
+		});
+	}
+	
+}
+
+function mysqldb() {
 	
 }
