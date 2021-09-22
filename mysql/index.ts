@@ -277,6 +277,7 @@ export class Mysql implements Database {
 		}
 
 		self._enqueue(function() {
+			// (self._connection as any).parser._sql = sql;
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(sql, 'utf-8'));
 			packet.writeNumber(1, constants.COM_QUERY);
 			packet.write(sql, 'utf-8');
@@ -323,7 +324,7 @@ export class Mysql implements Database {
 	/**
 	 * exec query database
 	 */
-	 exec<T = Result[]>(sql: string): Promise<T> {
+	 exec(sql: string): Promise<Result[]> {
 		return new Promise((resolve, reject)=>{
 			this.query(sql, function(err: any, data: any) {
 				err ? reject(err): resolve(data);
@@ -370,8 +371,8 @@ class MysqlCRUD implements DatabaseCRUD {
 		return sql.length ? prefix + ' ' + sql.join(` ${join} `): '';
 	}
 	
-	exec<T = Result[]>(sql: string): Promise<T> {
-		return this._db.exec<T>(sql);
+	exec(sql: string): Promise<Result[]> {
+		return this._db.exec(sql);
 	}
 
 	async insert(table: string, row: Dict): Promise<number> {
@@ -384,8 +385,8 @@ class MysqlCRUD implements DatabaseCRUD {
 			}
 		}
 		var sql = `insert into ${table} (${keys.join(',')}) values (${values.join(',')})`;
-		var r = await this.exec(sql);
-		return r[0].insertId as number;
+		var [r] = await this.exec(sql);
+		return r.insertId as number;
 	}
 
 	async delete(table: string, where: Where = ''): Promise<number> {
@@ -416,7 +417,7 @@ class MysqlCRUD implements DatabaseCRUD {
 
 	async select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
 		var struct = this.check(table);
-		var sql, ls: T[];
+		var sql;//, ls: T[];
 		var limit_str = '';
 		if (opts.limit) {
 			limit_str = Array.isArray(opts.limit) ? ' limit ' + opts.limit.join(','): ' limit ' + opts.limit;
@@ -426,13 +427,18 @@ class MysqlCRUD implements DatabaseCRUD {
 		if (typeof where == 'object') {
 			sql = `select * from ${table} ${this.escape(struct, where)} ${group} ${order} ${limit_str}`;
 			// console.log(sql, values)
-			ls = await this.exec(sql);
+			var [{rows: ls}] = await this.exec(sql);
 		} else {
 			var where_sql = where ? 'where ' + where: '';
 			sql = `select * from ${table} ${where_sql} ${group} ${order} ${limit_str}`
-			ls = await this.exec(sql);
+			var [{rows: ls}] = await this.exec(sql);
 		}
-		return ls;
+		return ls as T[];
+	}
+
+	async query<T = Dict>(sql: string): Promise<T[]> {
+		var [r] = await this.exec(sql);
+		return r.rows as T[];
 	}
 }
 
@@ -453,10 +459,10 @@ export class MysqlTools implements DatabaseTools {
 		return table in this._db_struct;
 	}
 
-	async exec<T = Result[]>(sql: string): Promise<T> {
+	async exec(sql: string): Promise<Result[]> {
 		var db = this.db();
 		try {
-			return await new MysqlCRUD(db, this).exec<T>(sql);
+			return await new MysqlCRUD(db, this).exec(sql);
 		} finally {
 			db.close();
 		}
@@ -498,6 +504,22 @@ export class MysqlTools implements DatabaseTools {
 		}
 	}
 
+	async query<T = Dict>(sql: string): Promise<T[]> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).query<T>(sql);
+		} finally {
+			db.close();
+		}
+	}
+
+	private _Sql(sql: string) {
+		return sql
+			.replace(/AUTOINCREMENT/img, 'AUTO_INCREMENT')
+			.replace(/DEFAULT\s+\(([^\)]+)\)/img, 'DEFAULT $1')
+		;
+	}
+
 	async load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[], id?: string): Promise<void> {
 		var _id = id || 'default';
 		var _db = this.db();
@@ -510,7 +532,9 @@ export class MysqlTools implements DatabaseTools {
 		// 	`key` VARCHAR(45) NOT NULL DEFAULT '',
 		// 	PRIMARY KEY (`id`));
 
-		await _db.exec(SQL.replace(/AUTOINCREMENT/img, 'AUTO_INCREMENT'));
+		// DEFAULT 0
+
+		await _db.exec(this._Sql(SQL));
 
 		// SELECT table_name FROM information_schema.tables WHERE table_schema='yellowcong' AND table_type='base table'
 		// SELECT column_name FROM information_schema.columns WHERE table_schema='yellowcong' AND table_name='sys_user';
@@ -524,7 +548,7 @@ export class MysqlTools implements DatabaseTools {
 				);
 			if (action == 'add') {
 				if (!res.length)
-					await _db.exec(sql);
+					await _db.exec(this._Sql(sql));
 			} else if (res.length) { // drop
 				// await _db.exec(sql);
 			}
@@ -536,7 +560,7 @@ export class MysqlTools implements DatabaseTools {
 			var [,,name,table] = sql.match(
 				/^create\s+(unique\s+)?index\s+(\w+)\s+on\s+(\w+)/i) as RegExpMatchArray;
 			var res = await _db.exec(
-				`show index from ${table} where Key_name = ${name}`);
+				`show index from ${table} where Key_name = '${name}'`);
 			if (!res.length) {
 				await _db.exec(sql);
 			}
@@ -546,15 +570,15 @@ export class MysqlTools implements DatabaseTools {
 		// SELECT * FROM information_schema.columns WHERE table_schema='mvp' and table_name='callback_url';
 		var _db_struct = this._db_struct;
 
-		var r = await _db.exec<Dict[]>(
+		var [{rows=[]}] = await _db.exec(
 				`select * from information_schema.tables where table_schema='${this._name}' and table_type='base table'`);
-		for (let {table_name} of r) {
-			var struct: DBStruct = _db_struct[table_name] = { names: [], columns: {} };
-			var columns = await _db.exec<any[]>(
-					`select * from information_schema.columns where table_schema='${this._name}' and table_name='${table_name}'`);
+		for (let {TABLE_NAME} of rows) {
+			var struct: DBStruct = _db_struct[TABLE_NAME] = { names: [], columns: {} };
+			var [{rows:columns = []}] = await _db.exec(
+					`select * from information_schema.columns where table_schema='${this._name}' and table_name='${TABLE_NAME}'`);
 			for (var column of columns) {
-				struct.names.push(column.column_name);
-				struct.columns[column.column_name] = column;
+				struct.names.push(column.COLUMN_NAME);
+				struct.columns[column.COLUMN_NAME] = column as any;
 			}
 		}
 

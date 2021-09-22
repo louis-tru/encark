@@ -186,12 +186,14 @@ export class Parser {
 	 * @param {node.Buffer}
 	 */
 	write(buffer: Buffer) {
+		// if ((this as any)._sql == `select * from information_schema.columns where table_schema='mvp' and table_name='tx_async'`)
+		// 	debugger;
 		var c: number = 0;
 		var self = this;
 		var state = this.state;
 		var length = buffer.length;
 		var packet = this.packet as Packet;
-		var packet_: PacketData = {};
+		var packet_: PacketData = packet ? packet.data : {};
 
 		function advance(newState?: Constants) {
 			self.state = state = (newState === undefined)
@@ -239,7 +241,7 @@ export class Parser {
 				self.greeted = true;
 				delete (packet as any).index;
 				self.onPacket.trigger(packet);
-				(<any>packet) = null;
+				(packet as any) = null;
 			}
 		}
 
@@ -684,6 +686,7 @@ export class Parser {
 					}
 					break;
 				case 46: // COLUMN_VALUE_LENGTH:
+
 					if (packet.index == 0) {
 						packet_.columnLength = 0;
 						packet.type = Constants.ROW_DATA_PACKET;
@@ -712,10 +715,13 @@ export class Parser {
 							continue;
 						}
 					}
+
 					break;
 				case 47: // COLUMN_VALUE_STRING:
-					if (packet_.columnLength === undefined)
+					if (packet_.columnLength === undefined) {
+						// packet_.columnLength = 0;
 						throw new Error('Type error');
+					}
 					var remaining = packet_.columnLength - packet.index, read;
 					if (i + remaining > buffer.length) {
 						read = buffer.length - i;
@@ -735,11 +741,13 @@ export class Parser {
 
 					if (packet.received == packet.length) {
 						self.packet = null;
-						(<any>packet) = null;
+						(packet as any) = null;
 						self.state = state = Constants.PACKET_LENGTH;
 					}
 
 					continue;
+				default:
+					break;
 			}
 
 			packet.index++;
@@ -748,6 +756,12 @@ export class Parser {
 				emitPacket();
 			}
 		}
+		
+		// this._data.push({ sql: this._sql, buffer });
+		
 	}
+
+	// private _data: any[] = [];
+	// private _sql = '';
 
 }

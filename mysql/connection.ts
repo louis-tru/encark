@@ -114,6 +114,7 @@ export class Connection {
 	private _idle_tomeout = 0;
 	private _isUse = false;
 	private _isReady = false;
+	readonly parser: Parser;
 
 	private _write(packet: OutgoingPacket) {
 		(this._socket as Socket).write(packet.buffer);
@@ -202,6 +203,8 @@ export class Connection {
 		var self = this;
 		var parser = new Parser();
 		var socket = this._socket = new Socket();
+
+		this.parser = parser;
 
 		socket.setNoDelay(true);
 		socket.setTimeout(36e5, ()=>/*1h timeout*/ socket.end());

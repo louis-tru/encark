@@ -75,7 +75,7 @@ export interface Database {
 	/**
 	 * exec query database
 	 */
-	exec<T = Result[]>(sql: string): Promise<T>;
+	exec(sql: string): Promise<Result[]>;
 
 	/**
 	 * close database connection
@@ -108,16 +108,17 @@ export interface SelectOptions {
 }
 
 export interface DatabaseCRUD {
-	exec<T = Result[]>(sql: string): Promise<T>;
+	exec(sql: string): Promise<Result[]>;
 	insert(table: string, row: Dict): Promise<number>;
 	delete(table: string, where?: Where): Promise<number>;
 	update(table: string, row: Dict, where?: Where): Promise<number>;
 	select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]>;
+	query<T = Dict>(sql: string): Promise<T[]>;
 }
 
 export interface DatabaseTools extends DatabaseCRUD {
 	has(table: string): boolean;
-	load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[]): Promise<void>;
+	load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[], id?: string): Promise<void>;
 	scope<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T>;
 	transaction<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T>;
 	db(): Database;
