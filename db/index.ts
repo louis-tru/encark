@@ -63,19 +63,19 @@ export interface Result extends Dict {
 }
 
 /**
- * @class Client
+ * @class DatabaseTools
  */
-export interface Client {
+export interface Database {
 
 	/**
 	 * database statistics
 	 */
-	statistics(): Promise<Result[]>;
+	statistics(): Promise<any>;
 
 	/**
 	 * exec query database
 	 */
-	exec<T = any>(sql: string): Promise<T>;
+	exec<T = Result[]>(sql: string): Promise<T>;
 
 	/**
 	 * close database connection
@@ -107,16 +107,18 @@ export interface SelectOptions {
 	limit?: number | number[];
 }
 
-export interface DatabaseAction {
-	exec<T = any>(sql: string): Promise<T>;
+export interface DatabaseCRUD {
+	exec<T = Result[]>(sql: string): Promise<T>;
 	insert(table: string, row: Dict): Promise<number>;
 	delete(table: string, where?: Where): Promise<number>;
 	update(table: string, row: Dict, where?: Where): Promise<number>;
 	select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]>;
 }
 
-export interface SQLDB extends DatabaseAction {
+export interface DatabaseTools extends DatabaseCRUD {
+	has(table: string): boolean;
 	load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[]): Promise<void>;
-	scope<T = any>(cb: (db: DatabaseAction, self: SQLDB)=>Promise<T>): Promise<T>;
-	transaction<T = any>(cb: (db: DatabaseAction, self: SQLDB)=>Promise<T>): Promise<T>;
+	scope<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T>;
+	transaction<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T>;
+	db(): Database;
 }

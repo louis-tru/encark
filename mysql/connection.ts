@@ -39,7 +39,7 @@ import * as auth from './auth';
 import {OutgoingPacket} from './outgoing_packet';
 import {Buffer} from 'buffer';
 import {Socket} from 'net';
-import {Options, defaultOptions} from '../db';
+import {Options, default_options} from './opts';
 
 const CONNECT_TIMEOUT = 1e4;
 const connect_pool: Dict<Connection[]> = {};
@@ -198,7 +198,7 @@ export class Connection {
 	 * @arg opt {Object}
 	 */
 	constructor(options?: Options) {
-		this.options = Object.assign({}, defaultOptions, options);
+		this.options = Object.assign({}, default_options, options);
 		var self = this;
 		var parser = new Parser();
 		var socket = this._socket = new Socket();

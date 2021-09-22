@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import {Database, Result} from '../db';
+import {Database, DatabaseCRUD, DatabaseTools, Result, Where, SelectOptions, escape} from '../db';
 import constants from './constants';
 import {Query, Field} from './query';
 import {OutgoingPacket} from './outgoing_packet';
@@ -37,6 +37,10 @@ import { Connection } from './connection';
 import { Constants, Packet } from './parser';
 import util from '../util';
 import {EventNoticer} from '../event';
+import errno from '../errno';
+import {Options, default_options} from './opts';
+
+export * from './opts';
 
 interface After {
 	(packet: Packet): void;
@@ -46,22 +50,6 @@ interface Queue {
 	exec(): void;
 	after?: After;
 }
-
-export interface Options {
-	port?: number;
-	host?: string;
-	user?: string;
-	password?: string;
-	database?: string;
-}
-
-export const defaultOptions: Options = {
-	port: 3306,
-	host: 'localhost',
-	user: 'root',
-	password: '',
-	database: '',
-};
 
 export class ErrorPacket extends Packet {
 	error: Error;
@@ -233,19 +221,19 @@ export class Mysql implements Database {
 		* constructor function
 		*/
 	constructor(options?: Options) {
-		this.options = {...defaultOptions, ...options};
+		this.options = {...default_options, ...options};
 		this._queue = [];
 	}
 
 	statistics() {
 		var self = this;
-		return new Promise<Result[]>(function(resolve, reject){
+		return new Promise<Result>(function(resolve, reject){
 			self._enqueue(function() {
 				var packet = new OutgoingPacket(1);
 				packet.writeNumber(1, constants.COM_STATISTICS);
 				self._write(packet);
 			}, self._after(function (err, data) {
-				err ? reject(err): resolve(data as Result[]);
+				err ? reject(err): resolve((data as Result[])[0]);
 			}));
 		})
 	}
@@ -335,7 +323,7 @@ export class Mysql implements Database {
 	/**
 	 * exec query database
 	 */
-	 exec<T = any>(sql: string): Promise<T> {
+	 exec<T = Result[]>(sql: string): Promise<T> {
 		return new Promise((resolve, reject)=>{
 			this.query(sql, function(err: any, data: any) {
 				err ? reject(err): resolve(data);
@@ -345,6 +333,265 @@ export class Mysql implements Database {
 	
 }
 
-function mysqldb() {
+interface DBStruct {
+	names: string[];
+	columns: {
+		[key: string]: {
+			column_name: string;
+			data_type: string;
+			// [key: string]: any;
+		};
+	};
+}
+
+class MysqlCRUD implements DatabaseCRUD {
+	private _db: Database;
+	// private _host: MysqlTools;
+	private _db_struct: { [key: string]: DBStruct };
+	constructor(db: Database, host: MysqlTools) {
+		this._db = db;
+		// this._host = host;
+		this._db_struct = (host as any)._db_struct;
+	}
+
+	private check(table: string): DBStruct {
+		var struct = this._db_struct[table];
+		utils.assert(struct, errno.ERR_DATA_TABLE_NOT_FOUND);
+		return struct;
+	}
+
+	private escape(struct: DBStruct, row: object, join = 'and', prefix = 'where') {
+		var sql = [] as string[];
+		for (var [key,val] of Object.entries(row)) {
+			if ((key in struct.columns) && val !== undefined) {
+				sql.push(`${key} = ${escape(val)}`);
+			}
+		}
+		return sql.length ? prefix + ' ' + sql.join(` ${join} `): '';
+	}
 	
+	exec<T = Result[]>(sql: string): Promise<T> {
+		return this._db.exec<T>(sql);
+	}
+
+	async insert(table: string, row: Dict): Promise<number> {
+		var struct = this.check(table);
+		var keys = [] as string[], values = [] as string[];
+		for (var [key,val] of Object.entries(row)) {
+			if ((key in struct.columns) && val !== undefined) {
+				keys.push(key);
+				values.push(escape(val));
+			}
+		}
+		var sql = `insert into ${table} (${keys.join(',')}) values (${values.join(',')})`;
+		var r = await this.exec(sql);
+		return r[0].insertId as number;
+	}
+
+	async delete(table: string, where: Where = ''): Promise<number> {
+		var struct = this.check(table);
+		if (typeof where == 'object') {
+			var sql = `delete from ${table} ${this.escape(struct, where)}`;
+			var [r] = await this.exec(sql);
+		} else {
+			var sql = `delete from ${table} where ${where}`
+			var [r] = await this.exec(sql);
+		}
+		return r.affectedRows as number;
+	}
+
+	async update(table: string, row: Dict, where: Where = ''): Promise<number> {
+		var struct = this.check(table);
+		var set = this.escape(struct, row, ',', '');
+		if (typeof where == 'object') {
+			var sql = `update ${table} set ${set} ${this.escape(struct, where)}`;
+			var [r] = await this.exec(sql);
+		} else {
+			var where_sql = where ? 'where ' + where: '';
+			var sql = `update ${table} set ${set} ${where_sql}`;
+			var [r] = await this.exec(sql);
+		}
+		return r.affectedRows as number;
+	}
+
+	async select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
+		var struct = this.check(table);
+		var sql, ls: T[];
+		var limit_str = '';
+		if (opts.limit) {
+			limit_str = Array.isArray(opts.limit) ? ' limit ' + opts.limit.join(','): ' limit ' + opts.limit;
+		}
+		var group = opts.group ? `group by ${opts.group}`: '';
+		var order = opts.order ? `order by ${opts.order}`: '';
+		if (typeof where == 'object') {
+			sql = `select * from ${table} ${this.escape(struct, where)} ${group} ${order} ${limit_str}`;
+			// console.log(sql, values)
+			ls = await this.exec(sql);
+		} else {
+			var where_sql = where ? 'where ' + where: '';
+			sql = `select * from ${table} ${where_sql} ${group} ${order} ${limit_str}`
+			ls = await this.exec(sql);
+		}
+		return ls;
+	}
+}
+
+export class MysqlTools implements DatabaseTools {
+
+	private _name: string;
+	private _load: Map<string, [string, string[], string[]]> = new Map();
+	private _db_struct: { [key: string]: DBStruct } = {};
+	readonly options: Options;
+
+	constructor(options?: Options) {
+		this.options = {...default_options, ...options};
+		utils.assert(this.options.database);
+		this._name = this.options.database as string;
+	}
+
+	has(table: string): boolean {
+		return table in this._db_struct;
+	}
+
+	async exec<T = Result[]>(sql: string): Promise<T> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).exec<T>(sql);
+		} finally {
+			db.close();
+		}
+	}
+
+	async insert(table: string, row: Dict): Promise<number> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).insert(table, row);
+		} finally {
+			db.close();
+		}
+	}
+
+	async delete(table: string, where?: Where): Promise<number> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).delete(table, where);
+		} finally {
+			db.close();
+		}
+	}
+
+	async update(table: string, row: Dict, where?: Where): Promise<number> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).update(table, row, where);
+		} finally {
+			db.close();
+		}
+	}
+
+	async select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).select<T>(table, where, opts);
+		} finally {
+			db.close();
+		}
+	}
+
+	async load(SQL: string, SQL_ALTER: string[], SQL_INDEXES: string[], id?: string): Promise<void> {
+		var _id = id || 'default';
+		var _db = this.db();
+
+		utils.assert(!this._load.has(_id), errno.ERR_REPEAT_LOAD_MYSQL);
+
+		// CREATE TABLE `mvp`.`test` (
+		// 	`id` INT NOT NULL AUTO_INCREMENT,
+		// 	`name` VARCHAR(45) NOT NULL DEFAULT '',
+		// 	`key` VARCHAR(45) NOT NULL DEFAULT '',
+		// 	PRIMARY KEY (`id`));
+
+		await _db.exec(SQL.replace(/AUTOINCREMENT/img, 'AUTO_INCREMENT'));
+
+		// SELECT table_name FROM information_schema.tables WHERE table_schema='yellowcong' AND table_type='base table'
+		// SELECT column_name FROM information_schema.columns WHERE table_schema='yellowcong' AND table_name='sys_user';
+
+		for (let sql of SQL_ALTER) {
+			var [,table_name,action,table_column] = 
+				sql.match(/^alter\s+table\s+(\w+)\s+(add|drop)\s+(\w+)/i) as RegExpMatchArray;
+			var res = await _db.exec(
+				`select * from information_schema.columns where table_schema='${this._name}'
+					and table_name='${table_name}' and column_name = '${table_column}'`
+				);
+			if (action == 'add') {
+				if (!res.length)
+					await _db.exec(sql);
+			} else if (res.length) { // drop
+				// await _db.exec(sql);
+			}
+		}
+
+		// SHOW INDEX FROM information_schema.tables where Key_name = '0'
+
+		for (let sql of SQL_INDEXES) {
+			var [,,name,table] = sql.match(
+				/^create\s+(unique\s+)?index\s+(\w+)\s+on\s+(\w+)/i) as RegExpMatchArray;
+			var res = await _db.exec(
+				`show index from ${table} where Key_name = ${name}`);
+			if (!res.length) {
+				await _db.exec(sql);
+			}
+		}
+
+		// SELECT * FROM information_schema.tables WHERE table_schema='mvp' and table_type='base table';
+		// SELECT * FROM information_schema.columns WHERE table_schema='mvp' and table_name='callback_url';
+		var _db_struct = this._db_struct;
+
+		var r = await _db.exec<Dict[]>(
+				`select * from information_schema.tables where table_schema='${this._name}' and table_type='base table'`);
+		for (let {table_name} of r) {
+			var struct: DBStruct = _db_struct[table_name] = { names: [], columns: {} };
+			var columns = await _db.exec<any[]>(
+					`select * from information_schema.columns where table_schema='${this._name}' and table_name='${table_name}'`);
+			for (var column of columns) {
+				struct.names.push(column.column_name);
+				struct.columns[column.column_name] = column;
+			}
+		}
+
+		_db.close();
+
+		this._load.set(_id, [SQL, SQL_ALTER, SQL_INDEXES]);
+	}
+
+	async scope<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T> {
+		var db = this.db();
+		var crud = new MysqlCRUD(db, this);
+		try {
+			return await cb(crud, this);
+		} finally {
+			db.close();
+		}
+	}
+
+	async transaction<T = any>(cb: (db: DatabaseCRUD, self: DatabaseTools)=>Promise<T>): Promise<T> {
+		var db = this.db();
+		var crud = new MysqlCRUD(db, this);
+		var r: T;
+		try {
+			db.transaction();
+			r = await cb(crud, this);
+			db.commit();
+			return r;
+		} catch(err) {
+			db.rollback();
+			throw err;
+		} finally {
+			db.close();
+		}
+	}
+
+	db(): Database {
+		return new Mysql(this.options);
+	}
+
 }
