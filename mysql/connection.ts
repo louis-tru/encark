@@ -40,10 +40,12 @@ import {OutgoingPacket} from './outgoing_packet';
 import {Buffer} from 'buffer';
 import {Socket} from 'net';
 import {Options, default_options} from './opts';
+import {Watch} from '../monitor';
 
 const CONNECT_TIMEOUT = 1e4;
-const connect_pool: Dict<Connection[]> = {};
-const require_connect: Request[] = [];
+const G_connect_pool: Dict<{ used: Connection[], idle: Connection[] }> = {};
+const G_require_connect: Dict<Request[]> = {};
+const G_watch = new Watch(1e4);
 
 /**
 * <span style="color:#f00">[static]</span>max connect count
@@ -104,8 +106,50 @@ interface Callback {
 }
 
 interface Request {
-	timeout: any;
+	timeout: number;
+	time: ()=>void;
 	args: [ Options, Callback ];
+}
+
+function _Watch() {
+	var now = Date.now();
+	var isStop = true;
+	// watch reqs
+	for (var reqs of Object.values(G_require_connect)) {
+		for (var i = 0; i < reqs.length; ) {
+			var req = reqs[i];
+			if (now >= req.timeout) {
+				req.time();
+				reqs.splice(i, 1);
+			} else {
+				i++;
+			}
+			isStop = false;
+		}
+	}
+
+	for (var pool of Object.values(G_connect_pool)) {
+		for (var c of pool.idle) {
+			isStop = false;
+			c.checkIdleTimeout();
+		}
+	}
+
+	if (isStop) {
+		G_watch.stop();
+	}
+}
+
+function watch() {
+	if (!G_watch.running) {
+		G_watch.start(()=>{
+			try {
+				_Watch();
+			} catch(err) {
+				console.error(err);
+			}
+		});
+	}
 }
 
 export class Connection {
@@ -162,26 +206,30 @@ export class Connection {
 		this._write(packet);
 	}
 
-	private _clearTimeout() {
-		if (this._idle_tomeout) {
-			clearTimeout(this._idle_tomeout);
-			this._idle_tomeout = 0;
+	checkIdleTimeout() {
+		if (this._idle_tomeout && Date.now() > this._idle_tomeout) {
+			this._Destroy();
 		}
 	}
 
-	private destroy(reason?: any) {
+	private _Destroy(reason?: any) {
 		var self = this;
 		var socket = self._socket;
 		if (socket) {
 			self._socket = null;
+			this._idle_tomeout = 0;
+			var key = Connection._Key(this.options);
+			if (this._isUse) {
+				G_connect_pool[key].used.deleteOf(self);
+			} else {
+				G_connect_pool[key].idle.deleteOf(self);
+			}
 			if (reason)
 				self.onError.trigger(Error.new(reason));
-			self._clearTimeout();
 			self.onError.off();
 			self.onPacket.off();
 			self._onReady.off();
 			socket.destroy();
-			connect_pool[self.options.host + ':' + self.options.port].deleteOf(self);
 		}
 	}
 
@@ -209,16 +257,16 @@ export class Connection {
 		socket.setNoDelay(true);
 		socket.setTimeout(36e5, ()=>/*1h timeout*/ socket.end());
 		socket.on('data', e=>{
-			try { parser.write(e) } catch(err) { self.destroy(err) }
+			try { parser.write(e) } catch(err) { self._Destroy(err) }
 		});
-		socket.on('error', err=>self.destroy(err));
-		socket.on('end', ()=>self.destroy('mysql server has been socket end'));
-		socket.on('close', ()=>self.destroy('mysql server has been socket close'));
+		socket.on('error', err=>self._Destroy(err));
+		socket.on('end', ()=>self._Destroy('mysql server has been socket end'));
+		socket.on('close', ()=>self._Destroy('mysql server has been socket close'));
 
 		parser.onPacket.on(function(e) {
 			var packet = e.data;
 			if (packet.type === ParserConstants.ERROR_PACKET) {
-				self.destroy({ message: 'ERROR_PACKET', ...packet.toJSON() });
+				self._Destroy({ message: 'ERROR_PACKET', ...packet.toJSON() });
 			} else if (self._isReady) {
 				self.onPacket.trigger(packet);
 			} else if (packet.type == ParserConstants.GREETING_PACKET) {
@@ -242,6 +290,10 @@ export class Connection {
 		(this._socket as Socket).write(buffer);
 	}
 
+	private static _Key(opts: Options) {
+		return `${opts.host}_${opts.port}_${opts.user}`;
+	}
+
 	/**
 	 * return connection pool
 	 */
@@ -253,26 +305,33 @@ export class Connection {
 		this.onPacket.off();
 		this.onError.off();
 		this._onReady.off();
-
+		
 		if (!this._socket)
 			return; // socket destroy
 
-		for (var i = 0, l = require_connect.length; i < l; i++) {
-			var req = require_connect[i];
-			var args = req.args;
-			var [opt] = args;
-			if (
-				opt.host == this.options.host && opt.port === this.options.port &&
-				opt.user == this.options.user && opt.password == this.options.password
-			) {
-				require_connect.splice(i, 1);
-				clearTimeout(req.timeout);
-				resolve(...args);
+		var opts_ = this.options;
+		var key = Connection._Key(opts_);
+		var reqs = G_require_connect[key];
+
+		G_connect_pool[key].used.deleteOf(this);
+		G_connect_pool[key].idle.push(this);
+
+		if (reqs) {
+			for (var i = 0, l = reqs.length; i < l; i++) {
+				var req = reqs[i];
+				var [opts,cb] = req.args;
+				reqs.splice(i, 1);
+				if (opts.database == opts_.database) {
+					this._ready(cb);
+				} else {
+					this._changeDB(opts.database as string, cb);
+				}
 				return;
 			}
 		}
 
-		this._idle_tomeout = (()=>this.destroy()).setTimeout(CONNECT_TIMEOUT);
+		this._idle_tomeout = Date.now() + CONNECT_TIMEOUT;
+		watch();
 	}
 
 	private _changeDB(db: string, cb: Callback) {
@@ -309,7 +368,10 @@ export class Connection {
 	private _use() {
 		utils.assert(!this._isUse);
 		this._isUse = true;
-		this._clearTimeout();
+		this._idle_tomeout = 0;
+		var key = Connection._Key(this.options);
+		G_connect_pool[key].idle.deleteOf(this);
+		G_connect_pool[key].used.push(this);
 	}
 
 	/**
@@ -318,41 +380,39 @@ export class Connection {
 	 * @param {Function} cb
 	 */
 	static resolve(opt: Options, cb: Callback) {
-		var key = opt.host + ':' + opt.port;
-		var pool = connect_pool[key];
-		if (!pool)
-			connect_pool[key] = pool = [];
+		var key = Connection._Key(opt);
+		var pool = G_connect_pool[key] || (G_connect_pool[key] = { used: [], idle: [] });
 
-		for (var c of pool) {
+		var c = pool.idle.shift();
+
+		if (c) {
 			var options = c.options;
-			if (!c._isUse && !c._socket) {
-				if (options.user == opt.user && options.password == opt.password) {
-					if (options.database == opt.database) {
-						c._ready(cb);
-					} else {
-						c._changeDB(opt.database as string, cb);
-					}
-					return;
-				}
+			if (options.database == opt.database) {
+				c._ready(cb);
+			} else {
+				c._changeDB(opt.database as string, cb);
 			}
+			return;
 		}
 
 		//is max connect
-		if (pool.length < MAX_CONNECT_COUNT) {
-			var c = new Connection(opt);
-			pool.push(c);
-			c._ready(cb);
+		if (pool.used.length + pool.idle.length < MAX_CONNECT_COUNT) {
+			var _c = new Connection(opt);
+			pool.idle.push(_c);
+			_c._ready(cb);
 		} else {
+			var reqs = G_require_connect[key] || (G_require_connect[key] = []);
 			// queue up
 			var req: Request = {
-				timeout: function() {
-					require_connect.deleteOf(req);
+				time: function() {
 					cb(new Error('obtaining a connection from the connection pool timeout'));
-				}.setTimeout(CONNECT_TIMEOUT),
-				args: [opt, cb]
+				},
+				timeout: Date.now() + CONNECT_TIMEOUT,
+				args: [opt, cb],
 			};
 			//append to require connect
-			require_connect.push(req);
+			reqs.push(req);
+			watch();
 		}
 	}
 }

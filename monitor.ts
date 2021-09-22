@@ -31,15 +31,14 @@
 import utils from './util';
 import errno from './errno';
 
-function clear(self: Monitor) {
+function clear(self: Watch) {
 	clearTimeout((<any>self).m_timeout_id);
 	(<any>self).m_running_id = 0;
 	(<any>self).m_timeout_id = 0;
 	(<any>self).m_run_loop = null;
 }
 
-export class Monitor {
-
+export class Watch {
 	private m_interval: number;
 	private m_maxDuration: number;
 	private m_running_id: number = 0;
@@ -57,7 +56,7 @@ export class Monitor {
 		this.m_maxDuration = maxDuration;
 	}
 
-	start<R>(run: (m: Monitor)=>Promise<R>|R): Promise<R|null> {
+	start<R>(run: (m: Watch)=>Promise<R>|R): Promise<R|null> {
 		return new Promise(async (resolve: (r:R|null)=>void, reject)=>{
 			if (this.m_running_id) {
 				reject(Error.new(errno.ERR_MONITOR_BEEN_STARTED));
@@ -113,3 +112,5 @@ export class Monitor {
 	}
 
 }
+
+export const Monitor: typeof Watch = Watch;
