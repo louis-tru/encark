@@ -312,23 +312,24 @@ export class Connection {
 		var opts_ = this.options;
 		var key = Connection._Key(opts_);
 		var reqs = G_require_connect[key];
+		var {used,idle} = G_connect_pool[key];
 
-		G_connect_pool[key].used.deleteOf(this);
-		G_connect_pool[key].idle.push(this);
+		used.deleteOf(this);
+		idle.push(this);
+
+		// console.log('idle()', 'reqs', reqs?.length, 'used', used.length, 'idle', idle.length);
 
 		if (reqs) {
 			for (var i = 0, l = reqs.length; i < l; i++) {
 				var req = reqs[i];
 				var [opts,cb] = req.args;
 				reqs.splice(i, 1);
-				if (opts.database == opts_.database) {
-					this._ready(cb);
-				} else {
-					this._changeDB(opts.database as string, cb);
-				}
+				resolve(opts, cb);
+				// console.log('idle() b', reqs.length);
 				return;
 			}
 		}
+		// console.log('idle() c', reqs?.length);
 
 		this._idle_tomeout = Date.now() + CONNECT_TIMEOUT;
 		watch();
@@ -383,11 +384,10 @@ export class Connection {
 		var key = Connection._Key(opt);
 		var pool = G_connect_pool[key] || (G_connect_pool[key] = { used: [], idle: [] });
 
-		var c = pool.idle.shift();
-
+		var c = pool.idle[0];
 		if (c) {
-			var options = c.options;
-			if (options.database == opt.database) {
+			var c_opts = c.options;
+			if (c_opts.database == opt.database) {
 				c._ready(cb);
 			} else {
 				c._changeDB(opt.database as string, cb);
@@ -402,6 +402,7 @@ export class Connection {
 			_c._ready(cb);
 		} else {
 			var reqs = G_require_connect[key] || (G_require_connect[key] = []);
+			// console.log('resolve()', 'reqs', reqs.length);
 			// queue up
 			var req: Request = {
 				time: function() {

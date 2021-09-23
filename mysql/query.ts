@@ -90,17 +90,20 @@ export class Query {
 		// We can't do this require() on top of the file.
 		// That's because there is circular dependency and we're overwriting
 		var self = this;
+		var serverStatus = packet.data.serverStatus
 
 		switch (packet.type) {
 			case Constants.OK_PACKET:
 				this.onResolve.trigger(<PacketData>packet.toJSON());
-				if (packet.data.serverStatus == 2 || packet.data.serverStatus == 3) {
+				if (serverStatus == 2 || serverStatus == 3 || serverStatus == 34) {
 					this.onEnd.trigger();
-				}
+				}/*else if (serverStatus == 34) {
+					this.onError.trigger(Error.new(`query OK_PACKET, error mysql.serverStatus=34`));
+				}*/
 				break;
 			case Constants.ERROR_PACKET:
 				packet.data.sql = self.sql;
-				this.onError.trigger(<Error>packet.toJSON());
+				this.onError.trigger(packet.toJSON() as Error);
 				break;
 			case Constants.FIELD_PACKET:
 				if (!this._fields) {
@@ -120,7 +123,7 @@ export class Query {
 				if (this._eofs == 2) {
 					this._fields = null;
 					this._eofs = 0;
-					if (packet.data.serverStatus == 34 || packet.data.serverStatus == 2) {
+					if (serverStatus == 34 || serverStatus == 2) {
 						this.onEnd.trigger();
 					}
 				}
