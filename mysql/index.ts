@@ -30,10 +30,10 @@
 
 import utils from '../util';
 import {Database, DatabaseCRUD, DatabaseTools, Result, Where, SelectOptions, escape} from '../db';
-import constants from './constants';
+import {Commands} from './constants';
 import {Query, Field} from './query';
-import {OutgoingPacket} from './outgoing_packet';
-import { Connection } from './connection';
+import {OutgoingPacket} from './packet';
+import { Connection } from './pool';
 import { Constants, Packet } from './parser';
 import util from '../util';
 import {EventNoticer} from '../event';
@@ -230,7 +230,7 @@ export class Mysql implements Database {
 		return new Promise<Result>(function(resolve, reject){
 			self._enqueue(function() {
 				var packet = new OutgoingPacket(1);
-				packet.writeNumber(1, constants.COM_STATISTICS);
+				packet.writeNumber(1, Commands.COM_STATISTICS);
 				self._write(packet);
 			}, self._after(function (err, data) {
 				err ? reject(err): resolve((data as Result[])[0]);
@@ -279,7 +279,7 @@ export class Mysql implements Database {
 		self._enqueue(function() {
 			// (self._connection as any).parser._sql = sql;
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(sql, 'utf-8'));
-			packet.writeNumber(1, constants.COM_QUERY);
+			packet.writeNumber(1, Commands.COM_QUERY);
 			packet.write(sql, 'utf-8');
 			self._write(packet);
 		}, function(packet: Packet) {
@@ -532,9 +532,8 @@ export class MysqlTools implements DatabaseTools {
 		// 	`key` VARCHAR(45) NOT NULL DEFAULT '',
 		// 	PRIMARY KEY (`id`));
 
-		// DEFAULT 0
-
-		await _db.exec(this._Sql(SQL));
+		if (SQL)
+			await _db.exec(this._Sql(SQL));
 
 		// SELECT table_name FROM information_schema.tables WHERE table_schema='yellowcong' AND table_type='base table'
 		// SELECT column_name FROM information_schema.columns WHERE table_schema='yellowcong' AND table_name='sys_user';
@@ -542,14 +541,14 @@ export class MysqlTools implements DatabaseTools {
 		for (let sql of SQL_ALTER) {
 			var [,table_name,action,table_column] = 
 				sql.match(/^alter\s+table\s+(\w+)\s+(add|drop)\s+(\w+)/i) as RegExpMatchArray;
-			var res = await _db.exec(
+			var [{rows=[]}] = await _db.exec(
 				`select * from information_schema.columns where table_schema='${this._name}'
 					and table_name='${table_name}' and column_name = '${table_column}'`
 				);
 			if (action == 'add') {
-				if (!res.length)
+				if (!rows.length)
 					await _db.exec(this._Sql(sql));
-			} else if (res.length) { // drop
+			} else if (rows.length) { // drop
 				// await _db.exec(sql);
 			}
 		}
@@ -559,9 +558,9 @@ export class MysqlTools implements DatabaseTools {
 		for (let sql of SQL_INDEXES) {
 			var [,,name,table] = sql.match(
 				/^create\s+(unique\s+)?index\s+(\w+)\s+on\s+(\w+)/i) as RegExpMatchArray;
-			var res = await _db.exec(
+			var [{rows=[]}] = await _db.exec(
 				`show index from ${table} where Key_name = '${name}'`);
-			if (!res.length) {
+			if (!rows.length) {
 				await _db.exec(sql);
 			}
 		}

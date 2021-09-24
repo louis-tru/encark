@@ -30,6 +30,7 @@
 
 import { EventNoticer, Event } from '../event';
 import { Packet, Constants, PacketData } from './parser';
+import {ServerStatus} from './constants';
 
 export enum FieldType {
 	FIELD_TYPE_DECIMAL = 0x00,
@@ -90,16 +91,16 @@ export class Query {
 		// We can't do this require() on top of the file.
 		// That's because there is circular dependency and we're overwriting
 		var self = this;
-		var serverStatus = packet.data.serverStatus
+		var serverStatus = packet.data.serverStatus || 0;
 
 		switch (packet.type) {
 			case Constants.OK_PACKET:
 				this.onResolve.trigger(<PacketData>packet.toJSON());
-				if (serverStatus == 2 || serverStatus == 3 || serverStatus == 34) {
+				if (serverStatus & ServerStatus.SERVER_MORE_RESULTS_EXISTS) {
+					// more results
+				} else {
 					this.onEnd.trigger();
-				}/*else if (serverStatus == 34) {
-					this.onError.trigger(Error.new(`query OK_PACKET, error mysql.serverStatus=34`));
-				}*/
+				}
 				break;
 			case Constants.ERROR_PACKET:
 				packet.data.sql = self.sql;
@@ -123,7 +124,9 @@ export class Query {
 				if (this._eofs == 2) {
 					this._fields = null;
 					this._eofs = 0;
-					if (serverStatus == 34 || serverStatus == 2) {
+					if (serverStatus & ServerStatus.SERVER_MORE_RESULTS_EXISTS) {
+						// more results
+					} else {
 						this.onEnd.trigger();
 					}
 				}

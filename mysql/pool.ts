@@ -33,10 +33,9 @@ import {EventNoticer,Event} from '../event';
 import {
 	Parser, Constants as ParserConstants, Packet
 } from './parser';
-import Constants from './constants';
-import Charsets from './charsets';
+import {ClientFlags, Charsets, Commands} from './constants';
 import * as auth from './auth';
-import {OutgoingPacket} from './outgoing_packet';
+import {OutgoingPacket} from './packet';
 import {Buffer} from 'buffer';
 import {Socket} from 'net';
 import {Options, default_options} from './opts';
@@ -67,21 +66,21 @@ var MAX_CONNECT_COUNT = 20;
 	* @static
 	*/
 var DEFAULT_FLAGS = 
-	Constants.CLIENT_LONG_PASSWORD
-	| Constants.CLIENT_FOUND_ROWS
-	| Constants.CLIENT_LONG_FLAG
-	| Constants.CLIENT_CONNECT_WITH_DB
-	| Constants.CLIENT_ODBC
-	| Constants.CLIENT_LOCAL_FILES
-	| Constants.CLIENT_IGNORE_SPACE
-	| Constants.CLIENT_PROTOCOL_41
-	| Constants.CLIENT_INTERACTIVE
-	| Constants.CLIENT_IGNORE_SIGPIPE
-	| Constants.CLIENT_TRANSACTIONS
-	| Constants.CLIENT_RESERVED
-	| Constants.CLIENT_SECURE_CONNECTION
-	| Constants.CLIENT_MULTI_STATEMENTS
-	| Constants.CLIENT_MULTI_RESULTS;
+		ClientFlags.CLIENT_LONG_PASSWORD
+	| ClientFlags.CLIENT_FOUND_ROWS
+	| ClientFlags.CLIENT_LONG_FLAG
+	| ClientFlags.CLIENT_CONNECT_WITH_DB
+	| ClientFlags.CLIENT_ODBC
+	| ClientFlags.CLIENT_LOCAL_FILES
+	| ClientFlags.CLIENT_IGNORE_SPACE
+	| ClientFlags.CLIENT_PROTOCOL_41
+	| ClientFlags.CLIENT_INTERACTIVE
+	| ClientFlags.CLIENT_IGNORE_SIGPIPE
+	| ClientFlags.CLIENT_TRANSACTIONS
+	| ClientFlags.CLIENT_RESERVED
+	| ClientFlags.CLIENT_SECURE_CONNECTION
+	| ClientFlags.CLIENT_MULTI_STATEMENTS
+	| ClientFlags.CLIENT_MULTI_RESULTS;
 
 /**
 	* <b style="color:#f00">[static]</b>charest number
@@ -97,7 +96,7 @@ export default {
 	get CHAREST_NUMBER() { return CHAREST_NUMBER },
 	set MAX_CONNECT_COUNT(value: number) { MAX_CONNECT_COUNT = value },
 	set MAX_PACKET_SIZE(value: number) { MAX_PACKET_SIZE = value },
-	set DEFAULT_FLAGS(value: Constants) { DEFAULT_FLAGS = value },
+	set DEFAULT_FLAGS(value: ClientFlags) { DEFAULT_FLAGS = value },
 	set CHAREST_NUMBER(value: Charsets) { CHAREST_NUMBER = value },
 };
 
@@ -341,7 +340,7 @@ export class Connection {
 			utils.assert(this._isReady);
 			this.options.database = db;
 			var packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
-			packet.writeNumber(1, Constants.COM_INIT_DB);
+			packet.writeNumber(1, Commands.COM_INIT_DB);
 			packet.write(db, 'utf-8');
 			this._write(packet);
 			this._isReady = false;

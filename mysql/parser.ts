@@ -29,6 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import {EventNoticer,Event} from '../event';
+import util from '../util';
 
 const POWS = [1, 256, 65536, 16777216];
 
@@ -165,123 +166,121 @@ export class Packet {
 }
 
 export class Parser {
-
 	private _lengthCodedLength?: number;
 	private _lengthCodedStringLength?: number;
-	private packet: Packet | null = null;
-	private greeted = false;
-	private authenticated = false;
-	private receivingFieldPackets = false;
-	private receivingRowPackets = false;
-
-	state = Constants.PACKET_LENGTH;
+	private _packet: Packet | null = null;
+	private _greeted = false;
+	private _authenticated = false;
+	private _receivingFieldPackets = false;
+	private _receivingRowPackets = false;
+	private _state = Constants.PACKET_LENGTH;
 
 	/**
 	 * @event onpacket
 	 */
 	readonly onPacket = new EventNoticer<Event<Packet>>('Packet', this);
 
+	private _advance(newState?: Constants) {
+		this._state = newState === undefined ? this._state + 1 : newState;
+		util.assert(this._packet);
+		(this._packet as Packet).index = -1;
+	}
+
+	private _lengthCoded(c: number, val?: number, nextState?: Constants): number | undefined {
+		var self = this;
+		var packet = this._packet as Packet;
+		util.assert(packet, 'not packet');
+
+		if (self._lengthCodedLength === undefined) {
+			if (c === Constants.LENGTH_CODED_16BIT_WORD) {
+				self._lengthCodedLength = 2;
+			} else if (c === Constants.LENGTH_CODED_24BIT_WORD) {
+				self._lengthCodedLength = 3;
+			} else if (c === Constants.LENGTH_CODED_64BIT_WORD) {
+				self._lengthCodedLength = 8;
+			} else if (c === Constants.LENGTH_CODED_NULL) {
+				self._advance(nextState);
+				return; // null;
+			} else if (c < Constants.LENGTH_CODED_NULL) {
+				self._advance(nextState);
+				return c;
+			}
+			return 0;
+		}
+
+		if (c) {
+			if (val === undefined)
+				throw new Error('Type error');
+			val += POWS[packet.index - 1] * c;
+		}
+
+		if (packet.index === self._lengthCodedLength) {
+			self._lengthCodedLength = undefined;
+			self._advance(nextState);
+		}
+
+		return val;
+	}
+
+	private _emitPacket() {
+		if (this._packet) {
+			var packet = this._packet;
+			this._packet = null;
+			this._state = Constants.PACKET_LENGTH;
+			this._greeted = true;
+			packet.index = -1;
+			this.onPacket.trigger(packet);
+		}
+	}
+
 	/**
 	 * write buffer and parser
 	 * @param {node.Buffer}
 	 */
 	write(buffer: Buffer) {
-		// if ((this as any)._sql == `select * from information_schema.columns where table_schema='mvp' and table_name='tx_async'`)
-		// 	debugger;
 		var c: number = 0;
 		var self = this;
-		var state = this.state;
 		var length = buffer.length;
-		var packet = this.packet as Packet;
-		var packet_: PacketData = packet ? packet.data : {};
-
-		function advance(newState?: Constants) {
-			self.state = state = (newState === undefined)
-				? self.state + 1
-				: newState;
-			packet.index = -1;
-		}
-
-		function lengthCoded(val?: number, nextState?: Constants): number | undefined {
-			if (self._lengthCodedLength === undefined) {
-				if (c === Constants.LENGTH_CODED_16BIT_WORD) {
-					self._lengthCodedLength = 2;
-				} else if (c === Constants.LENGTH_CODED_24BIT_WORD) {
-					self._lengthCodedLength = 3;
-				} else if (c === Constants.LENGTH_CODED_64BIT_WORD) {
-					self._lengthCodedLength = 8;
-				} else if (c === Constants.LENGTH_CODED_NULL) {
-					advance(nextState);
-					return; // null;
-				} else if (c < Constants.LENGTH_CODED_NULL) {
-					advance(nextState);
-					return c;
-				}
-				return 0;
-			}
-
-			if (c) {
-				if (val === undefined)
-					throw new Error('Type error');
-				val += POWS[packet.index - 1] * c;
-			}
-
-			if (packet.index === self._lengthCodedLength) {
-				self._lengthCodedLength = undefined;
-				advance(nextState);
-			}
-
-			return val;
-		}
-
-		function emitPacket() {
-			if (packet) {
-				self.packet = null;
-				self.state = state = Constants.PACKET_LENGTH;
-				self.greeted = true;
-				delete (packet as any).index;
-				self.onPacket.trigger(packet);
-				(packet as any) = null;
-			}
-		}
+		var packet = this._packet as Packet;
+		var packetData: PacketData = packet ? packet.data : {};
 
 		for (var i = 0; i < length; i++) {
 			c = buffer[i];
 
-			if (state > Constants.PACKET_NUMBER) {
+			if (this._state > Constants.PACKET_NUMBER) {
 				packet.received++;
 			}
 
-			switch (state) {
+			switch (this._state) {
 				// PACKET HEADER
 				case 0: // PACKET_LENGTH:
 					if (!packet) {
-						packet = this.packet = new Packet();
-						packet_ = packet.data;
+						this._packet = packet = new Packet();
+						packetData = packet.data;
 					}
 
 					// 3 bytes - Little endian
 					packet.length += POWS[packet.index] * c;
 
 					if (packet.index == 2) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 1: // PACKET_NUMBER:
 					// 1 byte
 					packet.number = c;
 
-					if (!this.greeted) {
-						advance(Constants.GREETING_PROTOCOL_VERSION);
+					if (!this._greeted) {
+						self._advance(Constants.GREETING_PROTOCOL_VERSION);
 						break;
 					}
 
-					if (this.receivingFieldPackets) {
-						advance(Constants.FIELD_CATALOG_LENGTH);
-					} else if (this.receivingRowPackets) {
-						advance(Constants.COLUMN_VALUE_LENGTH);
+					if (this._receivingFieldPackets) {
+						self._advance(Constants.FIELD_CATALOG_LENGTH);
+					} else if (this._receivingRowPackets) {
+						self._advance(Constants.COLUMN_VALUE_LENGTH);
 					} else {
-						advance(Constants.FIELD_COUNT);
+						self._advance(Constants.FIELD_COUNT);
 					}
 					break;
 
@@ -291,92 +290,92 @@ export class Parser {
 					// packet. Happens for too many connections errors.
 					if (c === 0xff) {
 						packet.type = Constants.ERROR_PACKET;
-						advance(Constants.ERROR_NUMBER);
+						self._advance(Constants.ERROR_NUMBER);
 						break;
 					}
 
 					// 1 byte
 					packet.type = Constants.GREETING_PACKET;
-					packet_.protocolVersion = c;
-					advance();
+					packetData.protocolVersion = c;
+					self._advance();
 					break;
 				case 3: // GREETING_SERVER_VERSION:
 					if (packet.index == 0) {
-						packet_.serverVersion = '';
+						packetData.serverVersion = '';
 					}
 
 					// Null-Terminated String
 					if (c != 0) {
-						packet_.serverVersion += String.fromCharCode(c);
+						packetData.serverVersion += String.fromCharCode(c);
 					} else {
-						advance();
+						self._advance();
 					}
 					break;
 				case 4: // GREETING_THREAD_ID:
 					if (packet.index == 0) {
-						packet_.threadId = 0;
+						packetData.threadId = 0;
 					}
 
 					// 4 bytes = probably Little endian, protocol docs are not clear
-					(packet_.threadId as number) += POWS[packet.index] * c;
+					(packetData.threadId as number) += POWS[packet.index] * c;
 
 					if (packet.index == 3) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 5: // GREETING_SCRAMBLE_BUFF_1:
 					if (packet.index == 0) {
-						packet_.scrambleBuffer = Buffer.alloc(8 + 12);
+						packetData.scrambleBuffer = Buffer.alloc(8 + 12);
 					}
 
 					// 8 bytes
-					(packet_.scrambleBuffer as Buffer)[packet.index] = c;
+					(packetData.scrambleBuffer as Buffer)[packet.index] = c;
 
 					if (packet.index == 7) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 6: // GREETING_FILLER_1:
 					// 1 byte - 0x00
-					advance();
+					self._advance();
 					break;
 				case 7: // GREETING_SERVER_CAPABILITIES:
 					if (packet.index == 0) {
-						packet_.serverCapabilities = 0;
+						packetData.serverCapabilities = 0;
 					}
 					// 2 bytes = probably Little endian, protocol docs are not clear
-					(packet_.serverCapabilities as number) += POWS[packet.index] * c;
+					(packetData.serverCapabilities as number) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 8: // GREETING_SERVER_LANGUAGE:
-					packet_.serverLanguage = c;
-					advance();
+					packetData.serverLanguage = c;
+					self._advance();
 					break;
 				case 9: // GREETING_SERVER_STATUS:
 					if (packet.index == 0) {
-						packet_.serverStatus = 0;
+						packetData.serverStatus = 0;
 					}
 
 					// 2 bytes = probably Little endian, protocol docs are not clear
-					(packet_.serverStatus as number) += POWS[packet.index] * c;
+					(packetData.serverStatus as number) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 10: // GREETING_FILLER_2:
 					// 13 bytes - 0x00
 					if (packet.index == 12) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 11: // GREETING_SCRAMBLE_BUFF_2:
 					// 12 bytes - not 13 bytes like the protocol spec says ...
 					if (packet.index < 12) {
-						(packet_.scrambleBuffer as Buffer)[packet.index + 8] = c;
+						(packetData.scrambleBuffer as Buffer)[packet.index + 8] = c;
 					}
 					break;
 
@@ -385,117 +384,117 @@ export class Parser {
 					if (packet.index == 0) {
 						if (c === 0xff) {
 							packet.type = Constants.ERROR_PACKET;
-							advance(Constants.ERROR_NUMBER);
+							self._advance(Constants.ERROR_NUMBER);
 							break;
 						}
 
-						if (c == 0xfe && !this.authenticated) {
+						if (c == 0xfe && !this._authenticated) {
 							packet.type = Constants.USE_OLD_PASSWORD_PROTOCOL_PACKET;
 							break;
 						}
 
 						if (c === 0x00) {
 							// after the first OK PACKET, we are authenticated
-							this.authenticated = true;
+							this._authenticated = true;
 							packet.type = Constants.OK_PACKET;
-							advance(Constants.AFFECTED_ROWS);
+							self._advance(Constants.AFFECTED_ROWS);
 							break;
 						}
 					}
 
-					this.receivingFieldPackets = true;
+					this._receivingFieldPackets = true;
 					packet.type = Constants.RESULT_SET_HEADER_PACKET;
-					packet_.fieldCount = lengthCoded(packet_.fieldCount, Constants.EXTRA_LENGTH);
+					packetData.fieldCount = this._lengthCoded(c, packetData.fieldCount, Constants.EXTRA_LENGTH);
 
 					break;
 
 				// ERROR_PACKET
 				case 13: // ERROR_NUMBER:
 					if (packet.index == 0) {
-						packet_.errno = 0;
+						packetData.errno = 0;
 					}
 
 					// 2 bytes = Little endian
-					(<number>packet_.errno) += POWS[packet.index] * c;
+					(<number>packetData.errno) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
-						if (!this.greeted) {
+						if (!this._greeted) {
 							// Turns out error packets are confirming to the 4.0 protocol when
 							// not greeted yet. Oh MySql, you are such a thing of beauty ...
-							advance(Constants.ERROR_MESSAGE);
+							self._advance(Constants.ERROR_MESSAGE);
 							break;
 						}
 
-						advance();
+						self._advance();
 					}
 					break;
 				case 14: // ERROR_SQL_STATE_MARKER:
 					// 1 character - always #
-					packet_.sqlStateMarker = String.fromCharCode(c);
-					packet_.sqlState = '';
-					advance();
+					packetData.sqlStateMarker = String.fromCharCode(c);
+					packetData.sqlState = '';
+					self._advance();
 					break;
 				case 15: // ERROR_SQL_STATE:
 					// 5 characters
 					if (packet.index < 5) {
-						packet_.sqlState += String.fromCharCode(c);
+						packetData.sqlState += String.fromCharCode(c);
 					}
 
 					if (packet.index == 4) {
-						advance(Constants.ERROR_MESSAGE);
+						self._advance(Constants.ERROR_MESSAGE);
 					}
 					break;
 				case 16: // ERROR_MESSAGE:
 					if (packet.received <= packet.length) {
-						packet_.errorMessage = (packet_.errorMessage || '') + String.fromCharCode(c);
+						packetData.errorMessage = (packetData.errorMessage || '') + String.fromCharCode(c);
 					}
 					break;
 
 				// OK_PACKET
 				case 17: // AFFECTED_ROWS:
-					packet_.affectedRows = lengthCoded(packet_.affectedRows);
+					packetData.affectedRows = this._lengthCoded(c, packetData.affectedRows);
 					break;
 				case 18: // INSERT_ID:
-					packet_.insertId = lengthCoded(packet_.insertId);
+					packetData.insertId = this._lengthCoded(c, packetData.insertId);
 					break;
 				case 19: // SERVER_STATUS:
 					if (packet.index == 0) {
-						packet_.serverStatus = 0;
+						packetData.serverStatus = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.serverStatus) += POWS[packet.index] * c;
+					(<number>packetData.serverStatus) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 20: // WARNING_COUNT:
 					if (packet.index == 0) {
-						packet_.warningCount = 0;
+						packetData.warningCount = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.warningCount) += POWS[packet.index] * c;
+					(<number>packetData.warningCount) += POWS[packet.index] * c;
 
 					if (packet.index == 1) {
-						packet_.message = '';
-						advance();
+						packetData.message = '';
+						self._advance();
 					}
 					break;
 				case 21: // MESSAGE:
 					if (packet.received <= packet.length) {
-						packet_.message += String.fromCharCode(c);
+						packetData.message += String.fromCharCode(c);
 					}
 					break;
 
 				// RESULT_SET_HEADER_PACKET
 				case 22: // EXTRA_LENGTH:
-					packet_.extra = '';
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					packetData.extra = '';
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					break;
 				case 23: // EXTRA_STRING:
-					packet_.extra += String.fromCharCode(c);
+					packetData.extra += String.fromCharCode(c);
 					break;
 
 				// FIELD_PACKET or EOF_PACKET
@@ -503,153 +502,153 @@ export class Parser {
 					if (packet.index == 0) {
 						if (c === 0xfe) {
 							packet.type = Constants.EOF_PACKET;
-							advance(Constants.EOF_WARNING_COUNT);
+							self._advance(Constants.EOF_WARNING_COUNT);
 							break;
 						}
 						packet.type = Constants.FIELD_PACKET;
 					}
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					break;
 				case 25: // FIELD_CATALOG_STRING:
 					if (packet.index == 0) {
-						packet_.catalog = '';
+						packetData.catalog = '';
 					}
-					packet_.catalog += String.fromCharCode(c);
+					packetData.catalog += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 26: // FIELD_DB_LENGTH:
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					if (self._lengthCodedStringLength == 0) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 27: // FIELD_DB_STRING:
 					if (packet.index == 0) {
-						packet_.db = '';
+						packetData.db = '';
 					}
-					packet_.db += String.fromCharCode(c);
+					packetData.db += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 28: // FIELD_TABLE_LENGTH:
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					if (self._lengthCodedStringLength == 0) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 29: // FIELD_TABLE_STRING:
 					if (packet.index == 0) {
-						packet_.table = '';
+						packetData.table = '';
 					}
-					packet_.table += String.fromCharCode(c);
+					packetData.table += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 30: // FIELD_ORIGINAL_TABLE_LENGTH:
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					if (self._lengthCodedStringLength == 0) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 31: // FIELD_ORIGINAL_TABLE_STRING:
 					if (packet.index == 0) {
-						packet_.originalTable = '';
+						packetData.originalTable = '';
 					}
-					packet_.originalTable += String.fromCharCode(c);
+					packetData.originalTable += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 32: // FIELD_NAME_LENGTH:
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					break;
 				case 33: // FIELD_NAME_STRING:
 					if (packet.index == 0) {
-						packet_.name = '';
+						packetData.name = '';
 					}
-					packet_.name += String.fromCharCode(c);
+					packetData.name += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 34: // FIELD_ORIGINAL_NAME_LENGTH:
-					self._lengthCodedStringLength = lengthCoded(self._lengthCodedStringLength);
+					self._lengthCodedStringLength = this._lengthCoded(c, self._lengthCodedStringLength);
 					if (self._lengthCodedStringLength == 0) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 35: // FIELD_ORIGINAL_NAME_STRING:
 					if (packet.index == 0) {
-						packet_.originalName = '';
+						packetData.originalName = '';
 					}
-					packet_.originalName += String.fromCharCode(c);
+					packetData.originalName += String.fromCharCode(c);
 
 					if (packet.index + 1 === self._lengthCodedStringLength) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 36: // FIELD_FILLER_1:
 					// 1 bytes - 0x00
-					advance();
+					self._advance();
 					break;
 				case 37: // FIELD_CHARSET_NR:
 					if (packet.index == 0) {
-						packet_.charsetNumber = 0;
+						packetData.charsetNumber = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.charsetNumber) += Math.pow(256, packet.index) * c;
+					(<number>packetData.charsetNumber) += Math.pow(256, packet.index) * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 38: // FIELD_LENGTH:
 					if (packet.index == 0) {
-						packet_.fieldLength = 0;
+						packetData.fieldLength = 0;
 					}
 
 					// 4 bytes - Little endian
-					(<number>packet_.fieldLength) += Math.pow(256, packet.index) * c;
+					(<number>packetData.fieldLength) += Math.pow(256, packet.index) * c;
 
 					if (packet.index == 3) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 39: // FIELD_TYPE:
 					// 1 byte
-					packet_.fieldType = c;
-					advance();
+					packetData.fieldType = c;
+					self._advance();
 				case 40: // FIELD_FLAGS:
 					if (packet.index == 0) {
-						packet_.flags = 0;
+						packetData.flags = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.flags) += Math.pow(256, packet.index) * c;
+					(<number>packetData.flags) += Math.pow(256, packet.index) * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 41: // FIELD_DECIMALS:
 					// 1 byte
-					packet_.decimals = c;
-					advance();
+					packetData.decimals = c;
+					self._advance();
 					break;
 				case 42: // FIELD_FILLER_2:
 					// 2 bytes - 0x00
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 43: // FIELD_DEFAULT:
@@ -659,28 +658,28 @@ export class Parser {
 				// EOF_PACKET
 				case 44: // EOF_WARNING_COUNT:
 					if (packet.index == 0) {
-						packet_.warningCount = 0;
+						packetData.warningCount = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.warningCount) += Math.pow(256, packet.index) * c;
+					(<number>packetData.warningCount) += Math.pow(256, packet.index) * c;
 
 					if (packet.index == 1) {
-						advance();
+						self._advance();
 					}
 					break;
 				case 45: // EOF_SERVER_STATUS:
 					if (packet.index == 0) {
-						packet_.serverStatus = 0;
+						packetData.serverStatus = 0;
 					}
 
 					// 2 bytes - Little endian
-					(<number>packet_.serverStatus) += Math.pow(256, packet.index) * c;
+					(<number>packetData.serverStatus) += Math.pow(256, packet.index) * c;
 
 					if (packet.index == 1) {
-						if (this.receivingFieldPackets) {
-							this.receivingFieldPackets = false;
-							this.receivingRowPackets = true;
+						if (this._receivingFieldPackets) {
+							this._receivingFieldPackets = false;
+							this._receivingRowPackets = true;
 						} else {
 						}
 					}
@@ -688,41 +687,39 @@ export class Parser {
 				case 46: // COLUMN_VALUE_LENGTH:
 
 					if (packet.index == 0) {
-						packet_.columnLength = 0;
+						packetData.columnLength = 0;
 						packet.type = Constants.ROW_DATA_PACKET;
 					}
 
 					if (packet.received == 1) {
 						if (c === 0xfe) {
 							packet.type = Constants.EOF_PACKET;
-							this.receivingRowPackets = false;
-							advance(Constants.EOF_WARNING_COUNT);
+							this._receivingRowPackets = false;
+							self._advance(Constants.EOF_WARNING_COUNT);
 							break;
 						}
 						this.onPacket.trigger(packet);
 					}
 
-					packet_.columnLength = lengthCoded(packet_.columnLength);
+					packetData.columnLength = this._lengthCoded(c, packetData.columnLength);
 
-					if (!packet_.columnLength && !this._lengthCodedLength) {
-						packet.onData.trigger({ buffer: packet_.columnLength === undefined ? null : Buffer.alloc(0), remaining: 0 });
+					if (!packetData.columnLength && !this._lengthCodedLength) {
+						packet.onData.trigger({ buffer: packetData.columnLength === undefined ? null : Buffer.alloc(0), remaining: 0 });
 						if (packet.received < packet.length) {
-							advance(Constants.COLUMN_VALUE_LENGTH);
+							self._advance(Constants.COLUMN_VALUE_LENGTH);
 						} else {
-							self.packet = null;
-							(<any>packet) = null;
-							self.state = state = Constants.PACKET_LENGTH;
+							self._packet = (packet as any) = null;
+							self._state = Constants.PACKET_LENGTH;
 							continue;
 						}
 					}
 
 					break;
 				case 47: // COLUMN_VALUE_STRING:
-					if (packet_.columnLength === undefined) {
-						// packet_.columnLength = 0;
+					if (packetData.columnLength === undefined) {
 						throw new Error('Type error');
 					}
-					var remaining = packet_.columnLength - packet.index, read;
+					var remaining = packetData.columnLength - packet.index, read;
 					if (i + remaining > buffer.length) {
 						read = buffer.length - i;
 						packet.index += read;
@@ -734,15 +731,14 @@ export class Parser {
 						packet.onData.trigger({ buffer: buffer.slice(i, i + remaining), remaining: 0 });
 						i += remaining - 1;
 						packet.received += remaining - 1;
-						advance(Constants.COLUMN_VALUE_LENGTH);
-						// advance() sets this to -1, but packet.index++ is skipped, so we need to manually fix
+						self._advance(Constants.COLUMN_VALUE_LENGTH);
+						// self._advance() sets this to -1, but packet.index++ is skipped, so we need to manually fix
 						packet.index = 0;
 					}
 
 					if (packet.received == packet.length) {
-						self.packet = null;
-						(packet as any) = null;
-						self.state = state = Constants.PACKET_LENGTH;
+						self._packet = (packet as any) = null;
+						self._state = Constants.PACKET_LENGTH;
 					}
 
 					continue;
@@ -752,16 +748,11 @@ export class Parser {
 
 			packet.index++;
 
-			if (state > Constants.PACKET_NUMBER && packet.received === packet.length) {
-				emitPacket();
+			if (this._state > Constants.PACKET_NUMBER && packet.received === packet.length) {
+				(packet as any) = null;
+				this._emitPacket();
 			}
 		}
-		
-		// this._data.push({ sql: this._sql, buffer });
-		
 	}
-
-	// private _data: any[] = [];
-	// private _sql = '';
 
 }
