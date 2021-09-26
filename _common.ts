@@ -232,13 +232,12 @@ export function fixRandom(arg: number, ...args: number[]): number {
 		return 0;
 	var total = arg;
 	var argus = [arg];
-	var len = args.length;
-	for (var i = 0; i < len; i++) {
+	for (var i = 0; i < args.length; i++) {
 		total += args[i];
 		argus.push(total);
 	}
 	var r = random(0, total - 1);
-	for (var i = 0; (i < len); i++) {
+	for (var i = 0; i < argus.length; i++) {
 		if (r < argus[i])
 			return i;
 	}
