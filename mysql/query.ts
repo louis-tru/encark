@@ -104,7 +104,7 @@ export class Query {
 				break;
 			case Constants.ERROR_PACKET:
 				packet.data.sql = self.sql;
-				this.onError.trigger(packet.toJSON() as Error);
+				this.onError.trigger(Error.new(packet.toJSON()).ext({sql: this.sql}));
 				break;
 			case Constants.FIELD_PACKET:
 				if (!this._fields) {
