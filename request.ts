@@ -57,6 +57,7 @@ var shared: any = null;
 // var __id = 1;
 
 export type Params = Dict | null;
+export type SecureVersion = 'TLSv1.3' | 'TLSv1.2' | 'TLSv1.1' | 'TLSv1';
 
 export interface Options {
 	params?: Params;
@@ -70,6 +71,8 @@ export interface Options {
 	cacheTime?: number;
 	noRepeat?: boolean;
 	proxy?: string;
+	minSsl?: SecureVersion;
+	maxSsl?: SecureVersion;
 }
 
 const defaultOptions: Options = {
@@ -258,8 +261,7 @@ function requestWeb(
 }
 
 // Node implementation
-function requestNode(	options: Dict,
-	soptions: Dict, 
+function requestNode(options: Options, soptions: Dict,
 	resolve: (e: Result)=>void,
 	reject: (e: any)=>void,
 	is_https?: boolean, 
@@ -269,6 +271,12 @@ function requestNode(	options: Dict,
 
 	var lib = is_https ? https: http;
 
+	if (options.minSsl) {
+		soptions.minVersion = options.minSsl;
+	}
+	if (options.maxSsl) {
+		soptions.maxVersion = options.maxSsl;
+	}
 	if (is_https) {
 		soptions.agent = new https.Agent(soptions);
 	}
@@ -299,7 +307,7 @@ function requestNode(	options: Dict,
 					statusCode: res.statusCode,
 					httpVersion: res.httpVersion,
 					requestHeaders: soptions.headers,
-					requestData: options.params,
+					requestData: options.params as any,
 					cached: false,
 				});
 			}
@@ -366,6 +374,7 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 		uri.clearHash();
 
 		var headers: Dict<string> = {
+			'Host': uri.port ? hostname + ':' + port: hostname,
 			'User-Agent': options.userAgent as string,
 			'Accept': 'application/json',
 		};
@@ -428,17 +437,13 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 				hostname = proxyUrl.hostname;
 				port = Number(proxyUrl.port) || (is_https ? 443: 80);
 				path = uri.href;
-				// set headers
-				headers.host = uri.hostname;
-				if (uri.port) {
-					headers.host += ':' + uri.port;
-				}
 			}
 		}
 
 		var timeout = Number( options.timeout || '' );
 		var send_options = {
 			hostname,
+			host: hostname,
 			port,
 			path,
 			method,
@@ -569,6 +574,7 @@ export class Request {
 
 		try {
 			result = await request(url, {
+				...opts,
 				method,
 				headers: headers,
 				params: params,

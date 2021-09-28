@@ -184,9 +184,11 @@ function resolve(...args: string[]) {
 		}
 	}
 
+	var suffix = path.substr(path.length - 1) == '/' ? '/' : '';
+
 	path = resolvePathLevel(path);
 
-	return path ? prefix + slash + path : prefix;
+	return (path ? prefix + slash + path : prefix) + suffix;
 }
 
 /**
