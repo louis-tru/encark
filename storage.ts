@@ -89,12 +89,11 @@ if (haveWeb) {
 var shared: Storage | null = null;
 
 export interface IStorage {
-	get<T = any>(key: string, defaultValue?: T): T;
-	has(key: string): boolean;
-	set(key: string, value: any): void;
-	delete(key: string): void;
-	clear(): void;
-	commit(): void;
+	get<T = any>(key: string, defaultValue?: T): Promise<T>;
+	has(key: string): Promise<boolean>;
+	set(key: string, value: any): Promise<void>;
+	delete(key: string): Promise<void>;
+	clear(): Promise<void>;
 }
 
 /**
@@ -126,7 +125,7 @@ export class Storage implements IStorage {
 		}
 	}
 
-	get(key: string, defaultValue?: any) {
+	async get(key: string, defaultValue?: any) {
 		key = format_key(this, key);
 		if (key in this.m_value) {
 			return paese_value(this.m_value[key]);
@@ -139,28 +138,24 @@ export class Storage implements IStorage {
 		}
 	}
 
-	has(key: string) {
+	async has(key: string) {
 		key = format_key(this, key);
 		return key in this.m_value;
 	}
 
-	set(key: string, value: any) {
+	async set(key: string, value: any) {
 		key = format_key(this, key);
 		this.m_value[key] = stringify_val(value);
 		commit(this);
 	}
 
-	del(key: string) {
-		this.delete(key);
-	}
-
-	delete(key: string) {
+	async delete(key: string) {
 		key = format_key(this, key);
 		delete this.m_value[key];
 		commit(this);
 	}
 
-	clear() {
+	async clear() {
 		if (haveWeb) {
 			var keys: any[] = [];
 			for (var i in this.m_value) {
@@ -175,14 +170,6 @@ export class Storage implements IStorage {
 			this.m_value = {};
 		}
 		commit(this);
-	}
-
-	commit() {
-		sync_local(this);
-	}
-
-	save() {
-		this.commit();
 	}
 
 }
@@ -216,20 +203,12 @@ export default {
 		return _shared().set(key, value);
 	},
 
-	del: function(key: string) {
+	delete: function(key: string) {
 		return _shared().delete(key);
 	},
 
 	clear: function() {
 		return _shared().clear();
-	},
-
-	save: function() {
-		_shared().commit();
-	},
-
-	commit: function() {
-		_shared().commit();
 	},
 
 };
