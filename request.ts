@@ -361,7 +361,7 @@ export interface Signer {
 /**
  * @func request
  */
-export function request(pathname: string, opts: Options): PromiseResult<IBuffer> {
+export function request(pathname: string, opts?: Options): PromiseResult<IBuffer> {
 	var options = Object.assign({}, defaultOptions, opts);
 	var { params, method, signer } = options;
 
@@ -427,7 +427,7 @@ export function request(pathname: string, opts: Options): PromiseResult<IBuffer>
 		}
 
 		var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
-		var proxy = opts.proxy || GLOBAL_PROXY;
+		var proxy = options.proxy || GLOBAL_PROXY;
 
 		if (proxy && (!haveWeb || proxy != GLOBAL_PROXY)) {
 			// set proxy
@@ -562,6 +562,10 @@ export class Request {
 		return buf;
 	}
 
+	protected rawRequest(url: string, opts?: Options) {
+		return request(url, opts);
+	}
+
 	private async __request<T>(name: string, method: string, params?: Params, options?: Options): PromiseResult<T> {
 		var opts = options || {};
 		var { headers } = opts;
@@ -573,7 +577,7 @@ export class Request {
 		var result: Result;
 
 		try {
-			result = await request(url, {
+			result = await this.rawRequest(url, {
 				...opts,
 				method,
 				headers: headers,

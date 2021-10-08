@@ -99,7 +99,7 @@ export class HttpService extends StaticService {
 	 * post form
 	 * @type {IncomingForm}
 	 */
-	form: any | null = null;
+	form: IncomingForm | null = null;
 
 	/**
 	 * post form data
