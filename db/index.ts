@@ -31,7 +31,7 @@
 /**
  * escape sql param
  */
- export function escape(param: any) {
+export function escape(param: any) {
 	if (param === undefined || param === null)
 		return 'NULL';
 
