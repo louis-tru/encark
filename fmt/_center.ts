@@ -281,7 +281,7 @@ export class FastMessageTransferCenter_IMPL {
 					return method ?
 						await (fnode as any)[method](id, ...args):
 						utils.assert(await fnode.query(id), errno.ERR_FMT_CLIENT_OFFLINE);
-				} catch(err) {
+				} catch(err: any) {
 					if (err.errno != errno.ERR_FMT_CLIENT_OFFLINE[0]) {
 						throw err;
 					}

@@ -158,7 +158,7 @@ export class WSClient extends Notification implements conv.MessageHandle {
 					console.log('WSClient.Call', `${self.name}.${name}(${JSON.stringify(data, null, 2)})`);
 				try {
 					r.data = await self.handleCall(name, data || {}, sender || '');
-				} catch(e) {
+				} catch(e: any) {
 					r.error = e;
 				}
 			} else if (msg.isEvent()) {

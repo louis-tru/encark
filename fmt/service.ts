@@ -101,7 +101,7 @@ export class FMTService extends wss.WSService {
 		this.m_user.time = this.m_time;
 		try {
 			await center.loginFrom(this);
-		} catch(err) {
+		} catch(err: any) {
 			if (err.errno == errno.ERR_REPEAT_LOGIN_FMTC[0])
 				await this._repeatForceLogout();
 			throw err;
