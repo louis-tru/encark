@@ -35,7 +35,6 @@ import {Query, Field} from './query';
 import {OutgoingPacket} from './packet';
 import { Connection } from './pool';
 import { Constants, Packet } from './parser';
-import util from '../util';
 import {EventNoticer} from '../event';
 import errno from '../errno';
 import {Options, default_options} from './opts';
@@ -143,7 +142,7 @@ export class Mysql implements Database {
 			return;
 		self._connecting = true;
 
-		util.assert(!self._connection, '_connection null ??');
+		utils.assert(!self._connection, '_connection null ??');
 
 		Connection.resolve(self.options, function(err, connection) {
 			if (err) {
@@ -572,12 +571,14 @@ export class MysqlTools implements DatabaseTools {
 		var [{rows=[]}] = await _db.exec(
 				`select * from information_schema.tables where table_schema='${this._name}' and table_type='base table'`);
 		for (let {TABLE_NAME} of rows) {
-			var struct: DBStruct = _db_struct[TABLE_NAME] = { names: [], columns: {} };
-			var [{rows:columns = []}] = await _db.exec(
-					`select * from information_schema.columns where table_schema='${this._name}' and table_name='${TABLE_NAME}'`);
-			for (var column of columns) {
-				struct.names.push(column.COLUMN_NAME);
-				struct.columns[column.COLUMN_NAME] = column as any;
+			if (!utils.config.fastStart || !_db_struct[TABLE_NAME]) {
+				var struct: DBStruct = _db_struct[TABLE_NAME] = { names: [], columns: {} };
+				var [{rows:columns = []}] = await _db.exec(
+						`select * from information_schema.columns where table_schema='${this._name}' and table_name='${TABLE_NAME}'`);
+				for (var column of columns) {
+					struct.names.push(column.COLUMN_NAME);
+					struct.columns[column.COLUMN_NAME] = column as any;
+				}
 			}
 		}
 
