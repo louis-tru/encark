@@ -32,36 +32,6 @@ import { EventNoticer, Event } from '../event';
 import { Packet, Constants, PacketData } from './parser';
 import {ServerStatus} from './constants';
 
-export enum FieldType {
-	FIELD_TYPE_DECIMAL = 0x00,
-	FIELD_TYPE_TINY = 0x01,
-	FIELD_TYPE_SHORT = 0x02,
-	FIELD_TYPE_LONG = 0x03,
-	FIELD_TYPE_FLOAT = 0x04,
-	FIELD_TYPE_DOUBLE = 0x05,
-	FIELD_TYPE_NULL = 0x06,
-	FIELD_TYPE_TIMESTAMP = 0x07,
-	FIELD_TYPE_LONGLONG = 0x08,
-	FIELD_TYPE_INT24 = 0x09,
-	FIELD_TYPE_DATE = 0x0a,
-	FIELD_TYPE_TIME = 0x0b,
-	FIELD_TYPE_DATETIME = 0x0c,
-	FIELD_TYPE_YEAR = 0x0d,
-	FIELD_TYPE_NEWDATE = 0x0e,
-	FIELD_TYPE_VARCHAR = 0x0f,
-	FIELD_TYPE_BIT = 0x10,
-	FIELD_TYPE_NEWDECIMAL = 0xf6,
-	FIELD_TYPE_ENUM = 0xf7,
-	FIELD_TYPE_SET = 0xf8,
-	FIELD_TYPE_TINY_BLOB = 0xf9,
-	FIELD_TYPE_MEDIUM_BLOB = 0xfa,
-	FIELD_TYPE_LONG_BLOB = 0xfb,
-	FIELD_TYPE_BLOB = 0xfc,
-	FIELD_TYPE_VAR_STRING = 0xfd,
-	FIELD_TYPE_STRING = 0xfe,
-	FIELD_TYPE_GEOMETRY = 0xff
-};
-
 export class Field {
 	readonly name: string;
 	readonly type: FieldType;
@@ -70,6 +40,40 @@ export class Field {
 		this.type = type;
 	}
 }
+
+export enum FieldType {
+	FIELD_TYPE_DECIMAL     = 0,
+	FIELD_TYPE_TINY        = 1,
+	FIELD_TYPE_SHORT       = 2,
+	FIELD_TYPE_LONG        = 3,
+	FIELD_TYPE_FLOAT       = 4,
+	FIELD_TYPE_DOUBLE      = 5,
+	FIELD_TYPE_NULL        = 6,
+	FIELD_TYPE_TIMESTAMP   = 7,
+	FIELD_TYPE_LONGLONG    = 8,
+	FIELD_TYPE_INT24       = 9,
+	FIELD_TYPE_DATE        = 10,
+	FIELD_TYPE_TIME        = 11,
+	FIELD_TYPE_DATETIME    = 12,
+	FIELD_TYPE_YEAR        = 13,
+	FIELD_TYPE_NEWDATE     = 14,
+	FIELD_TYPE_VARCHAR     = 15,
+	FIELD_TYPE_BIT         = 16,
+	FIELD_TYPE_TIMESTAMP2  = 17, //
+	FIELD_TYPE_DATETIME2   = 18, //
+	FIELD_TYPE_TIME2       = 19, //
+	FIELD_TYPE_JSON        = 245, //
+	FIELD_TYPE_NEWDECIMAL  = 246,
+	FIELD_TYPE_ENUM        = 247,
+	FIELD_TYPE_SET         = 248,
+	FIELD_TYPE_TINY_BLOB   = 249,
+	FIELD_TYPE_MEDIUM_BLOB = 250,
+	FIELD_TYPE_LONG_BLOB   = 251,
+	FIELD_TYPE_BLOB        = 252,
+	FIELD_TYPE_VAR_STRING  = 253,
+	FIELD_TYPE_STRING      = 254,
+	FIELD_TYPE_GEOMETRY    = 255,
+};
 
 export class Query {
 	private _eofs = 0;
@@ -85,6 +89,40 @@ export class Query {
 
 	constructor(sql: string) {
 		this.sql = sql;
+	}
+
+	private _ParseField(type: FieldType, str_value: string) {
+		// NOTE: need to handle more data types, such as binary data
+		switch (type) {
+			case FieldType.FIELD_TYPE_TIMESTAMP:
+			case FieldType.FIELD_TYPE_DATE:
+			case FieldType.FIELD_TYPE_DATETIME:
+			case FieldType.FIELD_TYPE_NEWDATE:
+			case FieldType.FIELD_TYPE_TIMESTAMP2:
+			case FieldType.FIELD_TYPE_DATETIME2:
+				return new Date(str_value);
+			case FieldType.FIELD_TYPE_DECIMAL:
+			case FieldType.FIELD_TYPE_TINY:
+			case FieldType.FIELD_TYPE_SHORT:
+			case FieldType.FIELD_TYPE_LONG:
+			case FieldType.FIELD_TYPE_LONGLONG:
+			case FieldType.FIELD_TYPE_INT24:
+			case FieldType.FIELD_TYPE_YEAR:
+				return parseInt(str_value, 10);
+			case FieldType.FIELD_TYPE_FLOAT:
+			case FieldType.FIELD_TYPE_DOUBLE:
+				// decimal types cannot be parsed as floats because
+				// V8 Numbers have less precision than some MySQL Decimals
+				return parseFloat(str_value);
+			case FieldType.FIELD_TYPE_BIT:
+				return str_value == '\u0000' ? false : true;
+			case FieldType.FIELD_TYPE_JSON:
+				return JSON.parse(str_value);
+			case FieldType.FIELD_TYPE_TIME2:
+			case FieldType.FIELD_TYPE_TIME:
+			default:
+				return str_value;
+		}
 	}
 
 	handlePacket(packet: Packet) {
@@ -164,40 +202,10 @@ export class Query {
 
 					self._rowIndex++;
 
-					// NOTE: need to handle more data types, such as binary data
 					if (value !== null) {
-						var str_value = value.toString('utf8');
-
-						switch (field.type) {
-							case FieldType.FIELD_TYPE_TIMESTAMP:
-							case FieldType.FIELD_TYPE_DATE:
-							case FieldType.FIELD_TYPE_DATETIME:
-							case FieldType.FIELD_TYPE_NEWDATE:
-								row[field.name] = new Date(str_value);
-								break;
-							case FieldType.FIELD_TYPE_TINY:
-							case FieldType.FIELD_TYPE_SHORT:
-							case FieldType.FIELD_TYPE_LONG:
-							case FieldType.FIELD_TYPE_LONGLONG:
-							case FieldType.FIELD_TYPE_INT24:
-							case FieldType.FIELD_TYPE_YEAR:
-								row[field.name] = parseInt(str_value, 10);
-								break;
-							case FieldType.FIELD_TYPE_FLOAT:
-							case FieldType.FIELD_TYPE_DOUBLE:
-								// decimal types cannot be parsed as floats because
-								// V8 Numbers have less precision than some MySQL Decimals
-								row[field.name] = parseFloat(str_value);
-								break;
-							case FieldType.FIELD_TYPE_BIT:
-								row[field.name] = str_value == '\u0000' ? false : true;
-								break;
-							default:
-								row[field.name] = str_value;
-								break;
-						}
+						row[field.name] = self._ParseField(field.type, value.toString('utf8'));
 					}
-					
+
 					if (self._rowIndex == fields.length) {
 						delete self._row;
 						delete (self as any)._rowIndex;

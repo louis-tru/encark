@@ -337,9 +337,30 @@ interface DBStruct {
 	names: string[];
 	columns: {
 		[key: string]: {
-			column_name: string;
-			data_type: string;
 			// [key: string]: any;
+			COLUMN_NAME: string;
+			COLUMN_TYPE: string;
+			// CHARACTER_MAXIMUM_LENGTH: null
+			// CHARACTER_OCTET_LENGTH: null
+			// CHARACTER_SET_NAME: null
+			// COLLATION_NAME: null
+			// COLUMN_COMMENT: ""
+			// COLUMN_DEFAULT: null
+			// COLUMN_KEY: ""
+			// COLUMN_NAME: "traits"
+			// COLUMN_TYPE: "json"
+			// DATA_TYPE: "json"
+			// DATETIME_PRECISION: null
+			// EXTRA: ""
+			// GENERATION_EXPRESSION: ""
+			// IS_NULLABLE: "YES"
+			// NUMERIC_PRECISION: null
+			// NUMERIC_SCALE: null
+			// ORDINAL_POSITION: 10
+			// PRIVILEGES: "select,insert,update,references"
+			// TABLE_CATALOG: "def"
+			// TABLE_NAME: "collection"
+			// TABLE_SCHEMA: "mvp_test"
 		};
 	};
 }
@@ -360,10 +381,13 @@ class MysqlCRUD implements DatabaseCRUD {
 		return struct;
 	}
 
-	private escape(struct: DBStruct, row: object, join = 'and', prefix = 'where') {
+	private escape(struct: DBStruct, row: object, json: boolean = false, join = 'and', prefix = 'where') {
 		var sql = [] as string[];
 		for (var [key,val] of Object.entries(row)) {
-			if ((key in struct.columns) && val !== undefined) {
+			var col = struct.columns[key];
+			if (col && val !== undefined) {
+				if (col.COLUMN_TYPE == 'json' && json)
+					val = JSON.stringify(val);
 				sql.push(`${key} = ${escape(val)}`);
 			}
 		}
@@ -378,7 +402,10 @@ class MysqlCRUD implements DatabaseCRUD {
 		var struct = this.check(table);
 		var keys = [] as string[], values = [] as string[];
 		for (var [key,val] of Object.entries(row)) {
-			if ((key in struct.columns) && val !== undefined) {
+			var col = struct.columns[key];
+			if (col && val !== undefined) {
+				if (col.COLUMN_TYPE == 'json')
+					val = JSON.stringify(val);
 				keys.push(key);
 				values.push(escape(val));
 			}
@@ -402,7 +429,7 @@ class MysqlCRUD implements DatabaseCRUD {
 
 	async update(table: string, row: Dict, where: Where = ''): Promise<number> {
 		var struct = this.check(table);
-		var set = this.escape(struct, row, ',', '');
+		var set = this.escape(struct, row, true, ',', '');
 		if (typeof where == 'object') {
 			var sql = `update ${table} set ${set} ${this.escape(struct, where)}`;
 			var [r] = await this.exec(sql);
