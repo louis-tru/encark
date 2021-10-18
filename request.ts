@@ -562,7 +562,7 @@ export class Request {
 		return buf;
 	}
 
-	protected rawRequest(url: string, opts?: Options) {
+	protected rawRequest(url: string, opts: Options) {
 		return request(url, opts);
 	}
 
