@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from './util';
-import buffer,{IBuffer, Zero} from './buffer';
+import buffer,{IBuffer} from './buffer';
 import url from './path';
 import errno from './errno';
 
@@ -56,6 +56,7 @@ else if (haveNode) {
 var shared: any = null;
 // var __id = 1;
 
+export const userAgent = user_agent;
 export type Params = Dict | null;
 export type SecureVersion = 'TLSv1.3' | 'TLSv1.2' | 'TLSv1.1' | 'TLSv1';
 
@@ -75,7 +76,7 @@ export interface Options {
 	maxSsl?: SecureVersion;
 }
 
-const defaultOptions: Options = {
+export const defaultOptions: Options = {
 	method: 'GET',
 	params: null,
 	headers: {},
@@ -377,9 +378,8 @@ export function request(pathname: string, opts?: Options): PromiseResult<IBuffer
 			'Host': uri.port ? hostname + ':' + port: hostname,
 			'User-Agent': options.userAgent as string,
 			'Accept': 'application/json',
+			...options.headers,
 		};
-
-		Object.assign(headers, options.headers);
 
 		var post_data: string | null = null;
 

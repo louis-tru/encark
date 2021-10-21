@@ -44,6 +44,7 @@ export type Bytes = Uint8Array | Uint8ClampedArray;
 export type BinaryLike = ArrayBufferView | ArrayBuffer | SharedArrayBuffer;
 export type FromArg = string | BinaryLike | Iterable<number> | ArrayLike<number>;
 export type IBuffer = InterfaceBuffer;
+export type IB = InterfaceBuffer;
 
 export function isInterfaceBuffer(IBuffer: any) {
 	if (IBuffer && IBuffer.__INTERFACE_IBuffer_TYPE__ == INTERFACE_IBuffer_TYPE)

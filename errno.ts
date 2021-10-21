@@ -62,6 +62,7 @@ export class ErrnoList {
 	ERR_REPEAT_REQUEST: ErrnoCode = [-30063, 'ERR_REPEAT_REQUEST']
 	ERR_REPEAT_LOAD_MYSQL: ErrnoCode = [-30064, 'ERR_REPEAT_LOAD_MYSQL']
 	ERR_DATA_TABLE_NOT_FOUND: ErrnoCode = [-30065, 'ERR_DATA_TABLE_NOT_FOUND']
+	ERR_HTTP2_ERROR: ErrnoCode = [-30066, 'ERR_HTTP2_ERROR']
 }
 
 export default new ErrnoList();
