@@ -41,7 +41,10 @@ export function escape(param: any) {
 
 	if (param instanceof Date) 
 		return param.toString("'yyyy-MM-dd hh:mm:ss'");
-		
+
+	if (type == 'object')
+		param = JSON.stringify(param);
+
 	return "'" + (param + '').replace(/[\0\n\r\b\t\\\'\"\x1a]/g, function (s) {
 		switch (s) {
 			case "\0": return "\\0";
