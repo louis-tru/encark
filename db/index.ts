@@ -116,6 +116,7 @@ export interface DatabaseCRUD {
 	delete(table: string, where?: Where): Promise<number>;
 	update(table: string, row: Dict, where?: Where): Promise<number>;
 	select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]>;
+	selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null>;
 	query<T = Dict>(sql: string): Promise<T[]>;
 }
 

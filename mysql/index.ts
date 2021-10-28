@@ -462,6 +462,11 @@ class MysqlCRUD implements DatabaseCRUD {
 		return ls as T[];
 	}
 
+	async selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null> {
+		var [s] = await this.select<T>(table, where, {limit: 1, ...opts});
+		return s || null;
+	}
+
 	async query<T = Dict>(sql: string): Promise<T[]> {
 		var [r] = await this.exec(sql);
 		return r.rows as T[];
@@ -528,6 +533,11 @@ export class MysqlTools implements DatabaseTools {
 		} finally {
 			db.close();
 		}
+	}
+
+	async selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null> {
+		var [s] = await this.select<T>(table, where, {limit: 1, ...opts});
+		return s || null;
 	}
 
 	async query<T = Dict>(sql: string): Promise<T[]> {
