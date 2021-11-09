@@ -255,7 +255,7 @@ export class WgetIMPL extends Promise<Result> {
 				res.socket.setKeepAlive(true, 3e4); // 30s
 
 				res.socket.on('error', e=>error(e));
-				res.socket.on('end', ()=>end());
+				res.socket.on('end', ()=>end.setTimeout(50)); // The end of the delay is called after ONDATA, which may be a node error.
 				res.socket.on('close', ()=>end());
 				res.on('error', e=>error(e));
 				res.on('close', ()=>end());
