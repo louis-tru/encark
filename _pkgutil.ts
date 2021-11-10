@@ -272,22 +272,26 @@ function readConfigFile(pathname: string, pathname2: string) {
 	}
 }
 
+var configDir = '';
+
 function getConfig(): Dict {
 	if (haveFlare) {
 		return _flare_pkgutil.config;
 	}
 	if (!config) {
 		if (haveNode) {
-			var mainModule = process.mainModule;
-			if (mainModule) {
-				config = 
-					readConfigFile(
-						_path.dirname(mainModule.filename) + '/.config', 
-						_path.dirname(mainModule.filename) + '/config') || 
-						readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
+			if (configDir) {
+				config = readConfigFile(configDir + '/.config', configDir + '/config');
 			} else {
-				config = readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
+				var mainModule = require.main;// process.mainModule || require.main;
+				if (mainModule) {
+					config = readConfigFile(
+						_path.dirname(mainModule.filename) + '/.config',
+						_path.dirname(mainModule.filename) + '/config'
+					);
+				}
 			}
+			config = config || readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
 		} else {
 			config = {};
 		}
@@ -326,6 +330,17 @@ export default {
 	isNetwork,
 	get options() { return options },
 	get config() { return getConfig() },
+	set config(cfg: any) {
+		if (haveFlare) {
+			_flare_pkgutil.config = cfg;
+		} else {
+			if (typeof cfg == 'string') {
+				configDir = cfg;
+			} else {
+				config = {...(cfg as any)};
+			}
+		}
+	},
 	debug,
 	//
 	cwd: _cwd,

@@ -38,6 +38,7 @@ export default {
 	get id() { return _common.getId() },
 	get options() { return _pkgutil.options },
 	get config() { return _pkgutil.config },
+	set config(cfg: any) { _pkgutil.config = cfg },
 	get debug() { return _pkgutil.debug },
 	// events
 	get onBeforeExit(): EventNoticer<Event<number>> { return _process.getNoticer('BeforeExit') },
