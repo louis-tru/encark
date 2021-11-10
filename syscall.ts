@@ -108,7 +108,7 @@ export interface SpawnResult {
 }
 
 export interface SpawnPromise extends Promise<SpawnResult> {
-	process: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null;
+	process: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable>;
 }
 
 export function exec(cmd: string, options: SpawnOptions = {}): SpawnPromise  {
@@ -126,7 +126,7 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 	stderr = stderr instanceof stream.Writable ? stderr: undefined;
 	stdin = stdin instanceof stream.Readable ? stdin: undefined;
 
-	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> | null = null;
+	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> = child_process.spawn(cmd, args);
 
 	var promise = new Promise<SpawnResult>(function(resolve, reject) {
 		var r_stdout: string[] = [];
@@ -170,7 +170,7 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 				if (stdin) {
 					stdin.unpipe(ch.stdin);
 				}
-				ch = null;
+				(ch as any) = null;
 				if (err) {
 					reject(Error.new(err));
 				} else {
@@ -184,11 +184,9 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 				}
 			}
 		}
-		
-		ch = child_process.spawn(cmd, args);
 
-		if (promise)
-			promise.process = ch;
+		// if (promise)
+		// 	promise.process = ch;
 
 		ch.stdout.on('data', function(e: Buffer) {
 			parse_data(e, 'stdout');
