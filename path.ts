@@ -75,11 +75,12 @@ function parse_base_ext_name(self: any) {
 }
 
 function parse_path(self: any) {
-	if (self._is_parse) return;
+	if (self._is_parse)
+		return;
 	self._is_parse = true;
-	
+
 	split_path(self);
-	
+
 	var mat = self._value.match(/^(([a-z]+:)\/\/)?(([^\/:]+)(?::(\d+))?)?(\/.*)?/);
 	if (mat) {
 		self._protocol = mat[2] || '';
@@ -159,13 +160,14 @@ export class URL {
 		if (!path && haveWeb) {
 			path = location.href;
 		}
-		(<any>this)._value = path;
+		(this as any)._value = path;
 	}
 	
 	// href: "http://xxxx.xxx:81/v1.1.0/flare/path.js?sasasas&asasasa#sdsdsd"
 	get href(): string {
-		parse_path(this);
-		return (<any>this)._origin + (<any>this)._filename + (<any>this)._search + (<any>this)._hash;
+		var self = this as any;
+		parse_path(self);
+		return self._origin + self._filename + self._search + self._hash;
 	}
 	
 	/**

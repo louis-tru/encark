@@ -31,8 +31,10 @@
 import {Buffer} from 'buffer';
 import * as Path from 'path';
 import * as fs from 'fs';
+import path2 from './path';
 export * from 'fs';
 
+const fb = path2.fallbackPath;
 type NoParamCallback = fs.NoParamCallback;
 
 type CancelParamCallback = (err: NodeJS.ErrnoException | null, r?: boolean) => void;
@@ -322,7 +324,7 @@ function async_call(func: any, ...args: any[]) {
  * set dir and file
  */
 export function chownr(path: string, uid: number, gid: number, cb: NoParamCallback) {
-	path = Path.resolve(path);
+	path = Path.resolve(fb(path));
 	
 	cb = cb || function (err:any) {
 		if (err)
@@ -364,7 +366,7 @@ export function chownr(path: string, uid: number, gid: number, cb: NoParamCallba
  * @param {Function} cb    (Optional)
  */
 export function chmodr(path: string, mode: number, cb: NoParamCallback) {
-	path = Path.resolve(path);
+	path = Path.resolve(fb(path));
 	
 	cb = cb || function (err: any) { 
 		if (err) throw Error.new(err);
@@ -408,6 +410,7 @@ export var removeSync = fs.unlinkSync;
  * @param {Function} cb   (Optional)
  */
 export function remover(path: string, cb: CancelParamCallback) {
+	path = Path.resolve(fb(path));
 	var handle = { is_cancel: false };
 	cb = cb || function (err: any) { 
 		if (err) throw Error.new(err);
@@ -437,6 +440,7 @@ export function remover(path: string, cb: CancelParamCallback) {
  * 删除文件与文件夹
  */
 export function removerSync(path: string) {
+	path = Path.resolve(fb(path));
 	try {
 		var stat = fs.lstatSync(path);
 	} catch(err) {
@@ -464,8 +468,8 @@ export interface CopyOptions {
  * @param {Function} cb   (Optional)
  */
 export function copy(path: string, target: string, options?: CopyOptions | CancelParamCallback, cb?: CancelParamCallback) {
-	path = Path.resolve(path);
-	target = Path.resolve(target);
+	path = Path.resolve(fb(path));
+	target = Path.resolve(fb(target));
 	
 	if (typeof options == 'function') {
 		cb = options;
@@ -518,8 +522,8 @@ export function copy(path: string, target: string, options?: CopyOptions | Cance
 	* @param {Object}   options  (Optional)
 	*/
 export function copySync(path: string, target: string, options?: CopyOptions) {
-	path = Path.resolve(path);
-	target = Path.resolve(target);
+	path = Path.resolve(fb(path));
+	target = Path.resolve(fb(target));
 
 	var options2 = Object.assign({ 
 		ignore_hide: false, // 忽略隐藏
@@ -557,35 +561,16 @@ export type MkdirOptopns = string | number | fs.MakeDirectoryOptions | null | un
 	* @param {Function} cb    (Optional)
 	*/
 export function mkdirp(path: string, mode?: MkdirOptopns | NoParamCallback, cb?: NoParamCallback) {
-	var mode2: any = mode;
 	if (typeof mode == 'function') {
 		cb = mode;
-		mode2 = null;
+		mode = null;
 	}
-	var cb2 = cb || function (err: any) {
+	cb = cb || function (err: any) {
 		if (err) throw Error.new(err);
 	}
-	path = Path.resolve(path);
-
-	fs.exists(path, function (exists) {
-		if (exists) return cb2(null);
-
-		var mat = <RegExpMatchArray>path.match(/^(\w+:)?\//);
-		var prefix = mat[0];
-		var ls = path.substr(prefix.length).split('/');
-
-		function shift(err?:any) {
-			if (err) return cb2(err);
-			if (!ls.length) return cb2(null);
-
-			prefix += ls.shift() + '/';
-			fs.exists(prefix, function(exists) {
-				if (exists) { return shift() }
-				fs.mkdir(prefix, mode2, shift);
-			});
-		}
-		shift();
-	});
+	mode = typeof mode != 'object' ? mode ? { mode }: {}: mode || {};
+	mode.recursive = true;
+	fs.mkdir(fb(path), mode, cb);
 }
 
 /**
@@ -594,22 +579,9 @@ export function mkdirp(path: string, mode?: MkdirOptopns | NoParamCallback, cb?:
 	* @param {String}   mode  (Optional)
 	*/
 export function mkdirpSync(path: string, mode?: MkdirOptopns) {
-	path = Path.resolve(path);
-
-	if (fs.existsSync(path)) {
-		return;
-	}
-
-	var mat = <RegExpMatchArray>path.match(/^(\w+:)?\//);
-	var prefix = mat[0];
-	var ls = path.substr(prefix.length).split('/');
-
-	for (var i = 0; i < ls.length; i++) {
-		prefix += ls[i] + '/';
-		if (!fs.existsSync(prefix)) {
-			fs.mkdirSync(prefix, mode);
-		}
-	}
+	mode = typeof mode != 'object' ? mode ? { mode }: {}: mode || {};
+	mode.recursive = true;
+	fs.mkdirSync(fb(path), mode);
 }
 
 export interface StatsDescribe extends fs.Stats {
@@ -677,7 +649,7 @@ export function list(
 	depth?: boolean | EachDirectoryCallback,
 	each_cb?: EachDirectoryCallback): Promise<StatsDescribe[]>
 {
-	path = Path.resolve(path);
+	path = Path.resolve(fb(path));
 
 	if (typeof depth == 'function') {
 		each_cb = depth;
@@ -714,7 +686,7 @@ export function list(
 	* get dir info
 	*/
 export function listSync(path: string, depth?: boolean | EachDirectoryCallback, each_cb?: EachDirectoryCallback) {
-	path = Path.resolve(path);
+	path = Path.resolve(fb(path));
 
 	if (typeof depth == 'function') {
 		each_cb = depth;

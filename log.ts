@@ -31,8 +31,10 @@
 import utils from './util';
 import path from './path';
 import { Notification } from './event';
+import path2 from './path';
 
 const { haveNode, haveFlare, haveWeb } = utils;
+const fb = path2.fallbackPath;
 
 if (haveFlare) {
 	var fs = __require__('_fs');
@@ -103,20 +105,20 @@ export class Console extends Notification {
 				this.m_fd = 0;
 			} else {
 				var now = new Date();
-				fs.mkdirpSync(path.dirname(this.m_pathname));
+				fs.mkdirpSync(fb(path.dirname(this.m_pathname)));
 				if (this.m_fd) {
 					var format = 'yyyyMMddhhmmss';
 					fs.closeSync(this.m_fd);
 					if (cut) {
 						try {
-							fs.renameSync(this.m_pathname, `${this.m_pathname}-${this.m_fd_open_time.toString(format)}-${now.toString(format)}`);
+							fs.renameSync(fb(this.m_pathname), fb(`${this.m_pathname}-${this.m_fd_open_time.toString(format)}-${now.toString(format)}`));
 						} catch(err) {
 							console.error(err);
 						}
 					}
 					this.m_fd = 0;
 				}
-				this.m_fd = fs.openSync(this.m_pathname, 'a');
+				this.m_fd = fs.openSync(fb(this.m_pathname), 'a');
 				this.m_fd_open_time = now;
 			}
 		} else {

@@ -83,7 +83,7 @@ if (haveFlare) {
 }
 
 const fallbackPath = win32 ? function(url: string) {
-	return url.replace(/^file:\/\/(\/([a-z]:))?/i, '$3').replace(/\//g, '\\');
+	return url.replace(/^file:\/\//i, '').replace(/^\/([a-z]:)?/i, '$1').replace(/\//g, '\\');
 } : function(url: string) {
 	return url.replace(/^file:\/\//i, '');
 };
