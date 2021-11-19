@@ -28,14 +28,14 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import buffer,{IB} from 'somes/buffer';
-import {URL} from 'somes/path';
+import buffer,{IB} from './buffer';
+import {URL} from './path';
 import * as http2 from 'http2';
 import {
 	Options,Result,defaultOptions,
 	userAgent,querystringStringify,stringifyXml, Request
 } from './request';
-import somes from 'somes';
+import somes from './util';
 import errno from './errno';
 
 export function http2request(session: http2.ClientHttp2Session, url: string, opts?: Options): Promise<Result<IB>> {

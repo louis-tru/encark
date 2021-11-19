@@ -164,8 +164,7 @@ export class WSClient extends Notification implements conv.MessageHandle {
 			} else if (msg.isEvent()) {
 				// console.log('CLI Event receive', name);
 				try {
-					var evt = new Event(data||{});
-					evt.origin = sender || '';
+					var evt = new Event(data||{}, sender || '');
 					this.triggerWithEvent(name, evt); // TODO
 				} catch(err) {
 					console.error(err);

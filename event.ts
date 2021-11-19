@@ -61,19 +61,18 @@ export declare class List<T> {
 /**
 	* @class Event
 	*/
-export declare class Event<Data, Sender extends object = object> {
+export declare class Event<Sender = any, Data = any, Origin = any> {
 	private _data;
-	protected _noticer: EventNoticer<Event<Data, Sender>> | null;
+	protected _noticer: EventNoticer<Event<Data, Sender, Origin>> | null;
 	private _origin;
 	get name(): string;
 	get data(): Data;
 	get sender(): Sender;
-	get origin(): any;
-	set origin(value: any);
-	get noticer(): EventNoticer<Event<Data, Sender>> | null;
-	constructor(data: Data);
+	get origin(): Origin;
+	get noticer(): EventNoticer<Event<Sender, Data, Origin>> | null;
+	constructor(data: Data, origin?: Origin);
 }
-declare type DefaultEvent = Event<any>;
+declare type DefaultEvent = Event;
 export interface Listen<Event = DefaultEvent, Scope extends object = object> {
 	(this: Scope, evt: Event): any;
 }
@@ -103,7 +102,7 @@ export declare class EventNoticer<E = DefaultEvent> {
 	/**
 	 * @get {Object} # 事件发送者
 	 */
-	get sender(): object;
+	get sender(): any;
 	/**
 	 *
 	 * @get {int} # 添加的事件侦听数量
