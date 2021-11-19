@@ -194,11 +194,13 @@ export class List<T> {
 	*/
 export class Event<Sender = any, Data = any, Origin = any> {
 	private _data: Data;
-	protected _noticer: any; //EventNoticer<Event<Data, Sender>> | null; // = null;
+	protected _noticer: any; //EventNoticer<Event<Sender, Data, Origin>> | null; // = null;
 	private _origin: any; // = null;
 
+	returnValue: number = 0;
+
 	get name() {
-		return (this._noticer as EventNoticer<Event<Data, Sender, Origin>>).name;
+		return (this._noticer as EventNoticer<Event<Sender, Data, Origin>>).name;
 	}
 
 	get data () {
@@ -440,7 +442,7 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @arg data {Object} # 要发送的数据
 	 */
 	trigger(data?: any) {
-		this.triggerWithEvent(new Event(data) as unknown as E);
+		this.triggerWithEvent(new Event(data, this.m_sender) as unknown as E);
 	}
 
 	/**

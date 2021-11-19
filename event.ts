@@ -63,8 +63,9 @@ export declare class List<T> {
 	*/
 export declare class Event<Sender = any, Data = any, Origin = any> {
 	private _data;
-	protected _noticer: EventNoticer<Event<Data, Sender, Origin>> | null;
+	protected _noticer: EventNoticer<Event<Sender, Data, Origin>> | null;
 	private _origin;
+	returnValue: number;
 	get name(): string;
 	get data(): Data;
 	get sender(): Sender;
