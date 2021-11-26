@@ -83,11 +83,11 @@ export class PacketParser {
 	private currentMessage: IBuffer[] | string | null = null;
 
 	readonly onClose = new EventNoticer('Close', this);
-	readonly onText = new EventNoticer<Event<string>>('Text', this);
-	readonly onData = new EventNoticer<Event<IBuffer>>('Data', this);
-	readonly onError = new EventNoticer<Event<Error>>('Error', this);
-	readonly onPing = new EventNoticer('Ping', this);
-	readonly onPong = new EventNoticer('Pong', this);
+	readonly onText = new EventNoticer<Event<PacketParser, string>>('Text', this);
+	readonly onData = new EventNoticer<Event<PacketParser, IBuffer>>('Data', this);
+	readonly onError = new EventNoticer<Event<PacketParser, Error>>('Error', this);
+	readonly onPing = new EventNoticer<Event<PacketParser>>('Ping', this);
+	readonly onPong = new EventNoticer<Event<PacketParser>>('Pong', this);
 
 	private opcodeHandlers: { [opcode: string]: (data: IBuffer)=>void } = {
 		'1': (data: IBuffer)=>{ // text

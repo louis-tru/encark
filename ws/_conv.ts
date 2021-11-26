@@ -54,8 +54,8 @@ export abstract class ConversationBasic {
 
 	readonly onClose = new EventNoticer('Close', this);
 	readonly onOpen = new EventNoticer('Open', this);
-	readonly onPing = new EventNoticer<Event<IBuffer>>('Ping', this);
-	readonly onPong = new EventNoticer<Event<IBuffer>>('Pong', this);
+	readonly onPing = new EventNoticer<Event<ConversationBasic, IBuffer>>('Ping', this);
+	readonly onPong = new EventNoticer<Event<ConversationBasic, IBuffer>>('Pong', this);
 	readonly onDrain = new EventNoticer('Drain', this);
 	readonly onOverflow = new EventNoticer('Overflow', this);
 

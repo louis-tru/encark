@@ -3,12 +3,12 @@
 
 import event, {EventNoticer,Event} from './event'
 
-function Hacker<Data = any, Sender extends object = object>(): EventNoticer<Event<Data, Sender>> {
+function Hacker<Sender extends object = object, Data = any>(): EventNoticer<Event<Sender, Data>> {
 	return null as any;
 }
 
 export default class A {
-	@event onAA: EventNoticer<Event<number>> = new EventNoticer<Event<number>>('AA', {});
+	@event onAA: EventNoticer<Event<any, number>> = new EventNoticer<Event<any, number>>('AA', {});
 }
 
 var a = new A();

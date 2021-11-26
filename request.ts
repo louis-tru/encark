@@ -219,6 +219,7 @@ function requestWeb(
 	xhr.timeout = soptions.timeout;
 
 	delete soptions.headers['User-Agent'];
+	delete soptions.headers['Host'];
 
 	for (var key in soptions.headers) {
 		xhr.setRequestHeader(key, soptions.headers[key]);

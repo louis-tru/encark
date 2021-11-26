@@ -260,8 +260,8 @@ export abstract class Server extends Notification {
 		return this.m_server;
 	}
 
-	readonly onWSConversationOpen = new EventNoticer<Event<_conv.ConversationBasic>>('WSConversationOpen', this);
-	readonly onWSConversationClose = new EventNoticer<Event<_conv.ConversationBasic>>('WSConversationClose', this);
+	readonly onWSConversationOpen = new EventNoticer<Event<Server, _conv.ConversationBasic>>('WSConversationOpen', this);
+	readonly onWSConversationClose = new EventNoticer<Event<Server, _conv.ConversationBasic>>('WSConversationClose', this);
 
 	/**
 	 * 构造函数

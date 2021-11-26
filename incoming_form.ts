@@ -480,8 +480,8 @@ class Part {
 	mime = ''
 	headerField = ''
 	headerValue = ''
-	readonly onData = new EventNoticer<Event<Buffer>>('Data', this);
-	readonly onEnd = new EventNoticer('End', this);
+	readonly onData = new EventNoticer<Event<Part, Buffer>>('Data', this);
+	readonly onEnd = new EventNoticer<Event<Part>>('End', this);
 }
 
 // ----------------------- IncomingForm -----------------------

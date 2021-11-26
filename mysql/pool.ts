@@ -237,9 +237,9 @@ export class Connection {
 	 * @type {Object}
 	 */
 	readonly options: Options;
-	readonly onError = new EventNoticer<Event<Error>>('Error', this);
-	readonly onPacket = new EventNoticer<Event<Packet>>('Packet', this);
-	private readonly _onReady = new EventNoticer<Event<void>>('_Ready', this);
+	readonly onError = new EventNoticer<Event<Connection, Error>>('Error', this);
+	readonly onPacket = new EventNoticer<Event<Connection, Packet>>('Packet', this);
+	private readonly _onReady = new EventNoticer<Event<Connection, void>>('_Ready', this);
 
 	/**
 	 * @constructor

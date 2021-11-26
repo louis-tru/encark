@@ -178,7 +178,7 @@ export class Parser {
 	/**
 	 * @event onpacket
 	 */
-	readonly onPacket = new EventNoticer<Event<Packet>>('Packet', this);
+	readonly onPacket = new EventNoticer<Event<Parser, Packet>>('Packet', this);
 
 	private _advance(newState?: Constants) {
 		this._state = newState === undefined ? this._state + 1 : newState;

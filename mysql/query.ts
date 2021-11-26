@@ -81,11 +81,11 @@ export class Query {
 	private _rowIndex: number = 0;
 	private _row?: Dict;
 	readonly sql: string;
-	readonly onError = new EventNoticer<Event<Error>>('Error', this);
-	readonly onResolve = new EventNoticer<Event<PacketData | null>>('Resolve', this);
-	readonly onField = new EventNoticer<Event<Field>>('Field', this);
-	readonly onRow = new EventNoticer<Event<Dict>>('Row', this);
-	readonly onEnd = new EventNoticer<Event<void>>('End', this);
+	readonly onError = new EventNoticer<Event<Query, Error>>('Error', this);
+	readonly onResolve = new EventNoticer<Event<Query, PacketData | null>>('Resolve', this);
+	readonly onField = new EventNoticer<Event<Query, Field>>('Field', this);
+	readonly onRow = new EventNoticer<Event<Query, Dict>>('Row', this);
+	readonly onEnd = new EventNoticer<Event<Query, void>>('End', this);
 
 	constructor(sql: string) {
 		this.sql = sql;
