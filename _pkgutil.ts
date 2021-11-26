@@ -154,7 +154,11 @@ function resolve(...args: string[]) {
 				prefix = PREFIX + mat[2] + '/';
 				path = path.substr(2);
 			} else {
-				prefix = PREFIX; //'file:///';
+				if (haveWeb) {
+					prefix = origin + '/';;
+				} else {
+					prefix = PREFIX; //'file:///';
+				}
 			}
 		} else {
 			if (mat[4]) { // local file protocol
@@ -184,7 +188,7 @@ function resolve(...args: string[]) {
 		}
 	}
 
-	var suffix = path.substr(path.length - 1) == '/' ? '/' : '';
+	var suffix = path.length > 1 && path.substr(path.length - 1) == '/' ? '/' : '';
 
 	path = resolvePathLevel(path);
 
