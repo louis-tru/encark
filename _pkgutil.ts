@@ -155,7 +155,7 @@ function resolve(...args: string[]) {
 				path = path.substr(2);
 			} else {
 				if (haveWeb) {
-					prefix = origin + '/';;
+					prefix = origin + '/';
 				} else {
 					prefix = PREFIX; //'file:///';
 				}
