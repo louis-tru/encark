@@ -736,7 +736,7 @@ export class MqttClient extends events.EventEmitter {
 
 		if (!subs.length) {
 			callback(undefined, []);
-			return;
+			return this;
 		}
 
 		// subscriptions to resubscribe to in case of disconnect
