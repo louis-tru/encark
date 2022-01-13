@@ -159,8 +159,8 @@ export class Storage implements IStorage {
 		if (haveWeb) {
 			var keys: any[] = [];
 			for (var i in this.m_value) {
-				if (i.substr(0, this.m_prefix.length) == this.m_prefix) {
-					keys.push(this.m_value);
+				if (i.substring(0, this.m_prefix.length) == this.m_prefix) {
+					keys.push(i);
 				}
 			}
 			for (var key of keys) {
