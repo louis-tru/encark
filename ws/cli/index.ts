@@ -39,26 +39,22 @@ export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 
 const print_log = false; // utils.debug
 
-class WSConversationIMPL extends conv.WSConversation {
-	initialize() {}
-	async send() {}
-	async ping() {}
-	async pong() {}
+declare class WSConversationIMPL extends conv.WSConversation {
+	initialize(): Promise<void>;
+	send(): Promise<void>;
+	ping(): Promise<void>;
+	pong(): Promise<void>;
 }
-
-interface WSConversationConstructor {
-	new(path: string): WSConversationIMPL;
-}
-
-export var WSConversation: WSConversationConstructor;
 
 if (utils.haveWeb) {
-	WSConversation = require('./conv_web').default;
+	var conv_impl = require('./conv_web').default;
 } else if (utils.haveNode) {
-	WSConversation = require('./conv_node').default;
+	var conv_impl = require('./conv_web').default;
 } else {
 	throw new Error('Unimplementation');
 }
+
+export class WSConversation extends (conv_impl as typeof WSConversationIMPL) {}
 
 interface CallData extends Data {
 	ok(e: any): void;

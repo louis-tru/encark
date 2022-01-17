@@ -183,7 +183,7 @@ class WSConversation2 extends WSConversation {
  */
 export default class APIStore extends Notification {
 	private m_name: string;
-	private m_conv: WSConversation2 | null = null;
+	private m_conv: WSConversation | null = null;
 	private m_req: Request2 | null = null;
 	private m_descriptors: Dict<Descriptors> = {};
 	private m_timeoutid = 0;
@@ -213,6 +213,10 @@ export default class APIStore extends Notification {
 		this.m_name = name;
 	}
 
+	get conv() {
+		return this.m_conv;
+	}
+
 	private _getWssocketConv() {
 		var self = this;
 		if (self.m_conv) {
@@ -225,16 +229,7 @@ export default class APIStore extends Notification {
 			conv.signer = self.m_signer;
 		conv.onClose.on(()=>console.error('Connection accidental disconnection'));
 		conv.keepAliveTime = 5e3; // 5s;
-		// disconnect auto connect
-		conv.onClose.on(()=>{
-			if (this.m_isLoaded)
-				utils.sleep(50).then(()=>conv.connect());
-		});
-		conv.onError.on(()=>{
-			if (this.m_isLoaded)
-				utils.sleep(50).then(()=>conv.connect());
-		});
-	
+		conv.autoReconnect = 50; // 50ms
 		return self.m_conv;
 	}
 

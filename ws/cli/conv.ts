@@ -58,7 +58,7 @@ export abstract class WSConversation extends ConversationBasic {
 	}
 
 	set autoReconnect(value: number) {
-		this.m_autoReconnect = Math.min(Math.max(0, Number(value) || 0), 5e3);
+		this.m_autoReconnect = Math.min(Math.max(0, Number(value) || 0), 6e4/*60s*/);
 	}
 
 	get keepAliveTime() {
