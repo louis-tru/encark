@@ -568,7 +568,7 @@ definePropertys(Error, {
 			err = new Error(String(arg));
 			Error.captureStackTrace(err, Error.new);
 		}
-		err.errno = Number(err.errno) || -30000;
+		err.errno = Number(err.errno) || Number(err.code) || -30000;
 
 		if (child.length) {
 			if (!Array.isArray(err.child))
