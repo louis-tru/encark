@@ -92,7 +92,7 @@ function on_error_default(data: Buffer): string {
 	return data.toString('utf8');
 }
 
-export interface SpawnOptions {
+export interface SpawnOptions extends child_process.SpawnOptions {
 	onData?: (data: Buffer)=>string;
 	onError?: (data: Buffer)=>string;
 	stdout?: stream.Writable;
@@ -120,13 +120,15 @@ export function spawn(cmd: string, args: string[] = [], options: SpawnOptions = 
 		onData = on_data_default,
 		onError = on_error_default,
 		stdout, stderr, stdin,
+		..._opts
 	} = options;
 
 	stdout = stdout instanceof stream.Writable ? stdout: undefined;
 	stderr = stderr instanceof stream.Writable ? stderr: undefined;
 	stdin = stdin instanceof stream.Readable ? stdin: undefined;
 
-	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> = child_process.spawn(cmd, args);
+	var ch: child_process.ChildProcessByStdio<stream.Writable, stream.Readable, stream.Readable> = 
+		child_process.spawn(cmd, args, _opts as child_process.SpawnOptionsWithoutStdio);
 
 	var promise = new Promise<SpawnResult>(function(resolve, reject) {
 		var r_stdout: string[] = [];
