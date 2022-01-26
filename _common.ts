@@ -272,6 +272,18 @@ export function filter(obj: any, exp: string[] | ((key: string, value: any)=>boo
 	return rev;
 }
 
+Object.defineProperty(Error.prototype, 'filter', {
+	enumerable: false,
+	value: function(this: Error, keys: string[], keys2?: string[]) {
+		var results = [] as any[];
+		for (var i of keys) {
+			results.push(this[i]);
+		}
+		results.push(filter(this, keys2 || keys, true));
+		return results;
+	}
+});
+
 /**
  * @fun update # update object property value
  * @arg obj {Object}      #        need to be updated for as

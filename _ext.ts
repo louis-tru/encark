@@ -222,6 +222,7 @@ interface Error {
 	child?: Error[];
 	[prop: string]: any;
 	ext: (desc: ErrorDescribe)=>this;
+	filter(keys: string[], keys2?: string[]): any[];
 }
 
 declare function setTimeout<A extends any[]>(cb: (...args: A)=>void, timeout?: number, ...args: A): TimeoutResult;
@@ -595,6 +596,10 @@ definePropertys(Error.prototype, {
 	ext(desc: ErrorDescribe) {
 		Object.assign(this, desc);
 		return this;
+	},
+
+	filter(this: Error, keys: string[], keys2?: string[]) {
+		return Object.values(this);
 	},
 
 	hashCode(): number {
