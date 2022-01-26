@@ -188,7 +188,7 @@ export class Console extends Notification {
 	}
 
 	warn(msg: any, ...args: any[]) {
-		return this._print('WARN', 'color: #777700; background: #eeff00', log, msg, ...args);
+		return this._print('WARN', 'color: #a89d7f; background: #fffbe9', log, msg, ...args);
 	}
 
 	error(msg: any, ...args: any[]) {
