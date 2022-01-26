@@ -157,7 +157,9 @@ export class Mysql implements Database {
 				self._exec();
 			} else {
 				self._connecting = false;
-				connection?.idle();
+				if (connection) {
+					connection.idle();
+				}
 			}
 		});
 	}

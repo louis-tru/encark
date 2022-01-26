@@ -69,7 +69,7 @@ export class List<T> {
 		return this._length;
 	}
 
-	del(item: ListItem<T>) {
+	delete(item: ListItem<T>) {
 		if ( item.host === this ) {
 			var prev = item.prev;
 			var next = item.next;
@@ -240,7 +240,7 @@ export interface Listen2<Event = DefaultEvent, Scope extends object = object> {
 
 interface ListenItem {
 	origin: any,
-	listen: Function | null,
+	listen: Function,
 	scope: any,
 	id: string,
 }
@@ -273,7 +273,7 @@ export class EventNoticer<E = DefaultEvent> {
 	private m_sender: any;
 	private m_listens: List<ListenItem> | null = null;
 	private m_listens_map: Map<string, ListItem<ListenItem>> | null = null
-	private m_length: number = 0
+	// private m_length: number = 0
 	private m_enable: boolean = true
 
 	/* @fun add # Add event listen */
@@ -307,8 +307,7 @@ export class EventNoticer<E = DefaultEvent> {
 		if ( item ) { // replace
 			item.value = value;
 		} else { // add
-			listens_map.set(id, (<List<ListenItem>>self.m_listens).push(value));
-			self.m_length++;
+			listens_map.set(id, (self.m_listens as List<ListenItem>).push(value));
 		}
 
 		return id;
@@ -347,7 +346,7 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @get {int} # 添加的事件侦听数量
 	 */
 	get length () {
-		return this.m_length;
+		return this.m_listens ? this.m_listens.length: 0;
 	}
 	
 	/**
@@ -450,18 +449,15 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @arg evt {Object} 要发送的event
 	 */
 	triggerWithEvent(evt: E) {
-		if ( this.m_enable && this.m_length ) {
+		if ( this.m_enable && this.m_listens ) {
 			(evt as any)._noticer = this;
 			var listens = this.m_listens as List<ListenItem>;
 			var item = listens.first;
 			while ( item ) {
-				var value = item.value;
-				if ( value.listen ) {
-					value.listen.call(value.scope, evt);
-					item = item.next;
-				} else {
-					item = listens.del(item);
-				}
+				var next = item.next;
+				var {listen,scope} = item.value;
+				listen.call(scope, evt);
+				item = next;
 			}
 			(evt as any)._noticer = null;
 		}
@@ -473,85 +469,75 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @arg [scope] {Object}  # scope
 	 */
 	off(listen?: string | Function | object, scope?: object): number {
-		if ( !this.m_length ) {
+		if ( !this.m_listens ) {
 			return 0;
 		}
 		var r = 0;
 		if (listen) {
 			if ( typeof listen == 'string' ) { // by id delete 
 				var name = String(listen);
-				let listens_map = <Map<string, ListItem<ListenItem>>>this.m_listens_map;
+				let listens = this.m_listens as List<ListenItem>;
+				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens_map.get(name);
 				if ( item ) {
-					this.m_length--;
+					listens.delete(item);
 					listens_map.delete(name);
-					item.value.listen = null; // clear
 					r++;
 				}
 			} else if ( listen instanceof Function ) { // 要卸载是一个函数
-				let listens = <List<ListenItem>>this.m_listens;
-				let listens_map = <Map<string, ListItem<ListenItem>>>this.m_listens_map;
+				let listens = this.m_listens as List<ListenItem>;
+				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens.first;
 				if (scope) { // 需比较范围
 					while ( item ) {
+						let next = item.next;
 						let value = item.value;
-						if ( value.listen ) {
-							if ( value.origin === listen && value.scope === scope ) {
-								this.m_length--;
-								listens_map.delete(value.id);
-								item.value.listen = null;
-								r++;
-								break; // clear
-							}
+						if ( value.origin === listen && value.scope === scope ) {
+							listens.delete(item);
+							listens_map.delete(value.id);
+							r++;
+							break; // clear
 						}
-						item = item.next;
+						item = next;
 					}
 				} else { // 与这个函数有关系的
-					let listens_map = <Map<string, ListItem<ListenItem>>>this.m_listens_map;
+					let listens = this.m_listens as List<ListenItem>;
+					let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 					while ( item ) {
+						let next = item.next;
 						let value = item.value;
-						if ( value.listen ) {
-							if ( value.origin === listen ) {
-								this.m_length--;
-								listens_map.delete(value.id);
-								item.value.listen = null;
-								r++;
-								break; // clear
-							}
+						if ( value.origin === listen ) {
+							listens.delete(item);
+							listens_map.delete(value.id);
+							r++;
+							break; // clear
 						}
-						item = item.next;
+						item = next;
 					}
 				}
 			} else if ( listen instanceof Object ) { //
-				let listens = <List<ListenItem>>this.m_listens;
-				let listens_map = <Map<string, ListItem<ListenItem>>>this.m_listens_map;
+				let listens = this.m_listens as List<ListenItem>;
+				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens.first;
 				// 要卸载这个范围上相关的侦听器,包括`EventNoticer`代理
 				while ( item ) {
+					var next = item.next;
 					var value = item.value;
-					if ( value.listen ) {
-						if ( value.scope === listen ) {
-							this.m_length--;
-							listens_map.delete(value.id);
-							item.value.listen = null; // break; // clear
-							r++;
-						}
+					if ( value.scope === listen ) {
+						listens.delete(item);
+						listens_map.delete(value.id);
+						r++;
 					}
-					item = item.next;
+					item = next;
 				}
 			} else { //
 				throw new Error('Bad argument.');
 			}
 		} else { // 全部删除
-			let listens = <List<ListenItem>>this.m_listens;
-			let item = listens.first;
-			while ( item ) {
-				item.value.listen = null; // clear
-				item = item.next;
-				r++;
-			}
-			this.m_length = 0;
-			this.m_listens_map = new Map<string, ListItem<ListenItem>>();
+			let listens = this.m_listens as List<ListenItem>;
+			let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
+			listens.clear();
+			listens_map.clear();
 		}
 		return r;
 	}
