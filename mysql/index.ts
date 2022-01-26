@@ -83,7 +83,7 @@ export class Mysql implements Database {
 			try {
 				connection.idle();
 			} catch(err) {
-				console.error(err);
+				console.warn(err);
 			}
 		} else if (self._connecting) {
 			self._connecting = false;
@@ -101,7 +101,7 @@ export class Mysql implements Database {
 		} else {
 			self.onError.trigger(err);
 			self._dequeue();
-			console.error(err);
+			console.warn(err);
 		}
 	}
 
@@ -116,7 +116,7 @@ export class Mysql implements Database {
 		} else {
 			if (packet.type === Constants.ERROR_PACKET) {
 				self.onError.trigger(packet.toJSON() as Error);
-				console.error(packet);
+				console.warn(packet);
 			}
 			self._dequeue();
 		}

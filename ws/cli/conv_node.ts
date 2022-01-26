@@ -169,7 +169,7 @@ export default class NodeConversation extends WSConversation {
 					socket.end();
 				socket.destroy();
 			} catch(err) {
-				console.error(err);
+				console.warn('NodeConversation#close', err);
 			}
 		} else {
 			if (this.m_req) {

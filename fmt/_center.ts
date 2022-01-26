@@ -205,9 +205,9 @@ export class FastMessageTransferCenter_IMPL {
 							if (cfg.retry >= 10 && !cfg.init) { // retry 10 count
 								delete this.m_fnodesCfg[cfg.url];
 							}
-							console.error(err);
+							console.warn('FastMessageTransferCenter_IMPL#run#1', err);
 						} else {
-							console.warn(err);
+							console.warn('FastMessageTransferCenter_IMPL#run#2', err);
 						}
 					});
 				}
@@ -220,7 +220,7 @@ export class FastMessageTransferCenter_IMPL {
 			try {
 				await node.destroy();
 			} catch(err) {
-				console.error(err);
+				console.warn('FastMessageTransferCenter_IMPL#run#3', err);
 			}
 		}
 		this.m_fnodes = {};
@@ -231,9 +231,9 @@ export class FastMessageTransferCenter_IMPL {
 			return;
 		try {
 			this.m_connecting.add(fNodePublishURL);
-			console.log('FastMessageTransferCenter_IMPL.connect', fNodePublishURL);
+			console.log('FastMessageTransferCenter_IMPL#connect#1', fNodePublishURL);
 			await (new fnode.FNodeRemoteClient(this, fNodePublishURL))._init();
-			console.log('FastMessageTransferCenter_IMPL, connect ok');
+			console.log('FastMessageTransferCenter_IMPL#connect#2', 'connect ok');
 		} finally {
 			this.m_connecting.delete(fNodePublishURL);
 		}

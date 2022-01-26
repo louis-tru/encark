@@ -149,7 +149,7 @@ export class Service {
 						_headers[key.toLowerCase()] = String(value);
 				}
 			} catch(e) {
-				console.error(e);
+				console.warn('Service#headers', e);
 			}
 			this.m_headers = { ...this.request.headers, ..._headers };
 		}

@@ -464,7 +464,7 @@ class DOMHandler {
 		this.saxExceptions.push(Error.new(error));
 	}
 	fatalError(error: Error) {
-		console.error(error);
+		console.warn('DOMHandler#fatalError', error);
 		throw error;
 	}
 	endEntityReference = noop

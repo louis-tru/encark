@@ -73,7 +73,7 @@ class WSClient extends cli.WSClient {
 				var events = [];
 				for (var i of (<any>host).m_subscribe)
 					events.push(i);
-				this.call('subscribe', {events}).catch(console.error);
+				this.call('subscribe', {events}).catch(console.warn);
 			}
 		});
 

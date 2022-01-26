@@ -112,7 +112,7 @@ class QuerystringParser implements Parser {
 				try {
 					data = parseJSON(buffer);
 				} catch(err) {
-					console.error(buffer, err);
+					console.warn('QuerystringParser#end', buffer, err);
 				}
 			}
 			this.onEnd(data);

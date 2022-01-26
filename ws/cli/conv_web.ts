@@ -111,7 +111,7 @@ export default class WebConversation extends WSConversation {
 			try {
 				req.close();
 			} catch(err) {
-				console.error(err);
+				console.warn('WebConversation#close', err);
 			}
 		}
 		super.close();

@@ -128,10 +128,10 @@ export abstract class ConversationBasic {
 			default:
 				var handle = this.m_handles[data.service || this.m_default_service];
 				if (handle) {
-					handle.receiveMessage(data).catch((e:any)=>console.error(e));
+					handle.receiveMessage(data).catch((e:any)=>console.warn(e));
 				} else {
-					console.error('Could not find the message handler, '+
-												'discarding the message, ' + data.service);
+					console.log('Could not find the message handler, '+
+											'discarding the message, ' + data.service);
 				}
 		}
 	}
@@ -139,7 +139,7 @@ export abstract class ConversationBasic {
 	handlePing(data: IBuffer) {
 		this.m_last_packet_time = Date.now();
 		if (this.replyPong)
-			this.pong().catch(console.error);
+			this.pong().catch(console.warn);
 		this.onPing.trigger(data);
 	}
 

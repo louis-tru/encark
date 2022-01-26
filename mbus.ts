@@ -68,7 +68,7 @@ export class NotificationCenter extends Notification {
 		cli.on('connect', e=>console.log(`MQTT, ${msg}, connect`));
 		cli.on('close', e=>console.log(`MQTT, ${msg}, close`));
 		cli.on('offline', e=>console.log(`MQTT, ${msg}, offline`));
-		cli.on('error', e=>console.error(`MQTT, ${msg}, ${e}`));
+		cli.on('error', e=>console.warn(`MQTT, ${msg}, ${e}`));
 
 		this.m_topic = topic;
 		this.m_mqtt = cli

@@ -48,7 +48,7 @@ function each_directory(root: string, dir: string, cb: Callback) {
 		try {
 			stat = fs.lstatSync(root + '/' + pathname);
 		} catch(e: any) {
-			console.error(e.message);
+			console.warn('sync_watch#each_directory', e);
 			return;
 		}
 		if (!stat.isSymbolicLink()) {

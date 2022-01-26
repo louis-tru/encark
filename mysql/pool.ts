@@ -145,7 +145,7 @@ function watch() {
 			try {
 				_Watch();
 			} catch(err) {
-				console.error(err);
+				console.warn(err);
 			}
 		});
 	}

@@ -170,7 +170,7 @@ export class HttpService extends StaticService {
 			try {
 				auth = await self.auth(info);
 			} catch(e) {
-				console.error(e);
+				console.warn('HttpService#action#1', 'auth error', e);
 			}
 
 			if (!auth) {
@@ -189,10 +189,10 @@ export class HttpService extends StaticService {
 			if (!self.isCompleteResponse || err) {
 				if (err) {
 					if (self.server.printLog) {
-						console.error(err);
+						console.warn('HttpService#action#2', err);
 					}
 					if (self.isCompleteResponse) {
-						console.error('Unexpected exception??', err);
+						console.warn('HttpService#action#3', err);
 						(self as any).m_markCompleteResponse = false;
 					}
 					self.returnError(err);

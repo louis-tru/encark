@@ -163,7 +163,7 @@ export class WSClient extends Notification implements conv.MessageHandle {
 					var evt = new Event(data||{}, sender || '');
 					this.triggerWithEvent(name, evt); // TODO
 				} catch(err) {
-					console.error(err);
+					console.warn('WSClient#receiveMessage', err);
 				}
 			} else {
 				return;

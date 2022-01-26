@@ -42,7 +42,7 @@ export default {
 	get debug() { return _pkgutil.debug },
 	// events
 	get onBeforeExit(): EventNoticer<Event<any, number>> { return _process.getNoticer('BeforeExit') },
-	get onExit(): EventNoticer<Event<any, number>> { return _process.getNoticer('BeforeExit') },
+	get onExit(): EventNoticer<Event<any, number>> { return _process.getNoticer('Exit') },
 	get onUncaughtException(): EventNoticer<Event<any, Error>> { return _process.getNoticer('UncaughtException') },
 	get onUnhandledRejection(): EventNoticer<Event<any, {reason: Error, promise: Promise<any>}>> { return _process.getNoticer('UnhandledRejection') },
 }

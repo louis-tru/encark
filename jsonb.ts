@@ -367,7 +367,7 @@ function read_bigint(bin: Binary): bigint | number {
 	if (  _buffer.isBigInt ) {
 		return _buffer.readBigUIntBE(bytes, 0, bytes.length);
 	} else { // not support bigint
-		console.warn('Not support bigint');
+		console.log('Not support bigint');
 		var num = 0;
 		for (var byte of bytes) {
 			num *= 256;

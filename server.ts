@@ -63,7 +63,7 @@ export class ServerIMPL extends Server {
 
 			if (cls) {
 				if (!util.equalsClass(StaticService, cls)) {
-					console.error(name + ' not the correct type, http request');
+					console.warn('ServerIMPL#initializ#2', name + ' not the correct type, http request');
 					cls = StaticService;
 				}
 			} else {
@@ -82,7 +82,7 @@ export class ServerIMPL extends Server {
 					return req.socket.destroy();
 				}
 			} catch(err) {
-				console.error(err);
+				console.warn('ServerIMPL#initializ#2', err);
 				return req.socket.destroy();
 			}
 
@@ -100,7 +100,7 @@ export class ServerIMPL extends Server {
 		});
 		
 		server.on('error', (err: any)=>{
-			console.log(err);
+			console.log('ServerIMPL#initializ#3', err);
 			console.log('Server Error ---------------');
 		});
 

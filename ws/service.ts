@@ -136,7 +136,7 @@ export class WSService extends Service implements conv.MessageHandle {
 				try {
 					this.trigger(name, data);
 				} catch(err) {
-					console.error(err);
+					console.warn(err);
 				}
 			} */ else {
 				return;

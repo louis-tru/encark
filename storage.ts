@@ -50,7 +50,9 @@ if (haveWeb) {
 	var paese_value = function(val: any): any {
 		try { 
 			return JSON.parse(val);
-		} catch(e) { console.warn(e) }
+		} catch(e) {
+			console.warn('somes#storage#paese_value', e);
+		}
 		return null;
 	};
 

@@ -166,15 +166,15 @@ export class WSConversation extends ConversationBasic  {
 		var upgrade = req.headers.upgrade;
 
 		if (!upgrade || upgrade.toLowerCase() !== 'websocket') {
-			console.error('connection invalid');
+			console.warn('connection invalid');
 			return false;
 		}
 		if (!this.verifyOrigin(origin)) {
-			console.error('connection invalid: origin mismatch');
+			console.warn('connection invalid: origin mismatch');
 			return false;
 		}
 		if (!key) {
-			console.error('connection invalid: received no key');
+			console.warn('connection invalid: received no key');
 			return false;
 		}
 
@@ -261,7 +261,7 @@ export class WSConversation extends ConversationBasic  {
 			self.m_services_count++;
 
 			await utils.sleep(200); // TODO 在同一个node进程中同时开启多个服务时socket无法写入
-			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.error(e));
+			ser._trigger('Load', {token:this.token}).catch((e: any)=>console.warn(e));
 
 			console.log('SER Load', this.request.url, this.m_token);
 		}
@@ -300,7 +300,7 @@ export class WSConversation extends ConversationBasic  {
 					socket.end();
 				socket.destroy();
 			} catch(err) {
-				console.error(err);
+				console.warn('WSConversation#close', err);
 			}
 			this.onClose.trigger({});
 			console.log('Hybi Conversation Close', this.m_token);

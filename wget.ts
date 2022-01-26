@@ -303,7 +303,7 @@ export class WgetIMPL extends Promise<Result> {
 					try {
 						this._progress({ total: this._download_total, size: this._download_size, speed, data: chunk });
 					} catch(e) {
-						console.error(e);
+						console.warn('WgetIMPL#_request', e);
 					}
 
 					this._buffers.push(chunk);

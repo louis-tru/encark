@@ -98,7 +98,7 @@ function tryReturnDirectory(self: StaticService, filename: string) {
 
 	fs.readdir(filename, function (err, files) {
 		if (err) {
-			console.log(err);
+			console.log('tryReturnDirectory#readdir', err);
 			return returnErrorStatus(self, 404);
 		}
 		for (var i = 0, name; (name = def[i]); i++) {
@@ -343,7 +343,7 @@ function _returnFile(self: StaticService, filename: string, stat: fs.Stats, mime
 	
 	fs.readFile(filename, function(err, data) {
 		if (err) {
-			console.error(err);
+			console.warn('tryReturnDirectory#readdir', err);
 			return returnErrorStatus(self, 404);
 		}
 		zlib.gzip(data, function (err, data) {        		//gzip
