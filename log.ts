@@ -99,6 +99,12 @@ export class Console extends Notification {
 		this.reopen();
 	}
 
+	private _Indent = true;
+
+	setIndent(indent: boolean) {
+		this._Indent = !!indent;
+	}
+
 	reopen(cut = false) {
 		if (this.m_pathname) {
 			if (haveWeb) {
@@ -131,7 +137,7 @@ export class Console extends Notification {
 
 		var args_str = args.map(e=>{
 			try {
-				return typeof e == 'object' ? JSON.stringify(e, null, 2): e;
+				return typeof e == 'object' ? this._Indent ? JSON.stringify(e, null, 2): JSON.stringify(e): e;
 			} catch(e) {
 				return e;
 			}
