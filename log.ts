@@ -127,14 +127,20 @@ export class Console extends Notification {
 	}
 
 	private _print(TAG: string, style: string, func: any, ...args: any[]) {
-		TAG += ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff');
-
+		args.unshift(TAG += ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
 		if (style) {
-			func.call(console, '%c' + TAG, style, ...args);
+			var _args = [];
+			for (var arg of args) {
+				if (typeof arg == 'object') {
+					_args.push(arg);
+				} else {
+					_args.push('%c' + arg, style);
+				}
+			}
+			func.call(console, ..._args);
 		} else {
-			func.call(console, TAG, ...args);
+			func.call(console, ...args);
 		}
-		args.unshift(TAG);
 
 		var args_str = args.map(e=>{
 			try {
