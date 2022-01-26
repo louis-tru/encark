@@ -126,18 +126,25 @@ export class Console extends Notification {
 		}
 	}
 
-	private _print(TAG: string, func: any, ...args: any[]) {
-		args.unshift(new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
+	private _print(TAG: string, style: string, func: any, ...args: any[]) {
+		TAG += ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff');
+
+		if (style) {
+			func.call(console, '%c' + TAG, style, ...args);
+		} else {
+			func.call(console, TAG, ...args);
+		}
 		args.unshift(TAG);
-		args = args.map(e=>{
+
+		var args_str = args.map(e=>{
 			try {
 				return typeof e == 'object' ? JSON.stringify(e, null, 2): e;
 			} catch(e) {
 				return e;
 			}
 		});
-		func.call(console, ...args);
-		var data = args.join(' ');
+
+		var data = args_str.join(' ');
 		if (this.m_fd) {
 			var cutTime = this.autoCutFileTime;
 			if (cutTime && Date.now() - this.m_fd_open_time.valueOf() > cutTime) {
@@ -178,23 +185,23 @@ export class Console extends Notification {
 	}
 
 	log(msg: any, ...args: any[]) {
-		return this._print('LOG', log, msg, ...args);
+		return this._print('LOG', '', log, msg, ...args);
 	}
 
 	warn(msg: any, ...args: any[]) {
-		return this._print('WARN', warn, msg, ...args);
+		return this._print('WARN', 'color: #888800; background: #ffff00', log, msg, ...args);
 	}
 
 	error(msg: any, ...args: any[]) {
-		return this._print('ERR', error, msg, ...args);
+		return this._print('ERR', '', error, msg, ...args);
 	}
 
 	dir(msg: any, ...args: any[]) {
-		return this._print('DIR', dir, msg, ...args);
+		return this._print('DIR', '', dir, msg, ...args);
 	}
 
 	print(tag: string, ...args: any[]) {
-		return this._print(tag, log, ...args);
+		return this._print(tag, '', log, ...args);
 	}
 
 	time(tag: string = '') {
