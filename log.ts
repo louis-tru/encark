@@ -127,20 +127,7 @@ export class Console extends Notification {
 	}
 
 	private _print(TAG: string, style: string, func: any, ...args: any[]) {
-		args.unshift(TAG += ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
-		if (style) {
-			var _args = [];
-			for (var arg of args) {
-				if (typeof arg == 'object') {
-					_args.push(arg);
-				} else {
-					_args.push('%c' + arg, style);
-				}
-			}
-			func.call(console, ..._args);
-		} else {
-			func.call(console, ...args);
-		}
+		args.unshift(TAG + ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
 
 		var args_str = args.map(e=>{
 			try {
@@ -149,8 +136,14 @@ export class Console extends Notification {
 				return e;
 			}
 		});
-
 		var data = args_str.join(' ');
+
+		if (style) {
+			func.call(console, '%c' + data, style);
+		} else {
+			func.call(console, ...args);
+		}
+
 		if (this.m_fd) {
 			var cutTime = this.autoCutFileTime;
 			if (cutTime && Date.now() - this.m_fd_open_time.valueOf() > cutTime) {
