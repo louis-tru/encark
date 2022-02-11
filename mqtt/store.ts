@@ -117,11 +117,10 @@ export default class Store {
 			}
 		}
 
-		stream.destroy = function () {
+		stream.destroy = function (this: Readable) {
 			if (destroyed) {
 				return
 			}
-
 			var self = this
 
 			destroyed = true
@@ -129,7 +128,7 @@ export default class Store {
 			process.nextTick(function () {
 				self.emit('close')
 			})
-		}
+		} as any;
 
 		return stream
 	}

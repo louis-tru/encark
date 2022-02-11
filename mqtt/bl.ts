@@ -126,7 +126,7 @@ export default class BufferList extends DuplexStream {
 		this.consume(size)
 	}
 	
-	end(chunk: any) {
+	end(chunk: any): any {
 		super.end(chunk);
 	
 		if (this._callback) {
@@ -269,7 +269,7 @@ export default class BufferList extends DuplexStream {
 		return copy;
 	}
 	
-	destroy() {
+	destroy(): any {
 		this._bufs.length = 0;
 		this.length = 0;
 		this.push(null);
