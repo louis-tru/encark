@@ -367,11 +367,11 @@ export function sleep<T = number>(time: number, defaultValue?: T): Promise<T> {
 	return new Promise((ok, err)=>setTimeout(()=>ok((defaultValue || 0) as any), time));
 }
 
-export function timeout<T>(promise: Promise<T> | T, time: number, otherErrorHandle?: (e: Error)=>void): Promise<T> {
+export function timeout<T>(promise: Promise<T> | T, time: number, timeoutAfterErrorHandle?: (e: Error)=>void): Promise<T> {
 	if (promise instanceof Promise) {
 		return new Promise(function(_resolve, _reject) {
 
-			var _error = otherErrorHandle || function(err: Error) {
+			var _error = timeoutAfterErrorHandle || function(err: Error) {
 				// console.warn('timeout otherErrorHandle? unhandled', err);
 				throw err;
 			};
