@@ -133,6 +133,7 @@ export default class BufferList extends DuplexStream {
 			this._callback(null, this.slice())
 			this._callback = null
 		}
+		return this;
 	}
 	
 	get(index: number) {
@@ -273,6 +274,7 @@ export default class BufferList extends DuplexStream {
 		this._bufs.length = 0;
 		this.length = 0;
 		this.push(null);
+		return this;
 	}
 
 	readDoubleBE(offset = 0) {
