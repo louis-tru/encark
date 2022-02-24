@@ -117,7 +117,7 @@ export default class Store {
 			}
 		}
 
-		stream.destroy = function () {
+		stream.destroy = function (this: Readable) {
 			if (!destroyed) {
 				var self = this
 
@@ -127,8 +127,9 @@ export default class Store {
 					self.emit('close')
 				});
 			}
+
 			return this;
-		}
+		} as any;
 
 		return stream
 	}

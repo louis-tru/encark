@@ -13,7 +13,7 @@
 		"build": "tsc && cp LICENSE *.md *.types *.json out/somes && node _.js"
 	},
 	"devDependencies": {
-		"@types/node": "~16.11.7"
+		"@types/node": "~14.14.22"
 	},
 	"keywords": [
 		"mysql",
