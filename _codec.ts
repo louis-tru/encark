@@ -30,7 +30,7 @@
 
 import utils from './util';
 import errno from './errno';
-import base_x, {Encoder} from './_base-x';
+import base_x, {Encoder} from './_base_x';
 
 type ArrayNumber = ArrayLike<number>;
 
@@ -306,6 +306,22 @@ function decodeHex(str: string): number[] {
 	return bytes;
 }
 
+function isHexString(str: string) {
+	if (str.length % 2 !== 0)
+		return false;
+	return /^[0-9a-f]+$/i.test(str);
+}
+
+function isBase64String(str: string) {
+	if (str.length % 4 !== 0)
+		return false;
+	return /^[0-9a-f\+\/\=]+$/i.test(str);
+}
+
+function isBase58String(str: string) {
+	return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/i.test(str);
+}
+
 // base64 string => bytes
 function decodeBase64(str: string): number[] {
 	var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
@@ -364,6 +380,10 @@ function convertBase58String(bytes: ArrayNumber) {
 }
 
 export default {
+	// is
+	isHexString,
+	isBase64String,
+	isBase58String,
 	// encode
 	encodeUTF8Word,
 	encodeUTF8,

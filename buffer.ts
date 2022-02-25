@@ -495,6 +495,9 @@ Object.defineProperty(IBufferIMPL.prototype, '__INTERFACE_IBuffer_TYPE__', {
 });
 
 export default {
+	isHexString: _codec.isHexString,
+	isBase64String: _codec.isBase64String,
+	isBase58String: _codec.isBase58String,
 	byteLength,
 	isInterfaceBuffer,
 	from,

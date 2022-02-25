@@ -31,7 +31,7 @@ export default function base(ALPHABET: string): Encoder {
 	const FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
 	const iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
 
-	function encode (source: ArrayLike<number>, start: number = 0, end: number = source.length): string {
+	function encode(source: ArrayLike<number>, start: number = 0, end: number = source.length): string {
 
 		start = Math.max(start, 0);
 		end = Math.min(end, source.length);
@@ -83,7 +83,7 @@ export default function base(ALPHABET: string): Encoder {
 		return str
 	}
 
-	function decodeUnsafe (source: string) {
+	function decodeUnsafe(source: string) {
 		if (typeof source !== 'string') throw new TypeError('Expected String')
 		if (source.length === 0) return new Uint8Array(0);
 
@@ -144,9 +144,10 @@ export default function base(ALPHABET: string): Encoder {
 		return vch
 	}
 
-	function decode (string: string) {
+	function decode(string: string) {
 		const buffer = decodeUnsafe(string)
-		if (buffer) return buffer
+		if (buffer)
+			return buffer;
 
 		throw new Error('Non-base' + BASE + ' character')
 	}
