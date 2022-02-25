@@ -118,16 +118,17 @@ export default class Store {
 		}
 
 		stream.destroy = function (this: Readable) {
-			if (destroyed) {
-				return
+			if (!destroyed) {
+				var self = this
+
+				destroyed = true
+
+				process.nextTick(function () {
+					self.emit('close')
+				});
 			}
-			var self = this
 
-			destroyed = true
-
-			process.nextTick(function () {
-				self.emit('close')
-			})
+			return this;
 		} as any;
 
 		return stream
