@@ -297,6 +297,15 @@ export class HttpService extends StaticService {
 	}
 
 	/**
+	 * @fun rev # return data to browser
+	 * @arg data {JSON}
+	 */
+	returnJSONNoWrap(data: any) {
+		this.setNoCache();
+		return returnJSON(this, data);
+	}
+
+	/**
 	 * @fun returnError() return error to browser
 	 * @arg [err] {Error} 
 	 */
