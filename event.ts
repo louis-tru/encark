@@ -51,6 +51,7 @@ export declare class List<T> {
 	get last(): ListItem<T> | null;
 	get length(): number;
 	del(item: ListItem<T>): ListItem<T> | null;
+	delete(item: ListItem<T>): ListItem<T> | null;
 	unshift(value: T): ListItem<T>;
 	push(value: T): ListItem<T>;
 	pop(): T | null;
@@ -235,7 +236,7 @@ export declare class Notification<E = DefaultEvent> {
 	triggerListenerChange(name: string, count: number, change: number): void;
 }
 export declare function event(target: any, name: string): void;
-export {};
+export { };
 
 // ======================== IMPL ========================
 
@@ -251,4 +252,4 @@ if (typeof __require__ == 'function') { // flare
 	_ex = Object.assign(exports, require('./_event'));
 }
 
-export default (_ex.event as (target: any, name: string)=>void);
+export default (_ex.event as (target: any, name: string) => void);

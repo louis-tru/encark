@@ -32,7 +32,7 @@ var _id = 0;
 
 export class ListItem<T> {
 	private _host: List<T> | null;
-	private _prev: ListItem<T> | null; 
+	private _prev: ListItem<T> | null;
 	private _next: ListItem<T> | null;
 	private _value: T;
 	constructor(host: List<T>, prev: ListItem<T> | null, next: ListItem<T> | null, value: T) {
@@ -70,7 +70,7 @@ export class List<T> {
 	}
 
 	delete(item: ListItem<T>) {
-		if ( item.host === this ) {
+		if (item.host === this) {
 			var prev = item.prev;
 			var next = item.next;
 			if (prev) {
@@ -92,9 +92,13 @@ export class List<T> {
 		return null;
 	}
 
+	del(item: ListItem<T>) {
+		return this.delete(item);
+	}
+
 	unshift(value: T): ListItem<T> {
 		var item: ListItem<T>;
-		if ( this._first ) {
+		if (this._first) {
 			item = new ListItem(this, null, this._first, value);
 			(<any>this._first)._prev = item;
 			this._first = item;
@@ -109,7 +113,7 @@ export class List<T> {
 
 	push(value: T): ListItem<T> {
 		var item: ListItem<T>;
-		if ( this._last ) {
+		if (this._last) {
 			item = new ListItem(this, this._last, null, value);
 			(<any>this._last)._next = item;
 			this._last = item;
@@ -123,9 +127,9 @@ export class List<T> {
 	}
 
 	pop(): T | null {
-		if ( this._length ) {
+		if (this._length) {
 			var r = <ListItem<T>>this._last;
-			if ( this._length > 1 ) {
+			if (this._length > 1) {
 				(<any>r.prev)._next = null;
 				this._last = r.prev;
 			} else {
@@ -142,9 +146,9 @@ export class List<T> {
 	}
 
 	shift(): T | null {
-		if ( this._length ) {
-			var r= <ListItem<T>>this._first;
-			if ( this._length > 1 ) {
+		if (this._length) {
+			var r = <ListItem<T>>this._first;
+			if (this._length > 1) {
 				(<any>r.next)._prev = null;
 				this._first = r.next;
 			} else {
@@ -203,7 +207,7 @@ export class Event<Sender = any, Data = any, Origin = any> {
 		return (this._noticer as EventNoticer<Event<Sender, Data, Origin>>).name;
 	}
 
-	get data () {
+	get data() {
 		return this._data;
 	}
 
@@ -246,12 +250,12 @@ interface ListenItem {
 }
 
 function check_noticer(noticer: any) {
-	if ( !(noticer as EventNoticer) )
+	if (!(noticer as EventNoticer))
 		throw new Error('Event listener function type is incorrect ');
 }
 
 function check_fun(origin: any) {
-	if ( typeof origin != 'function' ) {
+	if (typeof origin != 'function') {
 		throw new Error('Event listener function type is incorrect ');
 	}
 }
@@ -281,7 +285,7 @@ export class EventNoticer<E = DefaultEvent> {
 		var self = this;
 
 		var listens_map = self.m_listens_map;
-		if ( !listens_map ) {
+		if (!listens_map) {
 			self.m_listens = new List();
 			self.m_listens_map = listens_map = new Map();
 		}
@@ -304,7 +308,7 @@ export class EventNoticer<E = DefaultEvent> {
 		};
 		var item = listens_map.get(id);
 
-		if ( item ) { // replace
+		if (item) { // replace
 			item.value = value;
 		} else { // add
 			listens_map.set(id, (self.m_listens as List<ListenItem>).push(value));
@@ -319,21 +323,21 @@ export class EventNoticer<E = DefaultEvent> {
 	get enable() {
 		return this.m_enable;
 	}
-	
+
 	/**
 	 * @set enable {bool} # 设置, 启用/禁用
 	 */
 	set enable(value: boolean) {
 		this.m_enable = value;
 	}
-	
+
 	/**
 	 * @get name {String} # 事件名称
 	 */
 	get name(): string {
 		return this.m_name;
 	}
-	
+
 	/**
 	 * @get {Object} # 事件发送者
 	 */
@@ -345,16 +349,16 @@ export class EventNoticer<E = DefaultEvent> {
 	 * 
 	 * @get {int} # 添加的事件侦听数量
 	 */
-	get length () {
-		return this.m_listens ? this.m_listens.length: 0;
+	get length() {
+		return this.m_listens ? this.m_listens.length : 0;
 	}
-	
+
 	/**
 	 * @constructor
 	 * @arg name   {String} # 事件名称
 	 * @arg sender {Object} # 事件发起者
 	 */
-	constructor (name: string, sender: object) {
+	constructor(name: string, sender: object) {
 		this.m_name = name;
 		this.m_sender = sender;
 	}
@@ -429,7 +433,7 @@ export class EventNoticer<E = DefaultEvent> {
 	forwardOnce(noticer: EventNoticer<E>, id?: string): string {
 		check_noticer(noticer);
 		var self = this;
-		var _id = this._add(noticer, function(evt: E) {
+		var _id = this._add(noticer, function (evt: E) {
 			self.off(_id);
 			forwardNoticeNoticer(noticer, evt);
 		}, noticer, id);
@@ -449,13 +453,13 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @arg evt {Object} 要发送的event
 	 */
 	triggerWithEvent(evt: E) {
-		if ( this.m_enable && this.m_listens ) {
+		if (this.m_enable && this.m_listens) {
 			(evt as any)._noticer = this;
 			var listens = this.m_listens as List<ListenItem>;
 			var item = listens.first;
-			while ( item ) {
+			while (item) {
 				var next = item.next;
-				var {listen,scope} = item.value;
+				var { listen, scope } = item.value;
 				listen.call(scope, evt);
 				item = next;
 			}
@@ -469,30 +473,30 @@ export class EventNoticer<E = DefaultEvent> {
 	 * @arg [scope] {Object}  # scope
 	 */
 	off(listen?: string | Function | object, scope?: object): number {
-		if ( !this.m_listens ) {
+		if (!this.m_listens) {
 			return 0;
 		}
 		var r = 0;
 		if (listen) {
-			if ( typeof listen == 'string' ) { // by id delete 
+			if (typeof listen == 'string') { // by id delete 
 				var name = String(listen);
 				let listens = this.m_listens as List<ListenItem>;
 				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens_map.get(name);
-				if ( item ) {
+				if (item) {
 					listens.delete(item);
 					listens_map.delete(name);
 					r++;
 				}
-			} else if ( listen instanceof Function ) { // 要卸载是一个函数
+			} else if (listen instanceof Function) { // 要卸载是一个函数
 				let listens = this.m_listens as List<ListenItem>;
 				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens.first;
 				if (scope) { // 需比较范围
-					while ( item ) {
+					while (item) {
 						let next = item.next;
 						let value = item.value;
-						if ( value.origin === listen && value.scope === scope ) {
+						if (value.origin === listen && value.scope === scope) {
 							listens.delete(item);
 							listens_map.delete(value.id);
 							r++;
@@ -503,10 +507,10 @@ export class EventNoticer<E = DefaultEvent> {
 				} else { // 与这个函数有关系的
 					let listens = this.m_listens as List<ListenItem>;
 					let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
-					while ( item ) {
+					while (item) {
 						let next = item.next;
 						let value = item.value;
-						if ( value.origin === listen ) {
+						if (value.origin === listen) {
 							listens.delete(item);
 							listens_map.delete(value.id);
 							r++;
@@ -515,15 +519,15 @@ export class EventNoticer<E = DefaultEvent> {
 						item = next;
 					}
 				}
-			} else if ( listen instanceof Object ) { //
+			} else if (listen instanceof Object) { //
 				let listens = this.m_listens as List<ListenItem>;
 				let listens_map = this.m_listens_map as Map<string, ListItem<ListenItem>>;
 				let item = listens.first;
 				// 要卸载这个范围上相关的侦听器,包括`EventNoticer`代理
-				while ( item ) {
+				while (item) {
 					var next = item.next;
 					var value = item.value;
-					if ( value.scope === listen ) {
+					if (value.scope === listen) {
 						listens.delete(item);
 						listens_map.delete(value.id);
 						r++;
@@ -559,7 +563,7 @@ export class Notification<E = DefaultEvent> {
 	 */
 	getNoticer(name: string): EventNoticer<E> {
 		var noticer = (<any>this)[PREFIX + name];
-		if ( ! noticer ) {
+		if (!noticer) {
 			noticer = new EventNoticer<E>(name, this as any);
 			(<any>this)[PREFIX + name] = noticer;
 		}
@@ -675,7 +679,7 @@ export class Notification<E = DefaultEvent> {
 	 * @arg scope {Object}
 	 */
 	removeEventListenerWithScope(scope: object) {
-		for ( let noticer of this.allNoticers() ) {
+		for (let noticer of this.allNoticers()) {
 			noticer.off(scope);
 			this.triggerListenerChange(noticer.name, noticer.length, -1);
 		}
@@ -687,10 +691,10 @@ export class Notification<E = DefaultEvent> {
 	 */
 	allNoticers() {
 		var result: EventNoticer<E>[] = [];
-		for ( var i in this ) {
-			if ( FIND_REG.test(i) ) {
+		for (var i in this) {
+			if (FIND_REG.test(i)) {
 				var noticer = this[i];
-				if ( noticer instanceof EventNoticer ) {
+				if (noticer instanceof EventNoticer) {
 					result.push(noticer);
 				}
 			}
@@ -701,7 +705,7 @@ export class Notification<E = DefaultEvent> {
 	/**
 	 * @func triggerListenerChange
 	 */
-	triggerListenerChange(name: string, count: number, change: number) {/*NOOP*/}
+	triggerListenerChange(name: string, count: number, change: number) {/*NOOP*/ }
 
 }
 
