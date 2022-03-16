@@ -34,10 +34,9 @@ import * as fs2 from './fs2';
 import service, {Service} from './service';
 import * as http from 'http';
 import * as zlib from 'zlib';
+import {RuleResult} from './router'
 
 var g_static_cache: Dict = {};
-
-type RouterInfo = Dict;
 
 //set util
 function setHeader(self: StaticService, expires?: number) {
@@ -437,10 +436,19 @@ export class StaticService extends Service {
 		this.m_markCompleteResponse = true;
 	}
 
-	/** 
-	 * @overwrite
+	/**
+	 * @func onOptionsRequest() options request
+	 * @param {Object} rule info service info
 	 */
-	action(info: RouterInfo) {
+	onOptionsRequest(rule: RuleResult) {
+		this.returnErrorStatus(405);
+	}
+
+	/**
+	 * call function virtual function
+	 * @param {Object} info service info
+	 */
+	onAction(rule: RuleResult) {
 		var method = this.request.method;
 		if (method == 'GET' || method == 'HEAD') {
 			

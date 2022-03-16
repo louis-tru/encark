@@ -181,15 +181,8 @@ export class Service {
 	 * @param {Function} cb
 	 * @param {Object}   info
 	 */
-	requestAuth(info: RuleResult): Promise<boolean> | boolean {
+	onRequestAuth(info: RuleResult): Promise<boolean> | boolean {
 		return true;
-	}
-
-	/**
-	 * call function virtual function
-	 * @param {Object} info service info
-	 */
-	action(info: RuleResult) {
 	}
 
 	// @end

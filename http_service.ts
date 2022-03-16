@@ -28,6 +28,7 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+import util from './util';
 import {Cookie} from './cookie';
 import service from './service';
 import {StaticService} from './static_service';
@@ -38,7 +39,7 @@ import {IncomingForm} from './incoming_form';
 import {RuleResult} from './router';
 import errno from './errno';
 
-var StaticService_action = StaticService.prototype.action;
+var StaticService_onAction = StaticService.prototype.onAction;
 
 /**
  * @private
@@ -65,6 +66,8 @@ export class HttpService extends StaticService {
 
 	private m_cookie: Cookie | undefined;
 	private m_session: Session | undefined;
+	private _id: number;
+	private _st: number;
 
 	/**
 	 * @func markReturnInvalid() mark action return invalid
@@ -116,32 +119,37 @@ export class HttpService extends StaticService {
 		super(req, res);
 		this.jsonpCallback = this.params.callback || '';
 		this.data = {};
+		this._id = util.getId();
+		this._st = Date.now();
 	}
-	
+
 	/** 
 	 * @overwrite
 	 */
-	async action(info: RuleResult) {
+	onOptionsRequest(rule: RuleResult) {
+		var self = this;
+		if (self.server.allowOrigin == '*') {
+			var access_headers = '';
+			//'Content-Type,Access-Control-Allow-Headers,Authorization,X-Requested-With';
+			var access_headers_req = self.request.headers['access-control-request-headers'];
+			if (access_headers_req) {
+				access_headers += access_headers_req;
+			}
+			self.response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+			self.response.setHeader('Access-Control-Allow-Headers', access_headers);
+		}
+		self.setDefaultHeader();
+		self.response.writeHead(200);
+		self.response.end();
+	}
+
+	/** 
+	 * @overwrite
+	 */
+	async onAction(rule: RuleResult) {
 
 		var self = this;
-		var action = info.action;
-
-		if (self.request.method == 'OPTIONS') {
-			if (self.server.allowOrigin == '*') {
-				var access_headers = '';
-				//'Content-Type,Access-Control-Allow-Headers,Authorization,X-Requested-With';
-				var access_headers_req = self.request.headers['access-control-request-headers'];
-				if (access_headers_req) {
-					access_headers += access_headers_req;
-				}
-				self.response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-				self.response.setHeader('Access-Control-Allow-Headers', access_headers);
-			}
-			self.setDefaultHeader();
-			self.response.writeHead(200);
-			self.response.end();
-			return;
-		}
+		var action = rule.action;
 
 		/*
 		 * Note:
@@ -152,25 +160,29 @@ export class HttpService extends StaticService {
 		 */
 
 		//Filter private function
-		if (/^_/.test(action)){
-			return StaticService_action.call(this, info);
+		if (/^_/.test(action)) { // private method, disable call
+			return StaticService_onAction.call(this, rule);
 		}
 		
-		var fn = (<any>this)[action];
+		var fn = (this as any)[action];
 
-		if (action in HttpService.prototype) {
+		if (action in HttpService.prototype) { // base method, disable call
 			return self.returnError(Error.new(errno.ERR_FORBIDDEN_ACCESS));
 		}
 		if (!fn || typeof fn != 'function') {
-			return StaticService_action.call(this, info);
+			return StaticService_onAction.call(this, rule);
 		}
 		
-		var ok = async function() {
+		var handleCall = async function() {
 			var auth: boolean = false;
 			try {
-				auth = await self.auth(info);
+				auth = await self.onAuth(rule);
 			} catch(e) {
 				console.warn('HttpService#action#1', 'auth error', e);
+			}
+
+			if (self.server.printLog) {
+				console.log(`REQUEST  ID${self._id}`, ...(auth ? []: ['ILLEGAL ACCESS, onAuth']), self.pathname, self.headers, self.params, self.data);
 			}
 
 			if (!auth) {
@@ -178,8 +190,8 @@ export class HttpService extends StaticService {
 				return;
 			}
 
-			var { service, action, ..._info } = info;
-			var data = Object.assign({}, self.params, self.data, _info);
+			var { service, action, ..._rule } = rule;
+			var data = Object.assign({}, self.params, self.data, _rule);
 			var err, r;
 			try {
 				r = await (self as any)[action](data);
@@ -205,7 +217,7 @@ export class HttpService extends StaticService {
 		if (this.request.method == 'POST') {
 			var form = this.form = new IncomingForm(this);
 			try {
-				var accept = this.hasAcceptFilestream(info);
+				var accept = this.hasAcceptFilestream(rule);
 				if (accept instanceof Promise) {
 					this.request.pause();
 					form.isUpload = await accept;
@@ -220,25 +232,25 @@ export class HttpService extends StaticService {
 			form.onEnd.on(function() {
 				Object.assign(self.data, form.fields);
 				Object.assign(self.data, form.files);
-				ok();
+				handleCall();
 			});
 			form.parse();
 		} else {
-			this.request.on('end', ok);
+			this.request.on('end', handleCall);
 		}
 	}
 
 	/**
 	 * @func hasAcceptFilestream(info) 是否接收文件流
 	 */
-	hasAcceptFilestream(info: RuleResult): Promise<boolean> | boolean {
+	hasAcceptFilestream(rule: RuleResult): Promise<boolean> | boolean {
 		return false;
 	}
 
 	/**
 	 * @func auth(info)
 	 */
-	auth(info: RuleResult): Promise<boolean> | boolean {
+	onAuth(rule: RuleResult): Promise<boolean> | boolean {
 		return true;
 	}
 
@@ -249,6 +261,7 @@ export class HttpService extends StaticService {
 	 */
 	returnData(type: string, data: any): void {
 
+		var self = this;
 		var res = this.response;
 		var ae = <string>this.request.headers['accept-encoding'];
 		this.markCompleteResponse();
@@ -262,10 +275,15 @@ export class HttpService extends StaticService {
 				res.setHeader('Content-Encoding', 'gzip');
 				res.writeHead(200);
 				res.end(data);
+				if (self.server.printLog)
+					console.log(`RESPONSE ID${self._id}`, 'Time:', Date.now() - self._st, self.pathname);
 			});
 		} else {
 			res.writeHead(200);
 			res.end(data);
+
+			if (self.server.printLog)
+				console.log(`RESPONSE ID${self._id}`, 'Time:', Date.now() - self._st, self.pathname);
 		}
 	}
 

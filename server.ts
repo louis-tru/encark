@@ -36,6 +36,7 @@ import upgrade from './ws/upgrade';
 import service from './service';
 import {StaticService} from './static_service';
 import './http_service';
+import {RuleResult} from './router';
 export * from './_server';
 
 /**
@@ -47,14 +48,29 @@ export class ServerIMPL extends Server {
 
 	//Handle http and websocket and http-heartbeat request
 	protected initializ(server: http.Server) {
+
+		async function requestAuth(ser: StaticService, rule: RuleResult) {
+			var ok = ser.onRequestAuth(rule); // 认证请求的合法性
+			if (ok instanceof Promise) {
+				ser.request.pause();
+				if (! await ok) {
+					return ser.request.socket.destroy(); // 立即断开连接
+				}
+				ser.request.resume();
+			} else if (!ok) {
+				return ser.request.socket.destroy();
+			}
+			return true;
+		}
+
 		//http
 		server.on('request', async(req: http.IncomingMessage, res: http.ServerResponse)=>{
 			if (this.interceptRequest(req, res)) 
 				return;
 
 			var url = decodeURI(req.url || ''); // 解码
-			var info = this.router.find(url);   // 通过url查找目标服务信息
-			var name = info.service;
+			var rule = this.router.find(url);   // 通过url查找目标服务信息
+			var name = rule.service;
 			var cls = service.get(name) as unknown as typeof StaticService;
 
 			if (this.printLog) {
@@ -72,14 +88,13 @@ export class ServerIMPL extends Server {
 
 			try {
 				var ser: StaticService = new cls(req, res);
-				var ok = ser.requestAuth(info); // 认证请求的合法性
-				if (ok instanceof Promise) {
-					req.pause();
-					if (! await ok)
-						return req.socket.destroy(); // 立即断开连接
-					req.resume();
-				} else if (!ok) {
-					return req.socket.destroy();
+				if (req.method == 'OPTIONS') {
+					return ser.onOptionsRequest(rule); // handle options
+				}
+				if (! await requestAuth(ser, rule)) {
+					if (this.printLog)
+						console.log('REQUEST', 'ILLEGAL ACCESS, onRequestAuth', ser.pathname, ser.headers, ser.params);
+					return;
 				}
 			} catch(err) {
 				console.warn('ServerIMPL#initializ#2', err);
@@ -88,14 +103,13 @@ export class ServerIMPL extends Server {
 
 			req.on('data', function() {});
 
-			ser.action(info);
+			ser.onAction(rule);
 		});
 
 		// upgrade websocket, create web socket connection
 		server.on('upgrade', (req: http.IncomingMessage, socket: net.Socket, upgradeHead: any)=>{
-			if (this.printLog) {
+			if (this.printLog)
 				console.log(`Web socket upgrade ws://${req.headers.host}${req.url}`);
-			}
 			upgrade(req, upgradeHead);
 		});
 		
