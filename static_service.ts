@@ -408,6 +408,11 @@ export class StaticService extends Service {
 		return this.server.root;
 	}
 
+	// @overwrite
+	onRequestAuth(info: RuleResult): Promise<boolean> | boolean {
+		return true;
+	}
+
 	get isCompleteResponse() {
 		return this.m_markCompleteResponse ? true: false;
 	}

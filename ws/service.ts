@@ -34,6 +34,7 @@ import {Session} from '../session';
 import errno from '../errno';
 import {Types, DataBuilder, Data} from './data';
 import * as conv from './conv';
+import {RuleResult} from '../router'
 
 export const METHOD_CALL_TIMEOUT = 12e4; // 120s
 
@@ -55,7 +56,11 @@ export class WSService extends Service implements conv.MessageHandle {
 	private m_loaded = false;
 	private m_Intervalid: any;
 	private _destroy = false;
-	
+
+	onRequestAuth(rule: RuleResult): Promise<boolean> | boolean {
+		return true;
+	}
+
 	get conv() {
 		return this.m_conv;
 	}

@@ -42,7 +42,7 @@ const _service_cls: Dict<typeof Service> = {};
  * base service abstract class
  * @class Service
  */
-export class Service {
+export abstract class Service {
 	// @private:
 	private m_pathname: string | undefined;
 	private m_dirname: string | undefined;
@@ -181,9 +181,7 @@ export class Service {
 	 * @param {Function} cb
 	 * @param {Object}   info
 	 */
-	onRequestAuth(info: RuleResult): Promise<boolean> | boolean {
-		return true;
-	}
+	abstract onRequestAuth(info: RuleResult): Promise<boolean> | boolean;
 
 	// @end
 }
