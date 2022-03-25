@@ -40,7 +40,8 @@ import request from './request';
 export interface Options {
 	renewal?: boolean;
 	limit?: number;
-	onProgress?(opts: { total: number, size: number, speed: number, data: Buffer }): void;
+	onProgress?(opts: {total: number, size: number, speed: number, data: Buffer }): void;
+	onRedirect?(location: string): boolean;
 	timeout?: number;
 	proxy?: string;
 }
@@ -71,6 +72,7 @@ export class WgetIMPL extends Promise<Result> {
 	private _timeout = 0;
 	private _limit = 0;
 	private _progress = util.noop as any;
+	private _redirect = util.noop as any;
 	private _time = Date.now();
 	private _timeStr = new Date().toString('yyyy-MM-dd hh:mm:ss');
 
@@ -367,8 +369,13 @@ export class WgetIMPL extends Promise<Result> {
 				// "location": "https://files.dphotos.com.cn/2020/09/21/77b2670e.jpg?imageView2/1/w/720/h/1280"
 				this._req = undefined;
 				this._res = undefined;
-				req.destroy();
-				this._request(res.headers.location, redirect + 1);
+				var location = res.headers.location;
+				if ( this._redirect(location) ) {
+					req.destroy();
+					this._request(location, redirect + 1);
+				} else {
+					fail(); // err
+				}
 			} else {
 				fail(); // err
 			}
@@ -404,10 +411,12 @@ export class WgetIMPL extends Promise<Result> {
 					limit = wget.LIMIT, // limit rate byte/second
 					// limitTime = 0, // limt network use time
 					onProgress,
+					onRedirect,
 					timeout = 12e4, proxy } = options_ || {};
 
 		this._limit = Number(limit) || 0;
 		this._progress = onProgress || util.noop;
+		this._redirect = onRedirect || (()=>true);
 		this._timeout = timeout;
 		this._proxy = proxy || '';
 		this._www = www;
