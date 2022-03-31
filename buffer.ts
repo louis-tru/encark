@@ -52,7 +52,7 @@ export function isInterfaceBuffer(IBuffer: any) {
 	return false;
 }
 
-export function isTypedArray(arr: TypedArray) {
+export function isTypedArray(arr: any) {
 	return arr instanceof TypedArrayConstructor;
 }
 

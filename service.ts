@@ -211,8 +211,7 @@ export default {
 		var r: Dict = {};
 		Object.entries(_service_cls).forEach(([key, service])=>{
 			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
-
-				var type = 0;
+				// var type = 0;
 				var methods: string[] = [], events: string[] = [];
 				var item = { type: service.type, methods, events };
 				var self = <any>service.prototype;
@@ -220,7 +219,8 @@ export default {
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
 					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
-							events.push(k.substr(2));
+							if (typeof v.value != 'function')
+								events.push(k.substr(2));
 						} else { // methods
 							if (typeof v.value == 'function') {
 								methods.push(k);
@@ -233,7 +233,7 @@ export default {
 
 				while (self !== Service.prototype) {
 					Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-						if (/^on[a-zA-Z]/.test(k)) { // event
+						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event
 							events.push(k.substr(2));
 						}
 					});
