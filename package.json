@@ -10,6 +10,7 @@
 		"url": "https://github.com/louis-tru/somes/"
 	},
 	"scripts": {
+		"prepare": "npm run build",
 		"build": "tsc && cp LICENSE *.md *.types *.json out/somes && node _.js"
 	},
 	"devDependencies": {
