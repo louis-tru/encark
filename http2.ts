@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-import buffer,{IB} from './buffer';
+import buffer,{Buffer} from './buffer';
 import {URL} from './path';
 import * as http2 from 'http2';
 import {
@@ -38,11 +38,11 @@ import {
 import somes from './util';
 import errno from './errno';
 
-export function http2request(session: http2.ClientHttp2Session, url: string, opts?: Options): Promise<Result<IB>> {
+export function http2request(session: http2.ClientHttp2Session, url: string, opts?: Options): Promise<Result<Buffer>> {
 	var options = Object.assign({}, defaultOptions, opts);
 	var { params, method, signer } = options;
 
-	return somes.promise<Result<IB>>(async (resolve, reject)=>{
+	return somes.promise<Result<Buffer>>(async (resolve, reject)=>{
 		var uri = new URL(url);
 		uri.clearHash();
 	
