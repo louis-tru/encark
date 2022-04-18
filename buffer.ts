@@ -427,7 +427,7 @@ export class IBufferIMPL extends Uint8Array implements IBuffer {
 
 	compare(target: Uint8Array, start?: number, end?: number, thisStart?: number, thisEnd?: number) {
 
-		if (!Buffer.isBuffer(target)) {
+		if (!isUint8Array(target)) {
 			throw new TypeError(
 				'The "target" argument must be one of type Buffer or Uint8Array. ' +
 				'Received type ' + (typeof target)
