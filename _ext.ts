@@ -200,7 +200,7 @@ interface ErrorDescribe {
 	message?: string;
 	error?: string;
 	description?: string;
-	errno?: number;
+	errno?: number | string;
 	child?: Error | Error[];
 	[prop: string]: any;
 }
@@ -217,7 +217,7 @@ interface ErrorConstructor {
 }
 
 interface Error {
-	errno?: number;
+	errno?: number | string;
 	description?: string;
 	child?: Error[];
 	[prop: string]: any;
