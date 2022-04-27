@@ -49,7 +49,7 @@ declare class WSConversationIMPL extends conv.WSConversation {
 if (utils.haveWeb) {
 	var conv_impl = require('./conv_web').default;
 } else if (utils.haveNode) {
-	var conv_impl = require('./conv_web').default;
+	var conv_impl = require('./conv_node').default;
 } else {
 	throw new Error('Unimplementation');
 }
