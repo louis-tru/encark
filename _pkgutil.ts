@@ -38,7 +38,7 @@ const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
 var config: Dict | null = null;
-const _require = (globalThis['module'] as any).require;
+const _require = function(a: any, ...args: any[]) { return a(args[0]) }((a:any)=>a, require);
 
 var cwd:()=>string;
 var _cwd:()=>string;
@@ -62,7 +62,7 @@ if (haveFlare) {
 	_cwd = win32 ? function() {
 		return PREFIX + cwd().replace(/\\/g, '/');
 	}: function() {
-		return PREFIX + cwd().substr(1);
+		return PREFIX + cwd().substring(1);
 	};
 	chdir = function(path) {
 		path = fallbackPath(path);
