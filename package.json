@@ -1,6 +1,6 @@
 {
 	"name": "somes",
-	"version": "0.11.6",
+	"version": "0.11.7",
 	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "index.js",
 	"types": "index",

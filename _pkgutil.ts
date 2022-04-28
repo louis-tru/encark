@@ -38,7 +38,7 @@ const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
 var config: Dict | null = null;
-const _require = (module as any).require;
+const _require = (globalThis['module'] as any).require;
 
 var cwd:()=>string;
 var _cwd:()=>string;
