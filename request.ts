@@ -74,6 +74,8 @@ export interface Options {
 	proxy?: string;
 	minSsl?: SecureVersion;
 	maxSsl?: SecureVersion;
+	limitDataSize?: number;
+	onReady?: (statusCode: number, headers: Dict)=>any;
 }
 
 export const defaultOptions: Options = {
@@ -230,7 +232,7 @@ function requestWeb(
 		for (var s of str.split(/\r?\n/)) {
 			var index = s.indexOf(':');
 			if (index != -1)
-				r[s.substr(0, index)] = s.substr( index + 1);
+				r[s.substring(0, index)] = s.substr( index + 1);
 		}
 		return r;
 	}
@@ -296,7 +298,17 @@ function requestNode(options: Options, soptions: Dict,
 		}
 	}
 
-	var req = lib.request(soptions, (res: any)=> {
+	var req = lib.request(soptions, async (res: any)=> {
+
+		if (options.onReady) {
+			try {
+				await options.onReady(res.statusCode, res.headers);
+			} catch(err) {
+				error(err);
+				req.abort();
+				return;
+			}
+		}
 
 		function end() {
 			if (!ok) {
@@ -317,9 +329,18 @@ function requestNode(options: Options, soptions: Dict,
 		// console.log(`STATUS: ${res.statusCode}`);
 		// console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
 		// res.setEncoding('utf8');
+		var limitDataSize = 0;
 		var buffers: Buffer[] = [];
 		res.on('data', (chunk: Buffer)=> {
 			// console.log(`BODY: ${chunk}`);
+			if (options.limitDataSize) {
+				limitDataSize += chunk.length;
+				if (limitDataSize > options.limitDataSize) {
+					error(errno.ERR_REQUEST_LIMIT_DATA_SIZE);
+					req.abort();
+					return;
+				}
+			}
 			buffers.push(chunk);
 		});
 		res.on('error', (e:any)=>error(e));
