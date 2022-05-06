@@ -33,7 +33,7 @@ import _util from './_util' ;
 
 export type Optopns = Dict<string|string[]>;
 
-const {haveNode, haveFlare, haveWeb} = _util;
+const {haveNode, haveNoug, haveWeb} = _util;
 const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
@@ -45,11 +45,11 @@ var _cwd:()=>string;
 var chdir:(cwd:string)=>boolean;
 var win32: boolean = false;
 var _path: any;
-var _flare_pkgutil: any;
+var _noug_pkgutil: any;
 var debug = false;
 
-if (haveFlare) {
-	_flare_pkgutil = __require__('_pkguitl');
+if (haveNoug) {
+	_noug_pkgutil = __require__('_pkguitl');
 	_path = __require__('_path');
 	win32 = __require__('_util').platform == 'win32';
 	cwd = _path.cwd;
@@ -217,7 +217,7 @@ function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-if (haveNode && !haveFlare) {
+if (haveNode && !haveNoug) {
 	var fs = require('fs');
 	require('module').Module._extensions['.keys'] = 
 		function(module: NodeModule, filename: string): any {
@@ -279,8 +279,8 @@ function readConfigFile(pathname: string, pathname2: string) {
 var configDir = '';
 
 function getConfig(): Dict {
-	if (haveFlare) {
-		return _flare_pkgutil.config;
+	if (haveNoug) {
+		return _noug_pkgutil.config;
 	}
 	if (!config) {
 		if (haveNode) {
@@ -310,7 +310,7 @@ function initArgv() { // init
 	}
 	parseOptions(args, options);
 
-	if (haveFlare) {
+	if (haveNoug) {
 		debug = __require__('_util').debug;
 	} else if (haveNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
@@ -335,8 +335,8 @@ export default {
 	get options() { return options },
 	get config() { return getConfig() },
 	set config(cfg: any) {
-		if (haveFlare) {
-			_flare_pkgutil.config = cfg;
+		if (haveNoug) {
+			_noug_pkgutil.config = cfg;
 		} else {
 			if (typeof cfg == 'string') {
 				configDir = cfg;

@@ -163,7 +163,7 @@ export class URL {
 		(this as any)._value = path;
 	}
 	
-	// href: "http://xxxx.xxx:81/v1.1.0/flare/path.js?sasasas&asasasa#sdsdsd"
+	// href: "http://xxxx.xxx:81/v1.1.0/noug/path.js?sasasas&asasasa#sdsdsd"
 	get href(): string {
 		var self = this as any;
 		parse_path(self);
@@ -208,19 +208,19 @@ export class URL {
 		return (<any>this)._hash;
 	}
 	
-	// host: "flare.cool:81"
+	// host: "noug.cc:81"
 	get host(): string {
 		parse_path(this);
 		return (<any>this)._hostname + ((<any>this)._port ? ':' + (<any>this)._port : '');
 	}
 	
-	// hostname: "flare.cool"
+	// hostname: "noug.cc"
 	get hostname(): string {
 		parse_path(this);
 		return (<any>this)._hostname;
 	}
 	
-	// origin: "http://flare.cool:81"
+	// origin: "http://noug.cc:81"
 	get origin(): string {
 		parse_path(this);
 		return (<any>this)._origin;

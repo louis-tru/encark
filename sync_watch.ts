@@ -8,7 +8,7 @@ import { execSync } from './syscall';
 defOpts('help', 0,									'--help, --help print help info');
 defOpts('u', 'louis',								'-u username [{0}]');
 defOpts('h', '192.168.0.115',				'-h host [{0}]');
-defOpts('t', '~/flare',							'-t target directory [{0}]');
+defOpts('t', '~/noug',							'-t target directory [{0}]');
 defOpts('i', '',										'-i ignore directory or file');
 defOpts('d',  0,										'-d delay time [{0}] watch');
 
