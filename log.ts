@@ -75,6 +75,7 @@ export class Console extends Notification {
 	private m_fd_open_time = new Date();
 	private m_timeStack: Map<string, Stack>;
 	private m_autoCutFileTime = 0;
+	private _prefix: string;
 
 	get autoCutFileTime() {
 		return this.m_autoCutFileTime;
@@ -92,10 +93,11 @@ export class Console extends Notification {
 		return this.m_pathname;
 	}
 
-	constructor(pathname?: string) {
+	constructor(pathname?: string, prefix?: string) {
 		super();
 		this.m_pathname = pathname || '';
 		this.m_timeStack = new Map<string, any>();
+		this._prefix = prefix || '';
 		this.reopen();
 	}
 
@@ -135,34 +137,39 @@ export class Console extends Notification {
 	private _print(TAG: string, style: string, func: any, ...args: any[]) {
 		args.unshift(TAG + ' ' + new Date().toString('yyyy-MM-dd hh:mm:ss.fff'));
 
-		var args_str = args.map(e=>{
+		if (this._prefix) {
+			args.unshift(this._prefix);
+		}
+
+		let log = args.map(e=>{
 			try {
 				return typeof e == 'object' ? this._Indent ? JSON.stringify(e, null, 2): JSON.stringify(e): e;
 			} catch(e) {
 				return e;
 			}
-		});
-		var data = args_str.join(' ');
+		}).join(' ');
 
 		if (style) {
-			func.call(console, '%c' + data, style);
+			func.call(console, '%c' + log, style);
 		} else {
 			func.call(console, ...args);
 		}
 
 		if (this.m_fd) {
-			var cutTime = this.autoCutFileTime;
+			let cutTime = this.autoCutFileTime;
 			if (cutTime && Date.now() - this.m_fd_open_time.valueOf() > cutTime) {
 				this.reopen(true);
 			}
-			fs.write(this.m_fd, data + '\n', (err:any)=>{
+			fs.write(this.m_fd, log + '\n', (err:any)=>{
 				if (err) {
 					this.reopen();
 				}
 			});
 		}
-		this.trigger('Log', { tag: TAG, data: data });
-		return data;
+
+		this.trigger('Log', { prefix: this._prefix, tag: TAG, data: log });
+
+		return log;
 	}
 
 	makeDefault() {
@@ -199,6 +206,10 @@ export class Console extends Notification {
 
 	error(msg: any, ...args: any[]) {
 		return this._print('ERR', '', error, msg, ...args);
+	}
+
+	fault(msg: any, ...args: any[]) {
+		return this._print('Fault', '', error, msg, ...args);
 	}
 
 	dir(msg: any, ...args: any[]) {
