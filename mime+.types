@@ -24,7 +24,7 @@ text/cache-manifest  appcache manifest
 # What: node binary buffer format
 # Why: semi-standard extension w/in the node community
 # Added by: tootallnate
-application/octet-stream  buffer
+application/octet-stream  buffer ipa
 
 # What: The "protected" MP-4 formats used by iTunes.
 # Why: Required for streaming music to browsers (?)
@@ -45,3 +45,5 @@ video/MP2T  ts
 text/plain					txt text conf def list log in b64 base64 map x module keys script gyp gypi
 application/xml			xml xsl vx
 application/javascript-xml	jsx
+
+text/xml    plist
