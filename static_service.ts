@@ -41,7 +41,7 @@ var g_static_cache: Dict = {};
 //set util
 function setHeader(self: StaticService, expires?: number) {
 	var res = self.response;
-	res.setHeader('Server', 'Flare utils');
+	res.setHeader('Server', 'Somes');
 	res.setHeader('Date', new Date().toUTCString());
 	if (self.request.method == 'GET') {
 		expires = expires === undefined ? self.server.expires : expires;
