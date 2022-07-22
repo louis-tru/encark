@@ -328,7 +328,13 @@ export class Mysql implements Database {
 	 exec(sql: string): Promise<Result[]> {
 		return new Promise((resolve, reject)=>{
 			this.query(sql, function(err: any, data: any) {
-				err ? reject(err): resolve(data);
+				if (err) {
+					if (err.errorMessage)
+						err.message += ` => errorMessage: ${err.errorMessage}`;
+					reject(err);
+				} else {
+					resolve(data);
+				}
 			});
 		});
 	}
