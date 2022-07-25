@@ -220,7 +220,7 @@ export default {
 					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
 							if (typeof v.value != 'function')
-								events.push(k.substr(2));
+								events.push(k.substring(2));
 						} else { // methods
 							if (typeof v.value == 'function') {
 								methods.push(k);
@@ -234,7 +234,7 @@ export default {
 				while (self !== Service.prototype) {
 					Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
 						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event
-							events.push(k.substr(2));
+							events.push(k.substring(2));
 						}
 					});
 					self = self.__proto__;
