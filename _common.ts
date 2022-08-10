@@ -274,12 +274,12 @@ export function filter(obj: any, exp: string[] | ((key: string, value: any)=>boo
 
 Object.defineProperty(Error.prototype, 'filter', {
 	enumerable: false,
-	value: function(this: Error, keys: string[], keys2?: string[]) {
+	value: function(this: Error, keys: string[], exclude?: string[]) {
 		var results = [] as any[];
 		for (var i of keys) {
 			results.push(this[i]);
 		}
-		results.push(filter(this, keys2 || keys, true));
+		results.push(filter(this, keys.concat(exclude || []), true));
 		return results;
 	}
 });
