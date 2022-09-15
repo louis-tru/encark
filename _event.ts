@@ -196,7 +196,7 @@ export class List<T> {
 /**
 	* @class Event
 	*/
-export class Event<Sender = any, Data = any, Origin = any> {
+export class Event<Sender = any, Data = any, Origin = Sender> {
 	private _data: Data;
 	protected _noticer: any; //EventNoticer<Event<Sender, Data, Origin>> | null; // = null;
 	private _origin: any; // = null;

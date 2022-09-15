@@ -62,7 +62,7 @@ export declare class List<T> {
 /**
 	* @class Event
 	*/
-export declare class Event<Sender = any, Data = any, Origin = any> {
+export declare class Event<Sender = any, Data = any, Origin = Sender> {
 	private _data;
 	protected _noticer: EventNoticer<Event<Sender, Data, Origin>> | null;
 	private _origin;
