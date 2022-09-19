@@ -104,45 +104,40 @@ function parse_path(self: any) {
 	}
 }
 
-function parse_params(self: any) {
-	if (self._params) 
+function parse_params(self: any, s1: string, s2: string, sp: string) {
+	if (self[s1])
 		return;
 	split_path(self);
-	
-	var params: Dict = self._params = {};
-	
-	if (self._search[0] != '?') 
-		return;
-		
-	var ls = self._search.substr(1).split('&');
-	
-	for (var i = 0; i < ls.length; i++) {
-		var o = ls[i].split('=');
-		params[ o[0] ] = decodeURIComponent(o[1] || '');
-	}
-}
 
-function parse_hash_params(self: any) {
-	if (self._hash_params) 
+	let params: Dict = self[s1] = {};
+	if (self[s2][0] != sp) 
 		return;
-	split_path(self);
-	
-	var params: Dict = self._hash_params = {};
-	if (self._hash[0] != '#') 
-		return;
-		
-	var ls = self._hash.substr(1).split('&');
-	
-	for (var i = 0; i < ls.length; i++) {
-		var o = ls[i].split('=');
-		params[ o[0] ] = decodeURIComponent(o[1] || '');
+
+	for (let it of self[s2].substr(1).split('&')) {
+		let [k,v] = it.split('=');
+		let v2 = decodeURIComponent(v || '');
+		if (k in params) {
+			if (Array.isArray(params[ k ])) {
+				params[k].push(v2);
+			} else {
+				params[k] = [params[k], v2];
+			}
+		} else {
+			params[k] = v2;
+		}
 	}
 }
 
 function querystringStringify(prefix: string, params: Dict) {
-	var rev = [];
-	for (var i in params) {
-		rev.push(i + '=' + encodeURIComponent(params[i]));
+	let rev = [];
+	for (let i in params) {
+		let val = params[i];
+		if (Array.isArray(val)) {
+			for (let j of val)
+				rev.push(i + '=' + encodeURIComponent(j));
+		} else {
+			rev.push(i + '=' + encodeURIComponent(val));
+		}
 	}
 	return rev.length ? prefix + rev.join('&') : '';
 }
@@ -251,7 +246,7 @@ export class URL {
 	}
 
 	get params(): Dict<string> {
-		parse_params(this);
+		parse_params(this, '_params', '_search', '?');
 		return (<any>this)._params;
 	}
 
@@ -261,7 +256,7 @@ export class URL {
 	}
 	
 	get hashParams(): Dict<string> {
-		parse_hash_params(this);
+		parse_params(this, '_hash_params', '_hash', '#');
 		return (<any>this)._hash_params;
 	}
 

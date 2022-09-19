@@ -591,6 +591,8 @@ definePropertys(Error, {
 
 });
 
+debugger
+
 definePropertys(Error.prototype, {
 
 	ext(desc: ErrorDescribe) {
