@@ -88,7 +88,7 @@ if (haveWeb) {
 	};
 }
 
-var shared: Storage | null = null;
+var shared: IStorageSync | null = null;
 
 export interface IStorage {
 	get<T = any>(key: string, defaultValue?: T): Promise<T>;
@@ -98,10 +98,18 @@ export interface IStorage {
 	clear(): Promise<void>;
 }
 
+export interface IStorageSync extends IStorage {
+	getSync<T = any>(key: string, defaultValue?: T): T;
+	hasSync(key: string): boolean;
+	setSync(key: string, value: any): void;
+	deleteSync(key: string): void;
+	clearSync(): void;
+}
+
 /**
  * @class Storage
  */
-export class Storage implements IStorage {
+export class Storage implements IStorageSync {
 
 	private m_path: string;
 	private m_prefix: string = '';
@@ -127,7 +135,13 @@ export class Storage implements IStorage {
 		}
 	}
 
-	async get(key: string, defaultValue?: any) {
+	async get<T = any>(key: string, defaultValue?: T) { return this.getSync(key, defaultValue) }
+	async has(key: string) { return this.hasSync(key) }
+	async set(key: string, value: any) { this.setSync(key, value) }
+	async delete(key: string) { this.deleteSync(key) }
+	async clear() { this.clearSync() }
+
+	getSync(key: string, defaultValue?: any) {
 		key = format_key(this, key);
 		if (key in this.m_value) {
 			return paese_value(this.m_value[key]);
@@ -140,24 +154,24 @@ export class Storage implements IStorage {
 		}
 	}
 
-	async has(key: string) {
+	hasSync(key: string) {
 		key = format_key(this, key);
 		return key in this.m_value;
 	}
 
-	async set(key: string, value: any) {
+	setSync(key: string, value: any) {
 		key = format_key(this, key);
 		this.m_value[key] = stringify_val(value);
 		commit(this);
 	}
 
-	async delete(key: string) {
+	deleteSync(key: string) {
 		key = format_key(this, key);
 		delete this.m_value[key];
 		commit(this);
 	}
 
-	async clear() {
+	clearSync() {
 		if (haveWeb) {
 			var keys: any[] = [];
 			for (var i in this.m_value) {
@@ -176,7 +190,7 @@ export class Storage implements IStorage {
 
 }
 
-function _shared(): IStorage {
+function _shared(): IStorageSync {
 	if (!shared) {
 		shared = new Storage();
 	}
@@ -189,28 +203,28 @@ export default {
 		return _shared();
 	},
 
-	setShared: function(value: Storage) {
+	setShared: function(value: IStorageSync) {
 		shared = value;
 	},
 
 	get: function(key: string, defaultValue?: any) {
-		return _shared().get(key, defaultValue);
+		return _shared().getSync(key, defaultValue);
 	},
 
 	has: function(key: string) {
-		return _shared().has(key);
+		return _shared().hasSync(key);
 	},
 
 	set: function(key: string, value: any) {
-		return _shared().set(key, value);
+		return _shared().setSync(key, value);
 	},
 
 	delete: function(key: string) {
-		return _shared().delete(key);
+		return _shared().deleteSync(key);
 	},
 
 	clear: function() {
-		return _shared().clear();
+		return _shared().clearSync();
 	},
 
 };
