@@ -233,9 +233,8 @@ declare function clearInterval(id?: TimeoutResult): void;
 declare function clearImmediate(id?: TimeoutResult): void;
 
 (function(_: any) {
-
-if (Date.formatTimeSpan !== undefined)
-	return;
+// if (Date.formatTimeSpan !== undefined)
+// 	return;
 
 if (typeof globalThis == 'undefined') {
 	var globa = arguments[0]('(typeof global == "object" ? global: 0)');
@@ -250,7 +249,11 @@ var currentTimezone = new Date().getTimezoneOffset() / -60;
 var G_slice = Array.prototype.slice;
 var G_hash_code_id = 1;
 var G_hash_code_set = new WeakSet();
-var dateToString = Date.prototype.toString;
+var DateToString = (Date.prototype as any).rawToString || Date.prototype.toString;
+var ErrorToString = (Error.prototype as any).rawToString || Error.prototype.toString;
+
+(Date.prototype as any).rawToString = DateToString;
+(Error.prototype as any).rawToString = ErrorToString;
 
 /**
  * @fun ext_class #  EXT class prototype objects
@@ -440,13 +443,13 @@ definePropertys(Date, {
 		var diffTime = currentTimezone - timezone;
 
 		return new Date(
-			Number(s.substr(indexOf(f, 'yyyy'), 4)) || d.getFullYear(),
-			Number(s.substr(indexOf(f, 'MM'), 2) || 1/*(d.getMonth() + 1)*/) - 1,
-			Number(s.substr(indexOf(f, 'dd'), 2)) || 1/*d.getDate()*/,
-			Number(s.substr(indexOf(f, 'hh'), 2) || 0/*d.getHours()*/) - diffTime,
-			Number(s.substr(indexOf(f, 'mm'), 2)) || 0/*d.getMinutes()*/,
-			Number(s.substr(indexOf(f, 'ss'), 2)) || 0/*d.getSeconds()*/,
-			Number(s.substr(indexOf(f, 'fff'), 3)) || 0
+			Number(s.substring(indexOf(f, 'yyyy'), 4)) || d.getFullYear(),
+			Number(s.substring(indexOf(f, 'MM'), 2) || 1/*(d.getMonth() + 1)*/) - 1,
+			Number(s.substring(indexOf(f, 'dd'), 2)) || 1/*d.getDate()*/,
+			Number(s.substring(indexOf(f, 'hh'), 2) || 0/*d.getHours()*/) - diffTime,
+			Number(s.substring(indexOf(f, 'mm'), 2)) || 0/*d.getMinutes()*/,
+			Number(s.substring(indexOf(f, 'ss'), 2)) || 0/*d.getSeconds()*/,
+			Number(s.substring(indexOf(f, 'fff'), 3)) || 0
 		);
 	},
 
@@ -519,7 +522,7 @@ definePropertys(Date.prototype, {
 				.replace('ss', d.getSeconds().toFixedBefore(2))
 				.replace('fff', d.getMilliseconds().toFixedBefore(3));
 		} else {
-			return dateToString.call(this);
+			return DateToString.call(this);
 		}
 	},
 
@@ -619,6 +622,11 @@ definePropertys(Error.prototype, {
 		if (stackTraceJSON)
 			r.stack = err.stack || '';
 		return r;
+	},
+
+	toString(this: Error) {
+		return ErrorToString.call(this) + '\n' + (this.description ? `Description: ${this.description}\n`: '') + 
+			(this.child ? `Childs: [${this.child.map(e=>e.toString()).join(',')}]`: '');
 	},
 });
 
