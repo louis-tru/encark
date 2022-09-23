@@ -453,17 +453,16 @@ definePropertys(Date, {
 		);
 	},
 
-	formatTimeSpan(time_span: number, format: string = 'dd hh:mm:ss'): string {
+	formatTimeSpan(time_span: number, format: string = '{(dd) }?{(hh):}?{(mm):}{(ss)}', isFixedBefore = false): string {
 
 		var data = [];
 		var items = [
-			[1, 1000, /fff/g],
-			[1000, 60, /ss/g],
-			[60, 60, /mm/g],
-			[60, 24, /hh/g],
-			[24, 1, /dd/g]
+			[1, 1000, /\{([^\}]*?)\(fff\)([^\}]*?)\}/g, /\{([^\}]*?)\(fff\)([^\}]*?)\}\?/g],
+			[1000, 60, /\{([^\}]*?)\(ss\)([^\}]*?)\}/g, /\{([^\}]*?)\(ss\)([^\}]*?)\}\?/g],
+			[60, 60, /\{([^\}]*?)\(mm\)([^\}]*?)\}/g, /\{([^\}]*?)\(mm\)([^\}]*?)\}\?/g],
+			[60, 24, /\{([^\}]*?)\(hh\)([^\}]*?)\}/g, /\{([^\}]*?)\(hh\)([^\}]*?)\}\?/g],
+			[24, 1, /\{([^\}]*?)\(dd\)([^\}]*?)\}/g, /\{([^\}]*?)\(dd\)([^\}]*?)\}\?/g]
 		];
-		
 		var start = false;
 
 		for (var i = 0; i < 5; i++) {
@@ -485,9 +484,17 @@ definePropertys(Date, {
 		}
 
 		data.indexReverse(0).reverse();
-		data.forEach(function (item, index) {
-			format =
-				format.replace(<RegExp>items[index][2], Math.floor(<number>item[0]).toFixedBefore(2));
+
+		data.forEach(function (item, index) {//debugger
+			let val = Math.floor(item[0] as number);
+			let val2 = isFixedBefore ? val.toFixedBefore(2): String(val);
+			if (val) { // != 0
+				format = format.replace(items[index][3] as RegExp, `$1${val2}$2`);
+				format = format.replace(items[index][2] as RegExp, `$1${val2}$2`);
+			} else {
+				format = format.replace(items[index][3] as RegExp, '');
+				format = format.replace(items[index][2] as RegExp, `$1${val2}$2`);
+			}
 		});
 		return format;
 	},
