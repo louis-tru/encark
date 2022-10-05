@@ -203,19 +203,19 @@ export class URL {
 		return (<any>this)._hash;
 	}
 	
-	// host: "quark.cc:81"
+	// host: "quarks.cc:81"
 	get host(): string {
 		parse_path(this);
 		return (<any>this)._hostname + ((<any>this)._port ? ':' + (<any>this)._port : '');
 	}
 	
-	// hostname: "quark.cc"
+	// hostname: "quarks.cc"
 	get hostname(): string {
 		parse_path(this);
 		return (<any>this)._hostname;
 	}
 	
-	// origin: "http://quark.cc:81"
+	// origin: "http://quarks.cc:81"
 	get origin(): string {
 		parse_path(this);
 		return (<any>this)._origin;
