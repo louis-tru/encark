@@ -33,10 +33,10 @@ import path from './path';
 import { Notification } from './event';
 import path2 from './path';
 
-const { haveNode, haveNoug, haveWeb } = utils;
+const { haveNode, haveQuark, haveWeb } = utils;
 const fb = path2.fallbackPath;
 
-if (haveNoug) {
+if (haveQuark) {
 	var fs = __require__('_fs');
 } else if (haveNode) {
 	var fs = require('./fs');
