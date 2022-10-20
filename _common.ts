@@ -160,6 +160,13 @@ export function scopeLock<R>(mutex: any, cb: ()=>Promise<R>|R): Promise<R> {
 }
 
 /**
+ * @func isScopeLocked(mutex, cb)
+ */
+export function isScopeLocked(mutex: any) {
+	return scopeLockQueue.has(mutex);
+}
+
+/**
  * @fun get(name[,self]) # get object value by name
  * @arg name {String} 
  * @arg [self] {Object}
