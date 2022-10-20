@@ -147,7 +147,7 @@ export default class Parser extends EE {
 	private _parsePayload() {
 		var result = false
 
-		// Do we have a payload? Do we have enough data to complete the payload?
+		// Do we have a payload? Do we have equarkh data to complete the payload?
 		// PINGs have no payload
 		if (this.packet.length === 0 || this._list.length >= (this.packet.length as number)) {
 			this._pos = 0

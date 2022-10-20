@@ -158,7 +158,7 @@ export class URL {
 		(this as any)._value = path;
 	}
 	
-	// href: "http://xxxx.xxx:81/v1.1.0/noug/path.js?sasasas&asasasa#sdsdsd"
+	// href: "http://xxxx.xxx:81/v1.1.0/quark/path.js?sasasas&asasasa#sdsdsd"
 	get href(): string {
 		var self = this as any;
 		parse_path(self);
@@ -203,19 +203,19 @@ export class URL {
 		return (<any>this)._hash;
 	}
 	
-	// host: "noug.cc:81"
+	// host: "quarks.cc:81"
 	get host(): string {
 		parse_path(this);
 		return (<any>this)._hostname + ((<any>this)._port ? ':' + (<any>this)._port : '');
 	}
 	
-	// hostname: "noug.cc"
+	// hostname: "quarks.cc"
 	get hostname(): string {
 		parse_path(this);
 		return (<any>this)._hostname;
 	}
 	
-	// origin: "http://noug.cc:81"
+	// origin: "http://quarks.cc:81"
 	get origin(): string {
 		parse_path(this);
 		return (<any>this)._origin;

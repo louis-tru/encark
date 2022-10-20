@@ -49,7 +49,7 @@ export default function base(ALPHABET: string): Encoder {
 			zeroes++
 		}
 
-		// Allocate enough space in big-endian base58 representation.
+		// Allocate equarkh space in big-endian base58 representation.
 		const size = ((pend - pbegin) * iFACTOR + 1) >>> 0
 		const b58 = new Uint8Array(size)
 
@@ -100,7 +100,7 @@ export default function base(ALPHABET: string): Encoder {
 			psz++
 		}
 
-		// Allocate enough space in big-endian base256 representation.
+		// Allocate equarkh space in big-endian base256 representation.
 		const size = (((source.length - psz) * FACTOR) + 1) >>> 0 // log(58) / log(256), rounded up.
 		const b256 = new Uint8Array(size)
 

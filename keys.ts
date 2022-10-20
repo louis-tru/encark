@@ -33,7 +33,7 @@ import _keys from './_keys';
 
 var readFile: (path: string)=>string;
 
-if (util.haveNoug) {
+if (util.haveQuark) {
 	let reader = __require__('_reader');
 	readFile = function(path: string) {
 		return reader.readFileSync(path, 'utf8');
