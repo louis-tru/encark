@@ -113,6 +113,14 @@ interface Number {
 	*/
 	toFixedBefore(before: number, after?: number): string;
 
+	/**
+	 * 转换为前后固定位数的字符串,但不包含小数点后面为0
+	 * @arg after {Number}  小数点前固定位数
+	 * @arg split {Number?}  分割小数点前的字符
+	 * @arg symbol {String?}  分割小数点前的字符
+	*/
+	toFixedVariable(this: number, after: number, split?: number, symbol?: string): string;
+
 }
 
 interface Boolean {
@@ -395,18 +403,41 @@ definePropertys(Number.prototype, {
 		return this;
 	},
 
-	toFixedBefore(before: number, after: number): string {
+	toFixedBefore(this: number, before: number, after: number): string {
 		if (!isFinite(this)) {
 			return String(this);
 		} else {
 			var num = typeof after == 'number' ? this.toFixed(after) : String(this);
-			var match = num.match(/^(\d+)(\.\d+)?$/);
+			var match = num.match(/^(\d+)(\.\d+)?$/)!;
 			var integer = match[1];
 			var len = before - integer.length;
 			if (len > 0)
 				num = new Array(len + 1).join('0') + num;
 			return num;
 		}
+	},
+
+	toFixedVariable(this: number, after: number, split?: number, symbol?: string): string {
+		let num = this.toFixed(after);
+		let str = num.replace(/\.(\d*?)0+$/, function(_,b){ return b?'.'+b:'' });
+		if (!str)
+			return '0';
+		if (!split)
+			return str;
+		symbol = symbol || ',';
+		let l = str.split('.');
+		let l0 = l[0];
+		let l0_ = '';
+		for (let i = l0.length; i > 0; i-=split) {
+			let j = i - split;
+			if (j > 0) {
+				l0_ = symbol + l0.substring(j, i) + l0_;
+			} else {
+				l0_ = l0.substring(0, i) + l0_;
+			}
+		}
+		l[0] = l0_;
+		return l.join('.');
 	},
 
 });
