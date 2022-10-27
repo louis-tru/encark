@@ -117,8 +117,8 @@ export class Storage implements IStorageSync {
 	private m_value: Dict = {};
 	private m_sync: any;
 
-	constructor(path = url.cwd() + '/' + '.storage') {
-		this.m_path = url.fallbackPath(path);
+	constructor(path?: string) {
+		this.m_path = url.fallbackPath(path?path:(haveWeb ? location.origin: url.cwd()) + '/' + '.storage');
 		this.m_value = {};
 
 		if (haveWeb) {
