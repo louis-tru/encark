@@ -99,7 +99,7 @@ export default {
 	get MAX_PACKET_SIZE() { return MAX_PACKET_SIZE },
 	get DEFAULT_FLAGS() { return DEFAULT_FLAGS },
 	get CHAREST_NUMBER() { return CHAREST_NUMBER },
-	set CONNECT_TIMEOUT(value: number) { MAX_CONNECT_COUNT = value },
+	set CONNECT_TIMEOUT(value: number) { CONNECT_TIMEOUT = value },
 	set MAX_CONNECT_COUNT(value: number) { MAX_CONNECT_COUNT = value },
 	set MAX_PACKET_SIZE(value: number) { MAX_PACKET_SIZE = value },
 	set DEFAULT_FLAGS(value: ClientFlags) { DEFAULT_FLAGS = value },
