@@ -41,31 +41,35 @@ import {Socket} from 'net';
 import {Options, default_options} from './opts';
 import {Watch} from '../monitor';
 
-const CONNECT_TIMEOUT = 1e4;
 const G_connect_pool: Dict<{ used: Connection[], idle: Connection[] }> = {};
 const G_require_connect: Dict<Request[]> = {};
 const G_watch = new Watch(1e4);
+
+/**
+* @type {Numbet}
+*/
+let CONNECT_TIMEOUT = 1e4;
 
 /**
 * <span style="color:#f00">[static]</span>max connect count
 * @type {Numbet}
 * @static
 */
-var MAX_CONNECT_COUNT = 20;
+let MAX_CONNECT_COUNT = 20;
 
 /**
 	* <b style="color:#f00">[static]</b>max packet size
 	* @type {Number}
 	* @static
 	*/
-	var MAX_PACKET_SIZE = 0x01000000;
+let MAX_PACKET_SIZE = 0x01000000;
 
 /**
 	* <b style="color:#f00">[static]</b>default flags
 	* @type {Number}
 	* @static
 	*/
-var DEFAULT_FLAGS = 
+let DEFAULT_FLAGS = 
 		ClientFlags.CLIENT_LONG_PASSWORD
 	| ClientFlags.CLIENT_FOUND_ROWS
 	| ClientFlags.CLIENT_LONG_FLAG
@@ -87,13 +91,15 @@ var DEFAULT_FLAGS =
 	* @type {Number}
 	* @static
 	*/
-var CHAREST_NUMBER = Charsets.UTF8_UNICODE_CI;
+let CHAREST_NUMBER = Charsets.UTF8_UNICODE_CI;
 
 export default {
+	get CONNECT_TIMEOUT() { return CONNECT_TIMEOUT },
 	get MAX_CONNECT_COUNT() { return MAX_CONNECT_COUNT },
 	get MAX_PACKET_SIZE() { return MAX_PACKET_SIZE },
 	get DEFAULT_FLAGS() { return DEFAULT_FLAGS },
 	get CHAREST_NUMBER() { return CHAREST_NUMBER },
+	set CONNECT_TIMEOUT(value: number) { MAX_CONNECT_COUNT = value },
 	set MAX_CONNECT_COUNT(value: number) { MAX_CONNECT_COUNT = value },
 	set MAX_PACKET_SIZE(value: number) { MAX_PACKET_SIZE = value },
 	set DEFAULT_FLAGS(value: ClientFlags) { DEFAULT_FLAGS = value },
