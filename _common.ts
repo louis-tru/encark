@@ -299,8 +299,8 @@ Object.defineProperty(Error.prototype, 'filter', {
  */
 export function update<T>(obj: T, extd: any): T {
 	for (var key in extd) {
-		if (key in obj) {
-			(<any>obj)[key] = select((<any>obj)[key], extd[key]);
+		if (key in (obj as any)) {
+			(obj as any)[key] = select((obj as any)[key], extd[key]);
 		}
 	}
 	return obj;

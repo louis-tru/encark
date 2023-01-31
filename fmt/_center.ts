@@ -319,7 +319,9 @@ export class FastMessageTransferCenter_IMPL {
 			throw Error.new(errno.ERR_FMT_CLIENT_OFFLINE);
 		}
 		// Trigger again
-		this.m_host.getNoticer('_Login').trigger({ id, uuid, fnodeId: (fnode as fnode.FNode).id, time });
+		this.m_host.getNoticer('_Login').trigger({
+			id, uuid: uuid!, fnodeId: (fnode as fnode.FNode).id, time: time!
+		});
 
 		if (method) {
 			return await (fnode as any)[method](id, ...args);
