@@ -304,28 +304,28 @@ export class Mysql implements Database {
 		}
 	}
 
-	transaction() {
+	async transaction() {
 		if (this._transaction)
 			return;
 		this._transaction = true;
-		this.query('START TRANSACTION');
+		await this.exec('START TRANSACTION');
 	}
 
-	commit() {
+	async commit() {
 		this._transaction = false;
-		this.query('COMMIT');
+		await this.exec('COMMIT');
 	}
 
-	rollback() {
+	async rollback() {
 		this._queue = [];
 		this._transaction = false;
-		this.query('ROLLBACK');
+		await this.exec('ROLLBACK');
 	}
 
 	/**
 	 * exec query database
 	 */
-	 exec(sql: string): Promise<Result[]> {
+	exec(sql: string): Promise<Result[]> {
 		return new Promise((resolve, reject)=>{
 			this.query(sql, function(err: any, data: any) {
 				if (err) {
@@ -647,12 +647,12 @@ export class MysqlTools implements DatabaseTools {
 		var crud = new MysqlCRUD(db, this);
 		var r: T;
 		try {
-			db.transaction();
+			await db.transaction();
 			r = await cb(crud, this);
-			db.commit();
+			await db.commit();
 			return r;
 		} catch(err) {
-			db.rollback();
+			await db.rollback();
 			throw err;
 		} finally {
 			db.close();

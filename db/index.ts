@@ -88,17 +88,17 @@ export interface Database {
 	/**
 	 * srart transaction
 	 */
-	transaction(): void;
+	transaction(): Promise<void>;
 	
 	/**
 	 * commit transaction
 	 */
-	commit(): void;
+	commit(): Promise<void>;
 	
 	/**
 	 * rollback transaction and clear sql command queue
 	 */
-	rollback(): void;
+	rollback(): Promise<void>;
 
 }
 
