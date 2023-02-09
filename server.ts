@@ -33,7 +33,6 @@ import * as http from 'http';
 import * as net from 'net';
 import _server, {Server} from './_server';
 import upgrade from './ws/upgrade';
-import service from './service';
 import {StaticService} from './static_service';
 import './http_service';
 import {RuleResult} from './router';
@@ -47,7 +46,7 @@ export class ServerIMPL extends Server {
 	private m_checkIntervalId: any;
 
 	//Handle http and websocket and http-heartbeat request
-	protected initializ(server: http.Server) {
+	protected initialize(server: http.Server) {
 
 		async function requestAuth(ser: StaticService, rule: RuleResult) {
 			var ok = ser.onRequestAuth(rule); // 认证请求的合法性
@@ -71,7 +70,7 @@ export class ServerIMPL extends Server {
 			var url = decodeURI(req.url || ''); // 解码
 			var rule = this.router.find(url);   // 通过url查找目标服务信息
 			var name = rule.service;
-			var cls = service.get(name) as unknown as typeof StaticService;
+			var cls = this.getService(name) as unknown as typeof StaticService;
 
 			if (this.printLog) {
 				console.log(url);
@@ -121,7 +120,7 @@ export class ServerIMPL extends Server {
 		this.addEventListener('Startup', ()=>{
 			this.m_checkIntervalId = setInterval(()=>{
 				var time = Date.now();
-				for (var [,conv] of this.m_ws_conversations) {
+				for (var [,conv] of this._wsConversations) {
 					if (conv.keepAliveTime * 2 + conv.lastPacketTime < time) {
 						conv.close(); // disconnect
 					}
@@ -131,7 +130,7 @@ export class ServerIMPL extends Server {
 
 		server.on('close', ()=>{
 			clearInterval(this.m_checkIntervalId);
-			this.m_isRun = false;
+			this._isRun = false;
 			this.trigger('Stop', {});
 		});
 	}

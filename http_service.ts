@@ -30,7 +30,7 @@
 
 import util from './util';
 import {Cookie} from './cookie';
-import service from './service';
+import {Service} from './service';
 import {StaticService} from './static_service';
 import {Session} from './session';
 import * as http from 'http';
@@ -376,9 +376,46 @@ export class HttpService extends StaticService {
  * @class HttpService
  */
 export class Descriptors extends HttpService {
-	descriptors() {
-		return service.getServiceDescriptors();
-	}
-}
 
-service.set('descriptors', Descriptors);
+	descriptors() {
+		let res: Dict = {};
+
+		for (let key of this.server.services) {
+			let service = this.server.getService(key);
+			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
+				let methods: string[] = [], events: string[] = [];
+				let item = { type: service.type, methods, events };
+				let self = service.prototype as any;
+
+				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
+					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
+						if (/^on[a-zA-Z]/.test(k)) { // event
+							if (typeof v.value != 'function')
+								events.push(k.substring(2));
+						} else { // methods
+							if (typeof v.value == 'function') {
+								methods.push(k);
+							}
+						}
+					}
+				});
+
+				self = self.__proto__;
+
+				while (self !== Service.prototype) {
+					Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
+						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event
+							events.push(k.substring(2));
+						}
+					});
+					self = self.__proto__;
+				}
+				
+				res[key] = item;
+			}
+		}
+
+		return res;
+	}
+
+}

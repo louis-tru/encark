@@ -31,7 +31,6 @@
 import utils from '../util';
 import {URL} from '../path';
 import fmtc from './fmtc';
-import service from '../service';
 import * as wss from '../ws/service';
 import * as cli from '../ws/cli';
 import path from '../path';
@@ -337,5 +336,3 @@ export class FNodeRemoteClient extends cli.WSClient {
 
 utils.extendClass(FNodeRemoteService, FNodeRemoteIMPL);
 utils.extendClass(FNodeRemoteClient, FNodeRemoteIMPL);
-
-service.set('_fnode', FNodeRemoteService);

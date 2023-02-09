@@ -37,11 +37,10 @@ import * as _center from './_center';
 var _centers = new WeakMap<s.Server, _center.FastMessageTransferCenter_IMPL>();
 
 export default {
-	_register(server: s.Server, center: _center.FastMessageTransferCenter_IMPL) {
+	_set(server: s.Server, center: _center.FastMessageTransferCenter_IMPL) {
 		utils.assert(!_centers.has(server), 'Repeat FastMessageTransferCenter instance in Server');
 		utils.assert(server instanceof s.Server, errno.ERR_PARAM_TYPE_MISMATCH);
 		_centers.set(server, center);
-		center.run(); // run watch
 	},
 	_fmtc(server: s.Server): _center.FastMessageTransferCenter_IMPL | undefined {
 		return _centers.get(server);

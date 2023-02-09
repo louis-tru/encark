@@ -82,7 +82,7 @@ export class FastMessageTransferCenter_IMPL {
 	private m_fnode_id: string = uuid(); // center server global id
 	private m_publish_url: URL | null;
 	private m_fnodes: Dict<fnode.FNode> = {};
-	private m_isRun = false;
+	private _isRun = false;
 	private m_fnodesCfg: Dict<FnodesCfg> = {};
 	private _fmtService: Map<string, service.FMTService> = new Map(); // client service handle
 	private m_routeTable: Map<string, Route> = new Map(); // { 0_a: {fnodeId:'fnodeId-abcdefg-1',uuid,time} }
@@ -175,7 +175,11 @@ export class FastMessageTransferCenter_IMPL {
 			this.addFnodeCfg(cfg, true);
 		}
 
-		fmtc._register(server, this);
+		server.setService('_fmt', service.FMTService);
+		server.setService('_fnode', fnode.FNodeRemoteService);
+
+		fmtc._set(server, this);
+		this.run(); // run watch
 	}
 
 	addFnodeCfg(url: string, init = false) {
@@ -187,8 +191,8 @@ export class FastMessageTransferCenter_IMPL {
 	}
 
 	async run() {
-		utils.assert(!this.m_isRun);
-		this.m_isRun = true;
+		utils.assert(!this._isRun);
+		this._isRun = true;
 		this.m_fnodes = {};
 
 		// init local node

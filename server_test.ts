@@ -30,7 +30,6 @@
 
 import utils from './util';
 import server from './server';
-import service from './service';
 import {ViewController} from './ctr';
 
 class Test extends ViewController {
@@ -53,12 +52,12 @@ class Test extends ViewController {
 
 }
 
-service.set('test', Test);
-
 var s = new server.ServerIMPL({
 	port: 8091,
 	timeout: 60 * 1e3,
 	printLog: true,
 });
+
+s.setService('test', Test);
 
 s.start();

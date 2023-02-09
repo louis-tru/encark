@@ -29,7 +29,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 import utils from '../util';
-import service from '../service';
 import * as wsservice from './service';
 import errno from '../errno';
 import buffer, {IBuffer} from '../buffer';
@@ -235,7 +234,7 @@ export class WSConversation extends ConversationBasic  {
 	protected async bindServices(services: string[]) {
 		var self = this;
 		for (var name of services) {
-			var cls = service.get(name) as unknown as (typeof wsservice.WSService);
+			var cls = this.server.getService(name) as unknown as (typeof wsservice.WSService);
 			utils.assert(cls, name + ' not found');
 			utils.assert(utils.equalsClass(wsservice.WSService, cls), name + ' Service type is not correct');
 			utils.assert(!(name in self.m_handles), 'Service no need to repeat binding');

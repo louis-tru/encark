@@ -60,7 +60,7 @@ export class FastMessageTransferCenterDelegate {
 	/** 
 	 * @func auth() auth client, return client user info
 	*/
-	auth(fmtService: service.FMTService): Dict | null {
+	auth(fmtService: service.FMTService):Promise<Dict> | Dict | null {
 		return {/* user info */};
 	}
 

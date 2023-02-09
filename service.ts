@@ -28,15 +28,12 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
-import util from './util';
 import * as querystring from 'querystring';
 import * as Path from 'path';
 import * as http from 'http';
 import * as net from 'net';
 import {Server} from './_server';
 import {RuleResult} from './router';
-
-const _service_cls: Dict<typeof Service> = {};
 
 /**
  * base service abstract class
@@ -187,73 +184,3 @@ export abstract class Service {
 }
 
 Service.type = 'service';
-
-export default {
-
-	Service: Service,
-	
-	/**
-	 * 获取所有的服务名称列表
-	 */
-	get services() { return Object.keys(_service_cls) },
-	
-	/**
-	 * 通过名称获取服务class
-	 */
-	get(name: string): typeof Service {
-		return _service_cls[name];
-	},
-
-	/**
-	 * @func getServiceDescriptors()
-	 */
-	getServiceDescriptors() {
-		var r: Dict = {};
-		Object.entries(_service_cls).forEach(([key, service])=>{
-			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
-				// var type = 0;
-				var methods: string[] = [], events: string[] = [];
-				var item = { type: service.type, methods, events };
-				var self = <any>service.prototype;
-
-				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
-						if (/^on[a-zA-Z]/.test(k)) { // event
-							if (typeof v.value != 'function')
-								events.push(k.substring(2));
-						} else { // methods
-							if (typeof v.value == 'function') {
-								methods.push(k);
-							}
-						}
-					}
-				});
-
-				self = self.__proto__;
-
-				while (self !== Service.prototype) {
-					Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event
-							events.push(k.substring(2));
-						}
-					});
-					self = self.__proto__;
-				}
-				
-				r[key] = item;
-			}
-		});
-		return r;
-	},
-
-	set(name: string, cls: any) {
-		util.assert(util.equalsClass(Service, cls), `"${name}" is not a "Service" type`);
-		util.assert(!(name in _service_cls), `service repeat definition, "${name}"`);
-		cls.id = name;
-		_service_cls[name] = cls;
-	},
-
-	del(name: string) {
-		delete _service_cls[ name ];
-	},
-};

@@ -31,7 +31,7 @@
 import util from './util';
 import * as fs from './fs';
 import * as fs2 from './fs2';
-import service, {Service} from './service';
+import {Service} from './service';
 import * as http from 'http';
 import * as zlib from 'zlib';
 import {RuleResult} from './router'
@@ -562,7 +562,4 @@ export class StaticService extends Service {
 		return returnDirectory(this, filename);
 	}
 
-	// @end
 }
-
-service.set('StaticService', StaticService);

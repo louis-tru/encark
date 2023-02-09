@@ -31,7 +31,6 @@
 import utils from '../util';
 import uuid from '../hash/uuid';
 import fmtc from './fmtc';
-import service from '../service';
 import * as wss from '../ws/service';
 import errno from '../errno';
 import * as _center from './_center';
@@ -235,5 +234,3 @@ export class FMTServerClient {
 	}
 
 }
-
-service.set('_fmt', FMTService);

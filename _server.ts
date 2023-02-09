@@ -37,6 +37,9 @@ import * as fs from './fs';
 import * as path from 'path';
 import incoming_form from './incoming_form';
 import * as _conv from './ws/_conv';
+import {Service} from './service';
+import {StaticService} from './static_service';
+import {Descriptors} from './http_service';
 
 var shared: Server | null = null;
 var mimeTypes: Dict = {};
@@ -102,14 +105,20 @@ export interface Options {
 	*/
 export abstract class Server extends Notification {
 
-	protected m_ws_conversations = new Map<string, _conv.ConversationBasic>();// Dict<_conv.ConversationBasic> = {};
-	private m_server: http.Server;
-	protected m_isRun: boolean = false;
-	private m_host: string = '';
-	private m_port: number = 0; // 自动端口
+	protected _isRun: boolean = false;
+	protected _wsConversations = new Map<string, _conv.ConversationBasic>();// Dict<_conv.ConversationBasic> = {};
+	private _server: http.Server;
+	private _host: string = '';
+	private _port: number = 0; // 自动端口
+	private _serviceCls: Dict<typeof Service> = {};
 
-	get host() { return this.m_host }
-	get port() { return this.m_port }
+	get host() { return this._host }
+	get port() { return this._port }
+
+	/**
+	 * 获取所有的服务名称列表
+	 */
+	get services() { return Object.keys(this._serviceCls) }
 
 	/**
 		* 打印log
@@ -206,7 +215,7 @@ export abstract class Server extends Notification {
 	 * @type {Number}
 	 */
 	get timeout() {
-		return this.m_server.timeout;
+		return this._server.timeout;
 	}
 
 	/**
@@ -257,7 +266,7 @@ export abstract class Server extends Notification {
 	 * @get impl 
 	 */
 	get impl() {
-		return this.m_server;
+		return this._server;
 	}
 
 	readonly onWSConversationOpen = new EventNoticer<Event<Server, _conv.ConversationBasic>>('WSConversationOpen', this);
@@ -270,9 +279,9 @@ export abstract class Server extends Notification {
 	 */
 	constructor(config?: Options) {
 		super();
-		this.m_server = new http.Server();
+		this._server = new http.Server();
 		this.router = new Router();
-		(<any>this.m_server).__wrap__ = this;
+		(this._server as any).__wrap__ = this;
 
 		config = config || {};
 	
@@ -297,8 +306,8 @@ export abstract class Server extends Notification {
 			'tryFiles',
 		]));
 
-		this.m_port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;
-		this.m_host   = config.host ? String(config.host): '';
+		this._port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;
+		this._host   = config.host ? String(config.host): '';
 		this.root     = config.root ? Array.isArray(config.root) ? 
 			config.root.map(e=>path.resolve(e)): [path.resolve(config.root)] : this.root;
 		this.temp     = config.temp ? path.resolve(config.temp) : this.temp;
@@ -336,29 +345,32 @@ export abstract class Server extends Notification {
 
 		this.onWSConversationOpen.on(e=>{
 			var conv = e.data;
-			this.m_ws_conversations.set(conv.token, conv); // TODO private visit
+			this._wsConversations.set(conv.token, conv); // TODO private visit
 		});
 
 		this.onWSConversationClose.on(e=>{
 			var conv = e.data;
-			this.m_ws_conversations.delete(conv.token); // TODO private visit
+			this._wsConversations.delete(conv.token); // TODO private visit
 		});
 
-		this.initializ(this.m_server);
+		this.setService('descriptors', Descriptors);
+		this.setService('StaticService', StaticService);
+
+		this.initialize(this._server);
 	}
 
-	protected abstract initializ(server: http.Server): void;
+	protected abstract initialize(server: http.Server): void;
 
 	/**
 	 * Get wsConversations conversation 
 	 */
 	get wsConversations(): IterableIterator<_conv.ConversationBasic> {
-		return this.m_ws_conversations.values();
+		return this._wsConversations.values();
 	}
 
 	set timeout(timeout: number) {
-		timeout = Number(timeout) || this.m_server.timeout;
-		this.m_server.setTimeout(timeout);
+		timeout = Number(timeout) || this._server.timeout;
+		this._server.setTimeout(timeout);
 	}
 
 	/**
@@ -386,7 +398,7 @@ export abstract class Server extends Notification {
 	 * 是否正在运行
 	 */
 	get isRun(){
-		return this.m_isRun;
+		return this._isRun;
 	}
 
 	/**
@@ -395,19 +407,19 @@ export abstract class Server extends Notification {
 	start() {
 		return util.promise<void>((resolve)=>{
 			var complete = ()=>{
-				var addr = <net.AddressInfo>(this.m_server).address();
-				this.m_host = addr.address;
-				this.m_port = addr.port;
-				this.m_isRun = true;
+				var addr = <net.AddressInfo>(this._server).address();
+				this._host = addr.address;
+				this._port = addr.port;
+				this._isRun = true;
 				this.trigger('Startup', {});
 				resolve();
 			}
-			if (this.m_port) {
-				this.m_server.listen(this.m_port, this.m_host, complete);
-			} else if ( this.m_host ) {
-				this.m_server.listen(String(this.m_host), complete);
+			if (this._port) {
+				this._server.listen(this._port, this._host, complete);
+			} else if ( this._host ) {
+				this._server.listen(String(this._host), complete);
 			} else {
-				this.m_server.listen(complete);
+				this._server.listen(complete);
 			}
 		});
 	}
@@ -416,7 +428,7 @@ export abstract class Server extends Notification {
 	 * @func stop() sopt service
 	 */
 	stop() {
-		this.m_server.close();
+		this._server.close();
 	}
 
 	/**
@@ -427,7 +439,7 @@ export abstract class Server extends Notification {
 		(async ()=>{
 			var i = 4;
 			while (--i) {
-				if (!this.m_isRun) {
+				if (!this._isRun) {
 					this.start();
 					break;
 				}
@@ -436,7 +448,30 @@ export abstract class Server extends Notification {
 		})().catch(console.error);
 	}
 
-	// @end
+	/**
+	 * 通过名称获取服务class
+	 */
+	getService(name: string): typeof Service {
+		return this._serviceCls[name];
+	}
+
+	/**
+	 * @func setService() Registration Service
+	*/
+	setService(name: string, cls: any) {
+		util.assert(util.equalsClass(Service, cls), `"${name}" is not a "Service" type`);
+		util.assert(!(name in this._serviceCls), `service repeat definition, "${name}"`);
+		cls.id = name;
+		this._serviceCls[name] = cls;
+	}
+
+	/**
+	 * @func removeService() remove service
+	*/
+	removeService(name: string) {
+		delete this._serviceCls[ name ];
+	}
+
 }
 
 export default {
