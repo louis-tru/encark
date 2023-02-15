@@ -117,12 +117,12 @@ interface Request {
 }
 
 function _Watch() {
-	var now = Date.now();
-	var isStop = true;
+	let now = Date.now();
+	let isStop = true;
 	// watch reqs
-	for (var reqs of Object.values(G_require_connect)) {
-		for (var i = 0; i < reqs.length; ) {
-			var req = reqs[i];
+	for (let reqs of Object.values(G_require_connect)) {
+		for (let i = 0; i < reqs.length; ) {
+			let req = reqs[i];
 			if (now >= req.timeout) {
 				req.time();
 				reqs.splice(i, 1);
@@ -133,8 +133,8 @@ function _Watch() {
 		}
 	}
 
-	for (var pool of Object.values(G_connect_pool)) {
-		for (var c of pool.idle) {
+	for (let pool of Object.values(G_connect_pool)) {
+		for (let c of pool.idle) {
 			isStop = false;
 			c.checkIdleTimeout();
 		}
@@ -170,15 +170,15 @@ export class Connection {
 	}
 
 	private _sendAuth(greeting: Packet) {
-		var opt = this.options;
-		var token = auth.token(opt.password as string, greeting.data.scrambleBuffer as Buffer);
-		var packetSize = (
+		let opt = this.options;
+		let token = auth.token(opt.password as string, greeting.data.scrambleBuffer as Buffer);
+		let packetSize = (
 			4 + 4 + 1 + 23 +
 			(opt.user as string).length + 1 +
 			token.length + 1 +
 			(opt.database  as string).length + 1
 		);
-		var packet = new OutgoingPacket(packetSize, greeting.number + 1);
+		let packet = new OutgoingPacket(packetSize, greeting.number + 1);
 
 		packet.writeNumber(4, DEFAULT_FLAGS);
 		packet.writeNumber(4, MAX_PACKET_SIZE);
@@ -197,10 +197,10 @@ export class Connection {
 	}
 
 	private _sendOldAuth(greeting: Packet) {
-		var token = auth.scramble323(greeting.data.scrambleBuffer as Buffer, this.options.password as string);
-		var packetSize = (token.length + 1);
+		let token = auth.scramble323(greeting.data.scrambleBuffer as Buffer, this.options.password as string);
+		let packetSize = (token.length + 1);
 
-		var packet = new OutgoingPacket(packetSize, greeting.number + 3);
+		let packet = new OutgoingPacket(packetSize, greeting.number + 3);
 
 		// I could not find any official documentation for this, but from sniffing
 		// the mysql command line client, I think this is the right way to send the
@@ -218,12 +218,12 @@ export class Connection {
 	}
 
 	private _Destroy(reason?: any) {
-		var self = this;
-		var socket = self._socket;
+		let self = this;
+		let socket = self._socket;
 		if (socket) {
 			self._socket = null;
 			this._idle_tomeout = 0;
-			var key = Connection._Key(this.options);
+			let key = Connection._Key(this.options);
 			if (this._isUse) {
 				G_connect_pool[key].used.deleteOf(self);
 			} else {
@@ -253,10 +253,10 @@ export class Connection {
 	 */
 	constructor(options?: Options) {
 		this.options = Object.assign({}, default_options, options);
-		var self = this;
-		var parser = new Parser();
-		var socket = this._socket = new Socket();
-
+		let self = this;
+		let parser = new Parser();
+		let socket = this._socket = new Socket();
+ 
 		this.parser = parser;
 
 		socket.setNoDelay(true);
@@ -269,7 +269,7 @@ export class Connection {
 		socket.on('close', ()=>self._Destroy('mysql server has been socket close'));
 
 		parser.onPacket.on(function(e) {
-			var packet = e.data;
+			let packet = e.data;
 			if (packet.type === ParserConstants.ERROR_PACKET) {
 				self._Destroy({ message: 'ERROR_PACKET', ...packet.toJSON() });
 			} else if (self._isReady) {
@@ -284,7 +284,8 @@ export class Connection {
 			}
 		});
 
-		socket.connect(this.options.port as number, this.options.host as string);
+		socket.connect(this.options.port!, this.options.host!, ()=>{
+		});
 	}
 
 	/**
@@ -314,10 +315,10 @@ export class Connection {
 		if (!this._socket)
 			return; // socket destroy
 
-		var opts_ = this.options;
-		var key = Connection._Key(opts_);
-		var reqs = G_require_connect[key];
-		var {used,idle} = G_connect_pool[key];
+		let opts_ = this.options;
+		let key = Connection._Key(opts_);
+		let reqs = G_require_connect[key];
+		let {used,idle} = G_connect_pool[key];
 
 		used.deleteOf(this);
 		idle.push(this);
@@ -325,9 +326,9 @@ export class Connection {
 		// console.log('idle()', 'reqs', reqs?.length, 'used', used.length, 'idle', idle.length);
 
 		if (reqs) {
-			for (var i = 0, l = reqs.length; i < l; i++) {
-				var req = reqs[i];
-				var [opts,cb] = req.args;
+			for (let i = 0, l = reqs.length; i < l; i++) {
+				let req = reqs[i];
+				let [opts,cb] = req.args;
 				reqs.splice(i, 1);
 				resolve(opts, cb);
 				// console.log('idle() b', reqs.length);
@@ -345,7 +346,7 @@ export class Connection {
 			// init db, change db
 			utils.assert(this._isReady);
 			this.options.database = db;
-			var packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
+			let packet = new OutgoingPacket(1 + Buffer.byteLength(db, 'utf-8'));
 			packet.writeNumber(1, Commands.COM_INIT_DB);
 			packet.write(db, 'utf-8');
 			this._write(packet);
@@ -375,7 +376,7 @@ export class Connection {
 		utils.assert(!this._isUse);
 		this._isUse = true;
 		this._idle_tomeout = 0;
-		var key = Connection._Key(this.options);
+		let key = Connection._Key(this.options);
 		G_connect_pool[key].idle.deleteOf(this);
 		G_connect_pool[key].used.push(this);
 	}
@@ -386,12 +387,12 @@ export class Connection {
 	 * @param {Function} cb
 	 */
 	static resolve(opt: Options, cb: Callback) {
-		var key = Connection._Key(opt);
-		var pool = G_connect_pool[key] || (G_connect_pool[key] = { used: [], idle: [] });
+		let key = Connection._Key(opt);
+		let pool = G_connect_pool[key] || (G_connect_pool[key] = { used: [], idle: [] });
 
-		var c = pool.idle[0];
+		let c = pool.idle[0];
 		if (c) {
-			var c_opts = c.options;
+			let c_opts = c.options;
 			if (c_opts.database == opt.database) {
 				c._ready(cb);
 			} else {
@@ -402,14 +403,14 @@ export class Connection {
 
 		//is max connect
 		if (pool.used.length + pool.idle.length < MAX_CONNECT_COUNT) {
-			var _c = new Connection(opt);
+			let _c = new Connection(opt);
 			pool.idle.push(_c);
 			_c._ready(cb);
 		} else {
-			var reqs = G_require_connect[key] || (G_require_connect[key] = []);
+			let reqs = G_require_connect[key] || (G_require_connect[key] = []);
 			// console.log('resolve()', 'reqs', reqs.length);
 			// queue up
-			var req: Request = {
+			let req: Request = {
 				time: function() {
 					cb(new Error('obtaining a connection from the connection pool timeout'));
 				},

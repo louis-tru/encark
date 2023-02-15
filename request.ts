@@ -666,7 +666,7 @@ export class Request {
 		}
 	}
 
-	async get<T = any>(name: string, params?: Params, options?: Options): PromiseResult {
+	get<T = any>(name: string, params?: Params, options?: Options) {
 		return this.request<T>(name, 'GET', params, options);
 	}
 
