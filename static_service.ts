@@ -86,7 +86,7 @@ function tryReturnDirectory(self: StaticService, filename: string) {
 		if(self.server.autoIndex) {
 			return returnDirectory(self, filename);
 		} else {
-			return returnErrorStatus(self, 403);
+			return returnErrorStatus(self, 404);
 		}
 	}
 
@@ -367,32 +367,36 @@ function returnFile(self: StaticService, filename: string, mime?: string) {
 	}
 }
 
-function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
+async function returnErrorStatus(self: StaticService, statusCode: number, html?: string) {
+	if (util.debug && html)
+		return resultError(self, statusCode, html);
 
-	var filename = self.server.errorStatus[statusCode];
+	let returnFile_ = async (filename: string) =>{
+		try {
+			let stat = await fs2.stat(filename);
+			if (stat.isFile()) {
+				_returnFile(self, filename, stat);
+				return true;
+			}
+		} catch(err: any) {}
+		return false;
+	};
 
-	if (!filename) {
-		if (statusCode == 404 || statusCode == 403) {
-			filename = self.server.tryFiles;
+	if (statusCode == 404) {
+		let root = self.server.root[0];
+
+		if (self.server.trySuffixs) {
+			if (await returnFile_(root + self.pathname + self.server.trySuffixs))
+				return;
+		}
+
+		if (self.server.tryFiles) {
+			if (await returnFile_(root + self.server.tryFiles))
+				return;
 		}
 	}
 
-	if (filename) {
-		filename = (self as any)._root[0] + filename;
-		fs.stat(filename, function (err) {
-			if (err) {
-				resultError(self, statusCode, html);
-			} else {
-				if (util.debug && html) {
-					resultError(self, statusCode, html);
-				} else {
-					returnFile(self, filename);
-				}
-			}
-		});
-	} else {
-		resultError(self, statusCode, html);
-	}
+	resultError(self, statusCode, html);
 }
 
 /**
@@ -471,7 +475,7 @@ export class StaticService extends Service {
 			if (this.server.disable.test(filename)) {  //禁止访问的路径
 				return this.returnErrorStatus(403);
 			}
-			this.returnSiteFile(filename.substr(1));
+			this.returnSiteFile(filename.substring(1));
 		} else {
 			this.returnErrorStatus(405);
 		}

@@ -98,6 +98,7 @@ export interface Options {
 	staticService?: string;
 	router?: Rule[];
 	tryFiles?: string;
+	trySuffixs?: string;
 }
 
 /**
@@ -208,7 +209,11 @@ export abstract class Server extends Notification {
 	/**
 	 * 错误文件指向
 	*/
-	readonly tryFiles = '';
+	readonly tryFiles = ''; // '/index.html'
+	/**
+	 * 错误文件指向后缀
+	*/
+	readonly trySuffixs = ''; // '.html'|'.htm'
 
 	/**
 	 * 请求超时时间(毫秒)
@@ -304,6 +309,7 @@ export abstract class Server extends Notification {
 			'defaults',
 			'formHash',
 			'tryFiles',
+			'trySuffixs',
 		]));
 
 		this._port   = Number(process.env.WEB_SERVER_PORT) || Number(config.port) || 0;
