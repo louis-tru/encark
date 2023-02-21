@@ -372,7 +372,7 @@ function returnErrorStatus(self: StaticService, statusCode: number, html?: strin
 	var filename = self.server.errorStatus[statusCode];
 
 	if (!filename) {
-		if (statusCode == 404) {
+		if (statusCode == 404 || statusCode == 403) {
 			filename = self.server.tryFiles;
 		}
 	}
