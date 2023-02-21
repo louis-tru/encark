@@ -371,18 +371,19 @@ async function returnErrorStatus(self: StaticService, statusCode: number, html?:
 	if (util.debug && html)
 		return resultError(self, statusCode, html);
 
-	let returnFile_ = async (filename: string) =>{
-		try {
-			let stat = await fs2.stat(filename);
-			if (stat.isFile()) {
-				_returnFile(self, filename, stat);
-				return true;
-			}
-		} catch(err: any) {}
-		return false;
-	};
-
 	if (statusCode == 404) {
+
+		let returnFile_ = async (filename: string) =>{
+			try {
+				let stat = await fs2.stat(filename);
+				if (stat.isFile()) {
+					_returnFile(self, filename, stat);
+					return true;
+				}
+			} catch(err: any) {}
+			return false;
+		};
+	
 		let root = self.server.root[0];
 
 		if (self.server.trySuffixs) {
