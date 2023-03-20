@@ -31,6 +31,7 @@
 import { EventNoticer, Event } from '../event';
 import { Packet, Constants, PacketData } from './parser';
 import {ServerStatus} from './constants';
+import bufferLib,{IBuffer} from '../buffer';
 
 export class Field {
 	readonly name: string;
@@ -91,7 +92,19 @@ export class Query {
 		this.sql = sql;
 	}
 
-	private _ParseField(type: FieldType, str_value: string) {
+	private _ParseField(type: FieldType, data: IBuffer) {
+		switch (type) {
+			case FieldType.FIELD_TYPE_STRING:
+			case FieldType.FIELD_TYPE_VAR_STRING:
+			case FieldType.FIELD_TYPE_TINY_BLOB:
+			case FieldType.FIELD_TYPE_MEDIUM_BLOB:
+			case FieldType.FIELD_TYPE_LONG_BLOB:
+			case FieldType.FIELD_TYPE_BLOB:
+				return data;
+		}
+
+		let str_value = data.toString('utf-8');
+
 		// NOTE: need to handle more data types, such as binary data
 		switch (type) {
 			case FieldType.FIELD_TYPE_TIMESTAMP:
@@ -111,6 +124,7 @@ export class Query {
 				return parseInt(str_value, 10);
 			case FieldType.FIELD_TYPE_FLOAT:
 			case FieldType.FIELD_TYPE_DOUBLE:
+			case FieldType.FIELD_TYPE_NEWDECIMAL:
 				// decimal types cannot be parsed as floats because
 				// V8 Numbers have less precision than some MySQL Decimals
 				return parseFloat(str_value);
@@ -172,7 +186,7 @@ export class Query {
 			case Constants.ROW_DATA_PACKET: {
 				let row: Dict = {};
 				let field: Field | null = null;
-				let value: Buffer | null = null;
+				let value: IBuffer | null = null;
 				let fields = <Field[]>this._fields;
 				this._rowIndex = 0;
 				this._row = row;
@@ -187,7 +201,7 @@ export class Query {
 
 					if (buffer) {
 						if (value) {
-							value = Buffer.concat([value, buffer]);
+							value = bufferLib.concat([value, buffer]);
 						} else {
 							value = buffer;
 						}
@@ -203,7 +217,7 @@ export class Query {
 					self._rowIndex++;
 
 					if (value !== null) {
-						row[field.name] = self._ParseField(field.type, value.toString('utf8'));
+						row[field.name] = self._ParseField(field.type, value);
 					}
 
 					if (self._rowIndex == fields.length) {

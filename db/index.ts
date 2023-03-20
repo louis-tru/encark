@@ -28,19 +28,26 @@
  * 
  * ***** END LICENSE BLOCK ***** */
 
+import buffer from '../buffer';
+
 /**
  * escape sql param
  */
 export function escape(param: any) {
+
 	if (param === undefined || param === null)
 		return 'NULL';
 
-	var type = typeof param;
+	let type = typeof param;
+
 	if (type == 'boolean' || type == 'number')
 		return param + '';
 
 	if (param instanceof Date) 
 		return param.toString("'yyyy-MM-dd hh:mm:ss'");
+
+	if (buffer.isBuffer(param) || Buffer.isBuffer(param))
+		return param.length ? '0x'+param.toString('hex'): '';
 
 	if (type == 'object')
 		param = JSON.stringify(param);
