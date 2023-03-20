@@ -94,8 +94,6 @@ export class Query {
 
 	private _ParseField(type: FieldType, data: IBuffer) {
 		switch (type) {
-			case FieldType.FIELD_TYPE_STRING:
-			case FieldType.FIELD_TYPE_VAR_STRING:
 			case FieldType.FIELD_TYPE_TINY_BLOB:
 			case FieldType.FIELD_TYPE_MEDIUM_BLOB:
 			case FieldType.FIELD_TYPE_LONG_BLOB:
