@@ -30,15 +30,59 @@
 
 import { EventNoticer, Event } from '../event';
 import { Packet, Constants, PacketData } from './parser';
-import {ServerStatus} from './constants';
+import {ServerStatus,Charsets} from './constants';
 import bufferLib,{IBuffer} from '../buffer';
+
+
+// catalog
+// : 
+// "def"
+// charsetNumber
+// : 
+// 45
+// db
+// : 
+// "smartholder"
+// decimals
+// : 
+// 0
+// fieldLength
+// : 
+// 262140
+// fieldType
+// : 
+// 252
+// flags
+// : 
+// 4113
+// name
+// : 
+// "pkey"
+// originalName
+// : 
+// "pkey"
+// originalTable
+// : 
+// "auth_user"
+// table
+// : 
 
 export class Field {
 	readonly name: string;
-	readonly type: FieldType;
-	constructor(name: string, type: FieldType) {
+	readonly fieldLength: number;
+	readonly fieldType: FieldType;
+	readonly charsetNumber: Charsets;
+	readonly flags: number;
+
+	constructor(
+		name: string, fieldType: FieldType, charsetNumber: Charsets, 
+		fieldLength: number, flags: number
+	) {
 		this.name = name;
-		this.type = type;
+		this.fieldLength = fieldLength;
+		this.fieldType = fieldType;
+		this.charsetNumber = charsetNumber;
+		this.flags = flags;
 	}
 }
 
@@ -92,19 +136,24 @@ export class Query {
 		this.sql = sql;
 	}
 
-	private _ParseField(type: FieldType, data: IBuffer) {
-		switch (type) {
+	private _ParseField(field: Field, data: IBuffer) {
+		switch (field.fieldType) {
+			case FieldType.FIELD_TYPE_STRING:
+			case FieldType.FIELD_TYPE_VAR_STRING:
 			case FieldType.FIELD_TYPE_TINY_BLOB:
 			case FieldType.FIELD_TYPE_MEDIUM_BLOB:
 			case FieldType.FIELD_TYPE_LONG_BLOB:
 			case FieldType.FIELD_TYPE_BLOB:
-				return data;
+				if (field.charsetNumber == Charsets.BINARY)
+					return data;
+				else
+					return data.toString('utf-8');
 		}
 
 		let str_value = data.toString('utf-8');
 
 		// NOTE: need to handle more data types, such as binary data
-		switch (type) {
+		switch (field.fieldType) {
 			case FieldType.FIELD_TYPE_TIMESTAMP:
 			case FieldType.FIELD_TYPE_DATE:
 			case FieldType.FIELD_TYPE_DATETIME:
@@ -161,7 +210,13 @@ export class Query {
 					this._fields = [];
 					this.onResolve.trigger(null);
 				}
-				var field = new Field(packet.data.name || '', packet.data.fieldType || -1);
+				var field = new Field(
+					packet.data.name || '',
+					packet.data.fieldType || -1,
+					packet.data.charsetNumber || 0,
+					packet.data.fieldLength || 0,
+					packet.data.flags || 0,
+				);
 				this._fields.push(field);
 				this.onField.trigger(field);
 				break;
@@ -215,7 +270,7 @@ export class Query {
 					self._rowIndex++;
 
 					if (value !== null) {
-						row[field.name] = self._ParseField(field.type, value);
+						row[field.name] = self._ParseField(field, value);
 					}
 
 					if (self._rowIndex == fields.length) {
