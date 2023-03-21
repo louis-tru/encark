@@ -33,55 +33,21 @@ import { Packet, Constants, PacketData } from './parser';
 import {ServerStatus,Charsets} from './constants';
 import bufferLib,{IBuffer} from '../buffer';
 
-
-// catalog
-// : 
-// "def"
-// charsetNumber
-// : 
-// 45
-// db
-// : 
-// "smartholder"
-// decimals
-// : 
-// 0
-// fieldLength
-// : 
-// 262140
-// fieldType
-// : 
-// 252
-// flags
-// : 
-// 4113
-// name
-// : 
-// "pkey"
-// originalName
-// : 
-// "pkey"
-// originalTable
-// : 
-// "auth_user"
-// table
-// : 
-
 export class Field {
 	readonly name: string;
-	readonly fieldLength: number;
-	readonly fieldType: FieldType;
-	readonly charsetNumber: Charsets;
+	readonly type: FieldType;
+	readonly charset: Charsets;
+	readonly length: number;
 	readonly flags: number;
 
 	constructor(
-		name: string, fieldType: FieldType, charsetNumber: Charsets, 
-		fieldLength: number, flags: number
+		name: string, type: FieldType, charset: Charsets,
+		length: number, flags: number
 	) {
 		this.name = name;
-		this.fieldLength = fieldLength;
-		this.fieldType = fieldType;
-		this.charsetNumber = charsetNumber;
+		this.length = length;
+		this.type = type;
+		this.charset = charset;
 		this.flags = flags;
 	}
 }
@@ -137,14 +103,14 @@ export class Query {
 	}
 
 	private _ParseField(field: Field, data: IBuffer) {
-		switch (field.fieldType) {
+		switch (field.type) {
 			case FieldType.FIELD_TYPE_STRING:
 			case FieldType.FIELD_TYPE_VAR_STRING:
 			case FieldType.FIELD_TYPE_TINY_BLOB:
 			case FieldType.FIELD_TYPE_MEDIUM_BLOB:
 			case FieldType.FIELD_TYPE_LONG_BLOB:
 			case FieldType.FIELD_TYPE_BLOB:
-				if (field.charsetNumber == Charsets.BINARY)
+				if (field.charset == Charsets.BINARY)
 					return data;
 				else
 					return data.toString('utf-8');
@@ -153,7 +119,7 @@ export class Query {
 		let str_value = data.toString('utf-8');
 
 		// NOTE: need to handle more data types, such as binary data
-		switch (field.fieldType) {
+		switch (field.type) {
 			case FieldType.FIELD_TYPE_TIMESTAMP:
 			case FieldType.FIELD_TYPE_DATE:
 			case FieldType.FIELD_TYPE_DATETIME:
