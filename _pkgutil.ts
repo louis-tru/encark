@@ -73,7 +73,7 @@ if (haveQuark) {
 } else if (haveWeb) { // web
 	var origin = location.origin;
 	let pathname = location.pathname;
-	let dirname = pathname.substr(0, pathname.lastIndexOf('/'));
+	let dirname = pathname.substring(0, pathname.lastIndexOf('/'));
 	let cwdPath = origin + dirname;
 	cwd = function() { return cwdPath };
 	_cwd = function() { return cwdPath };
@@ -113,9 +113,9 @@ const matchs = win32 ? {
 };
 
 /** 
- * format part 
+ * normalizePath
  */
-function resolvePathLevel(path: string, retain_up: boolean = false): string {
+function normalizePath(path: string, retain_level: boolean = false): string {
 	var ls = path.split('/');
 	var rev = [];
 	var up = 0;
@@ -132,7 +132,7 @@ function resolvePathLevel(path: string, retain_up: boolean = false): string {
 	}
 	path = rev.reverse().join('/');
 
-	return (retain_up ? new Array(up + 1).join('../') + path : path);
+	return (retain_level ? new Array(up + 1).join('../') + path : path);
 }
 
 /**
@@ -152,7 +152,7 @@ function resolve(...args: string[]) {
 		if (mat[2]) { // local absolute path /
 			if (win32 && mat[2] != '/') { // windows d:\
 				prefix = PREFIX + mat[2] + '/';
-				path = path.substr(2);
+				path = path.substring(2);
 			} else {
 				if (haveWeb) {
 					prefix = origin + '/';
@@ -170,27 +170,27 @@ function resolve(...args: string[]) {
 			// if (prefix == path.length)
 			if (prefix == path) // file:///
 				return prefix;
-			path = path.substr(prefix.length);
+			path = path.substring(prefix.length);
 		}
 	} else { // Relative path, no network protocol
 		var cwd = _cwd();
 		if (haveWeb) {
 			prefix = origin + '/';
-			path = cwd.substr(prefix.length) + '/' + path;
+			path = cwd.substring(prefix.length) + '/' + path;
 		} else {
 			if (win32) {
-				prefix += cwd.substr(0,10) + '/'; // 'file:///d:/';
-				path = cwd.substr(11) + '/' + path;
+				prefix += cwd.substring(0,10) + '/'; // 'file:///d:/';
+				path = cwd.substring(11) + '/' + path;
 			} else {
 				prefix = PREFIX; // 'file:///';
-				path = cwd.substr(8) + '/' + path;
+				path = cwd.substring(8) + '/' + path;
 			}
 		}
 	}
 
-	var suffix = path.length > 1 && path.substr(path.length - 1) == '/' ? '/' : '';
+	var suffix = path.length > 1 && path.substring(path.length - 1) == '/' ? '/' : '';
 
-	path = resolvePathLevel(path);
+	path = normalizePath(path);
 
 	return (path ? prefix + slash + path : prefix) + suffix;
 }
@@ -326,7 +326,7 @@ initArgv();
 
 export default {
 	fallbackPath,
-	resolvePathLevel,
+	normalizePath,
 	resolve, 				// func pkg
 	isAbsolute, 		// func pkg
 	isLocal,				// 

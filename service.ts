@@ -29,7 +29,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 import * as querystring from 'querystring';
-import * as Path from 'path';
+import * as path from 'path';
 import * as http from 'http';
 import * as net from 'net';
 import {Server} from './_server';
@@ -107,7 +107,7 @@ export abstract class Service {
 	 */
 	get dirname(): string {
 		if (!this.m_dirname) {
-			this.m_dirname = Path.dirname(this.pathname);
+			this.m_dirname = path.dirname(this.pathname);
 		}
 		return <string>this.m_dirname;
 	}
@@ -146,7 +146,7 @@ export abstract class Service {
 						_headers[key.toLowerCase()] = String(value);
 				}
 			} catch(e) {
-				console.warn('Service#headers', e);
+				console.warn('#Service.headers', e);
 			}
 			this.m_headers = { ...this.request.headers, ..._headers };
 		}
@@ -169,8 +169,9 @@ export abstract class Service {
 		this.server = <Server>(<any>server).__wrap__;
 		this.request = req;
 		this.socket = req.socket;
-		this.host = <string>(req.headers.host || '');
-		this.url = decodeURI(<string>(req.url)||'');
+		this.host = req.headers.host || '';
+		this.url = decodeURI(req.url||'');
+		this.url = path.normalize(this.url[0] != '/' ? '/' + this.url: this.url);
 	}
 
 	/**

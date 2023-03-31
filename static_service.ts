@@ -468,7 +468,7 @@ export class StaticService extends Service {
 			if (virtual) { //是否有虚拟目录
 				var index = filename.indexOf(virtual + '/');
 				if (index === 0) {
-					filename = filename.substr(virtual.length);
+					filename = filename.substring(virtual.length);
 				} else {
 					return this.returnErrorStatus(404);
 				}
