@@ -82,6 +82,7 @@ export interface Options {
 	port?: number;
 	fileCacheTime?: number;
 	expires?: number;
+	noCache?: RegExp | string | string[];
 	timeout?: number;
 	session?: number;
 	maxFileSize?: number;
@@ -179,6 +180,12 @@ export abstract class Server extends Notification {
 	readonly expires: number = 60 * 24 * 30;
 
 	/**
+	 * no cache RegExp match
+	 * @type {RegExp}
+	 */
+	readonly noCache?: RegExp;
+
+	/**
 	 * 静态文件缓存,该值可减低硬盘静态文件读取次数,但需要消耗内存,单位(秒)
 	 * @type {Number}
 	 */
@@ -246,7 +253,7 @@ export abstract class Server extends Notification {
 	 * 设置禁止访问的目录
 	 * @type {RegExp}
 	 */
-	readonly disable: RegExp = /^\/server/i;
+	readonly disable?: RegExp;
 
 	/**
 	 * 错误状态页
@@ -318,14 +325,20 @@ export abstract class Server extends Notification {
 			config.root.map(e=>path.resolve(e)): [path.resolve(config.root)] : this.root;
 		this.temp     = config.temp ? path.resolve(config.temp) : this.temp;
 
-		var disable   = config.disable;
+		let {disable,noCache} = config;
 
 		if (disable) {
-			if (Array.isArray(disable)) 
-				disable = disable.join(' ');
-			disable = String(disable).trim().replace(/\s+/mg, '|');
-			this.disable = new RegExp('^\\/(' + disable + ')');
+			let cfg = Array.isArray(disable) ? disable: [disable];
+			let s = cfg.map(e=>String(e).trim()).join('|');
+			this.disable = new RegExp('^\\/(' + s + ')', 'i');
 		}
+
+		if (noCache) {
+			let cfg = Array.isArray(noCache) ? noCache: [noCache];
+			let s = cfg.map(e=>String(e).trim()).join('|');
+			this.noCache = new RegExp(s, 'i');
+		}
+
 		if (config.virtual) {
 			this.virtual = String(config.virtual).trim().replace(/^(\/|\\)*([^\/\\]+)/, '/$2');
 		}

@@ -39,7 +39,7 @@ import {RuleResult} from './router'
 var g_static_cache: Dict = {};
 
 //set util
-function setHeader(self: StaticService, expires?: number) {
+function setDefaultHeader(self: StaticService, expires?: number) {
 	var res = self.response;
 	res.setHeader('Server', 'Somes');
 	res.setHeader('Date', new Date().toUTCString());
@@ -68,10 +68,10 @@ function isGzip(self: StaticService, filename: string) {
 	if(!self.server.gzip){
 		return false;
 	}
-	var ae = <string>self.request.headers['accept-encoding'];
+	var ae = self.request.headers['accept-encoding'];
 	var type = self.server.getMime(filename);
 
-	return !!(ae && ae.match(/gzip/i) && type.match(self.server.gzip));
+	return !!(ae && String(ae).match(/gzip/i) && type.match(self.server.gzip));
 }
 
 //返回目录
@@ -116,7 +116,7 @@ function returnRedirect(self: StaticService, path: string) {
 
 function returnDirectory(self: StaticService, filename: string) {
 	var res = self.response;
-	var req = self.request;
+	//var req = self.request;
 
 	//读取目录
 	if (!filename.match(/\/$/)){  //目录不正确,重定向
@@ -158,7 +158,7 @@ function returnDirectory(self: StaticService, filename: string) {
 		}
 
 		html += ls1.join('') + ls2.join('') + '</pre><hr/></body></html>';
-		setHeader(self);
+		setDefaultHeader(self);
 
 		// var type = self.server.getMime('html');
 
@@ -180,7 +180,7 @@ function return_cache(self: StaticService, filename: string) {
 		var ims = <string>req.headers['if-modified-since'];
 		var mtime = <Date>cache.time;
 
-		setHeader(self);
+		setDefaultHeader(self);
 
 		res.setHeader('Last-Modified', mtime.toUTCString());
 		res.setHeader('Content-Type', getContentType(self, type));
@@ -274,7 +274,8 @@ function resultError(self: StaticService, statusCode: number, html?: string) {
 	var res = self.response;
 	var type = self.server.getMime('html');
 
-	setHeader(self);
+	setDefaultHeader(self);
+
 	res.setHeader('Content-Type', getContentType(self, type));
 	res.writeHead(statusCode);
 	res.end('<!DOCTYPE html><html><body><h3>' +
@@ -286,7 +287,7 @@ function _returnFile(self: StaticService, filename: string, stat: fs.Stats, mime
 
 	var req = self.request;
 	var res = self.response;
-	
+
 	//for file
 	if (stat.size > self.server.maxFileSize) { //File size exceeds the limit
 		return returnErrorStatus(self, 403);
@@ -297,14 +298,18 @@ function _returnFile(self: StaticService, filename: string, stat: fs.Stats, mime
 	var range = <string>req.headers['range'];
 	var type = mime || self.server.getMime(filename);
 	var gzip = isGzip(self, filename);
-	
-	setHeader(self);
+
+	if (self.server.noCache && self.server.noCache.test(filename)) {  //disable cache file
+		self.setNoCache();
+	}
+	setDefaultHeader(self);
+
 	res.setHeader('Last-Modified', mtime.toUTCString());
 	res.setHeader('Accept-Ranges', 'bytes');
 
 	if (range) { // return Range
-		if (range.substr(0, 6) == 'bytes=') {
-			var ranges = range.substr(6).split('-');
+		if (range.substring(0, 6) == 'bytes=') {
+			var ranges = range.substring(0, 6).split('-');
 			var start_range = ranges[0] ? Number(ranges[0]) : 0;
 			var end_range = ranges[1] ? Number(ranges[1]) : stat.size - 1;
 			if (isNaN(start_range) || isNaN(end_range)) {
@@ -473,7 +478,7 @@ export class StaticService extends Service {
 					return this.returnErrorStatus(404);
 				}
 			}
-			if (this.server.disable.test(filename)) {  //禁止访问的路径
+			if (this.server.disable && this.server.disable.test(filename)) {  //禁止访问的路径
 				return this.returnErrorStatus(403);
 			}
 			this.returnSiteFile(filename.substring(1));
@@ -540,7 +545,7 @@ export class StaticService extends Service {
 	}
 	
 	setDefaultHeader(expires?: number) {
-		setHeader(this, expires);
+		setDefaultHeader(this, expires);
 	}
 
 	setNoCache() {
