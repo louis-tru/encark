@@ -449,25 +449,44 @@ class MysqlCRUD implements DatabaseCRUD {
 		return r.affectedRows as number;
 	}
 
-	async select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
-		var struct = this.check(table);
-		var sql;//, ls: T[];
-		var limit_str = '';
+	private async _select<T = Dict>(table: string, where: Where, opts: SelectOptions, total: boolean): Promise<T[]> {
+		let struct = this.check(table);
+		let sql;//, ls: T[];
+		let limit_str = '';
 		if (opts.limit) {
 			limit_str = Array.isArray(opts.limit) ? ' limit ' + opts.limit.join(','): ' limit ' + opts.limit;
 		}
-		var group = opts.group ? `group by ${opts.group}`: '';
-		var order = opts.order ? `order by ${opts.order}`: '';
+		let out = total ? 'count(*) as __count': '*';
+		let group = opts.group ? `group by ${opts.group}`: '';
+		let order = opts.order ? `order by ${opts.order}`: '';
 		if (typeof where == 'object') {
-			sql = `select * from ${table} ${this.escape(struct, where)} ${group} ${order} ${limit_str}`;
+			sql = `select ${out} from ${table} ${this.escape(struct, where)} ${group}`;
+			if (!total)
+				sql += `${order} `;
+			sql += limit_str;
 			// console.log(sql, values)
 			var [{rows: ls}] = await this.exec(sql);
 		} else {
-			var where_sql = where ? 'where ' + where: '';
-			sql = `select * from ${table} ${where_sql} ${group} ${order} ${limit_str}`
+			let where_sql = where ? 'where ' + where: '';
+			sql = `select ${out} from ${table} ${where_sql} ${group} `;
+			if (!total)
+				sql += `${order} `;
+			sql += limit_str;
 			var [{rows: ls}] = await this.exec(sql);
 		}
 		return ls as T[];
+	}
+
+	select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
+		return this._select<T>(table, where, opts, false);
+	}
+
+	async selectCount(table: string, where: Where = '', opts: SelectOptions = {}): Promise<number> {
+		let d = await this._select(table, where, opts, true);
+		if (d.length) {
+			return Number(d[0].__count) || 0;
+		}
+		return 0;
 	}
 
 	async selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null> {
@@ -538,6 +557,15 @@ export class MysqlTools implements DatabaseTools {
 		var db = this.db();
 		try {
 			return await new MysqlCRUD(db, this).select<T>(table, where, opts);
+		} finally {
+			db.close();
+		}
+	}
+
+	async selectCount(table: string, where?: Where, opts?: SelectOptions): Promise<number> {
+		var db = this.db();
+		try {
+			return await new MysqlCRUD(db, this).selectCount(table, where, opts);
 		} finally {
 			db.close();
 		}
