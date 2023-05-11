@@ -326,7 +326,9 @@ function isBase58String(str: string) {
 function decodeBase64(str: string): number[] {
 	// var ERR_BAD_ARGUMENT = errno.ERR_BAD_ARGUMENT;
 	// utils.assert(str.length % 4 === 0, ERR_BAD_ARGUMENT);
-	str += Array.from({ length: 4 - (str.length % 4) + 1 }).join('=');
+	let mod = str.length % 4;
+	if (mod)
+		str += Array.from({ length: 5 - mod }).join('=');
 	var bytes = [];
 	for (var i = 0, l = str.length; i < l; i+=4) {
 		var a = <number>base64_keys.get(str[i]);
