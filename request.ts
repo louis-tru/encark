@@ -75,7 +75,7 @@ export interface Options {
 	minSsl?: SecureVersion;
 	maxSsl?: SecureVersion;
 	limitDataSize?: number;
-	logs?: false,
+	logs?: boolean,
 	onReady?: (statusCode: number, headers: Dict)=>any;
 }
 
