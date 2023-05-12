@@ -75,7 +75,7 @@ export interface Options {
 	minSsl?: SecureVersion;
 	maxSsl?: SecureVersion;
 	limitDataSize?: number;
-	printLog?: false,
+	logs?: false,
 	onReady?: (statusCode: number, headers: Dict)=>any;
 }
 
@@ -439,7 +439,7 @@ export function request(pathname: string, opts?: Options): PromiseResult<IBuffer
 			Object.assign(headers, await signer.sign(path, post_data ? post_data: ''));
 		}
 
-		if (utils.config.moreLog) {
+		if (options.logs) {
 			var logs = [
 				// `--location --request ${method} '${uri.href}'`,
 				"'" + uri.href + "'", '-X ' + method,

@@ -90,7 +90,7 @@ export function http2request(session: http2.ClientHttp2Session, url: string, opt
 			Object.assign(headers, await signer.sign(uri.path, post_data ? post_data: ''));
 		}
 
-		if (somes.config.moreLog) {
+		if (options.logs) {
 			var logs = [
 				"'" + uri.href + "'",
 				'-X ' + method,
