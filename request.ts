@@ -441,8 +441,8 @@ export function request(pathname: string, opts?: Options): PromiseResult<IBuffer
 
 		if (utils.config.moreLog) {
 			var logs = [
-				`--location --request ${method} '${uri.href}'`,
-				// "'" + uri.href + "'", '-X ' + method,
+				// `--location --request ${method} '${uri.href}'`,
+				"'" + uri.href + "'", '-X ' + method,
 				...(Object.entries(headers).map(([k,v])=>`-H '${k}: ${v}'`)),
 				...(post_data? [`-d '${post_data}'`]: []),
 			];
