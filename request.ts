@@ -49,6 +49,7 @@ else if (haveNode) {
 	var user_agent = _user_agent;
 	var http = require('http');
 	var https = require('https');
+	var zlib = require('zlib');
 } else {
 	throw Error.new('Unimplementation');
 }
@@ -76,6 +77,7 @@ export interface Options {
 	maxSsl?: SecureVersion;
 	limitDataSize?: number;
 	logs?: boolean,
+	gzip?: boolean,
 	onReady?: (statusCode: number, headers: Dict)=>any;
 }
 
@@ -292,10 +294,15 @@ function requestNode(options: Options, soptions: Dict,
 
 	var ok = false;
 
+	let ts = Date.now();
+
 	function error(err: any) {
 		if (!ok) {
 			ok = true;
-			reject(Error.new(err));
+			reject(Error.new(err).ext({ description: 'timeout timespan: ' + (Date.now() - ts)
+				+ (post_data?', post data: ' + JSON.parse(post_data):'')
+				+ `, uri: ${soptions.hostname}/${soptions.path}`
+			}));
 		}
 	}
 
@@ -311,20 +318,36 @@ function requestNode(options: Options, soptions: Dict,
 			}
 		}
 
+		function retuens(data: IBuffer) {
+			resolve({
+				data,
+				headers: res.headers,
+				statusCode: res.statusCode,
+				httpVersion: res.httpVersion,
+				requestHeaders: soptions.headers,
+				requestData: options.params as any,
+				cached: false,
+			});
+		}
+
 		function end() {
 			if (!ok) {
 				ok = true;
 				// console.log('No more data in response.');
 				// console.log('---requestNode', data + '');
-				resolve({
-					data: buffer.concat(buffers),
-					headers: res.headers,
-					statusCode: res.statusCode,
-					httpVersion: res.httpVersion,
-					requestHeaders: soptions.headers,
-					requestData: options.params as any,
-					cached: false,
-				});
+				let data = buffer.concat(buffers);
+				let encoding = res.headers['content-encoding'];
+				if (encoding && encoding.indexOf('gzip') != -1) { // unzip
+					try {
+						zlib.unzip(data, function (error: any, data: any) {
+							error ? reject(error): retuens(buffer.from(data));
+						});
+					} catch(err) {
+						reject(error);
+					}
+				} else {
+					retuens(data);
+				}
 			}
 		}
 		// console.log(`STATUS: ${res.statusCode}`);
@@ -403,6 +426,9 @@ export function request(pathname: string, opts?: Options): PromiseResult<IBuffer
 			'Accept': 'application/json',
 			...options.headers,
 		};
+		if (options.gzip) {
+			headers['Accept-Encoding'] = 'gzip, deflate, br'; // use gzip
+		}
 
 		var post_data: string | null = null;
 
