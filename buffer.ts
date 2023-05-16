@@ -135,6 +135,7 @@ export interface IBuffer extends Uint8Array {
 	writeFloatBE(value: number, offset?: number): number;
 	writeDoubleBE(value: number, offset?: number): number;
 	writeBigIntLE(bigint: bigint, offset?: number): number;
+	hashCode(): number;
 	// readUIntLE(offset: number, byteLength: number): number; // read le
 	// readIntLE(offset: number, byteLength: number): number;
 	// readUInt16LE(offset?: number): number;
