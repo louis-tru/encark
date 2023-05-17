@@ -271,8 +271,10 @@ function requireWithoutErr(pathname: string) {
 function readConfigFile(pathname: string, pathname2: string) {
 	var c = requireWithoutErr(pathname);
 	var c2 = requireWithoutErr(pathname2);
-	if (c || c2) {
-		return Object.assign({}, c, c2);
+	if (c && c2) {
+		return Object.assign(c2, Object.assign(c, c2));
+	} else {
+		return c2 || c;
 	}
 }
 
@@ -289,17 +291,15 @@ function getConfig(): Dict {
 			} else {
 				var mainModule = require.main;// process.mainModule || require.main;
 				if (mainModule) {
-					config = readConfigFile(
-						_path.dirname(mainModule.filename) + '/.config',
-						_path.dirname(mainModule.filename) + '/config'
-					);
+					let mainDir = _path.dirname(mainModule.filename);
+					config = readConfigFile(mainDir + '/.config', mainDir + '/config');
 				}
 			}
 			config = config || readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
 
 			// rend extend config file
 			if (config && config.extendConfigPath) {
-				Object.assign(config, requireWithoutErr(config!.extendConfigPath) || {});
+				Object.assign(config, requireWithoutErr(config.extendConfigPath));
 			}
 		} else {
 			config = {};
