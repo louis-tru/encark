@@ -296,6 +296,11 @@ function getConfig(): Dict {
 				}
 			}
 			config = config || readConfigFile(cwd() + '/.config', cwd() + '/config') || {};
+
+			// rend extend config file
+			if (config && config.extendConfigPath) {
+				Object.assign(config, requireWithoutErr(config!.extendConfigPath) || {});
+			}
 		} else {
 			config = {};
 		}
