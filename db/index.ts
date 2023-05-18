@@ -47,7 +47,7 @@ export function escape(param: any) {
 		return param.toString("'yyyy-MM-dd hh:mm:ss'");
 
 	if (buffer.isBuffer(param) || Buffer.isBuffer(param))
-		return param.length ? '0x'+param.toString('hex'): '';
+		return param.length ? '0x'+param.toString('hex'): "''";
 
 	if (type == 'object')
 		param = JSON.stringify(param);
