@@ -642,7 +642,7 @@ export class MysqlTools implements DatabaseTools {
 		var _db_struct = this._db_struct;
 
 		var [{rows=[]}] = await _db.exec(
-				`select * from information_schema.tables where table_schema='${this._name}' and table_type='base table'`);
+				`select * from information_schema.tables where table_schema='${this._name}' and table_type='BASE TABLE'`);
 		for (let {TABLE_NAME} of rows) {
 			if (!utils.config.fastStart || !_db_struct[TABLE_NAME]) {
 				var struct: DBStruct = _db_struct[TABLE_NAME] = { names: [], columns: {} };
