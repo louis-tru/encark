@@ -115,6 +115,7 @@ export interface SelectOptions {
 	group?: string;
 	order?: string;
 	limit?: number | number[];
+	out?: string;
 }
 
 export interface DatabaseCRUD {

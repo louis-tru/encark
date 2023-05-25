@@ -456,7 +456,7 @@ class MysqlCRUD implements DatabaseCRUD {
 		if (opts.limit) {
 			limit_str = Array.isArray(opts.limit) ? ' limit ' + opts.limit.join(','): ' limit ' + opts.limit;
 		}
-		let out = total ? 'count(*) as __count': '*';
+		let out = total ? 'count(*) as __count': opts.out || '*';
 		let group = opts.group ? `group by ${opts.group}`: '';
 		let order = opts.order ? `order by ${opts.order}`: '';
 		if (typeof where == 'object') {
