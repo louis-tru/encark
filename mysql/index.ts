@@ -375,11 +375,11 @@ interface DBStruct {
 
 class MysqlCRUD implements DatabaseCRUD {
 	private _db: Database;
-	// private _host: MysqlTools;
+	private _host: MysqlTools;
 	private _db_struct: { [key: string]: DBStruct };
 	constructor(db: Database, host: MysqlTools) {
 		this._db = db;
-		// this._host = host;
+		this._host = host;
 		this._db_struct = (host as any)._db_struct;
 	}
 
@@ -400,6 +400,10 @@ class MysqlCRUD implements DatabaseCRUD {
 			}
 		}
 		return sql.length ? prefix + ' ' + sql.join(` ${join} `): '';
+	}
+
+	has(table: string): boolean {
+		return this._host.has(table);
 	}
 	
 	exec(sql: string): Promise<Result[]> {

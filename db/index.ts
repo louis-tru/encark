@@ -127,6 +127,7 @@ export interface DatabaseCRUD {
 	selectCount(table: string, where?: Where, opts?: SelectOptions): Promise<number>;
 	selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null>;
 	query<T = Dict>(sql: string): Promise<T[]>;
+	has(name: string): boolean;
 }
 
 export interface DatabaseTools extends DatabaseCRUD {
