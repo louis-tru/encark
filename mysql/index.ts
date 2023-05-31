@@ -600,7 +600,7 @@ export class MysqlTools implements DatabaseTools {
 		var _id = id || 'default';
 		var _db = this.db();
 
-		utils.assert(!this._load.has(_id), errno.ERR_REPEAT_LOAD_MYSQL);
+		utils.assert(!this._load.has(_id), errno.ERR_REPEAT_LOAD_MYSQL, `${id}`);
 
 		// CREATE TABLE `mvp`.`test` (
 		// 	`id` INT NOT NULL AUTO_INCREMENT,
