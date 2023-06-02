@@ -52,137 +52,61 @@ const base58 = function() {
 	};
 }();
 
+// ---------------------- utf8 ----------------------
+
 // string => bytes
 // convert unicode to utf-8 codeing
 function encodeUTF8Word(unicode: number): number[] {
-	var bytes: number[] = [];
-	if (unicode < 0x7F + 1) {             // 单字节编码
-		bytes.push(unicode);
-	} else {
-		var len = 1;
-		if (unicode < 0x7FF + 1) {            // 两字节编码
-			len = 2;
-			bytes.push(0b11000000);
-		} else if (unicode < 0xFFFF + 1) {      // 三字节编码
-			len = 3;
-			bytes.push(0b11100000);
-		} else if (unicode < 0x10FFFF + 1) {    // 四字节编码
-			len = 4;
-			bytes.push(0b11110000);
-		} else if (unicode < 0x3FFFFFF + 1) {   // 五字节编码
-			if (unicode > 0x200000 - 1) {
-				len = 5;
-				bytes.push(0b11111000);
-			} else { // 这个区间没有编码
-				return bytes;
-			}
-		} else {                               //六字节编码
-			len = 6;
-			bytes.push(0b11111100);
+	// 1字节 0xxxxxxx
+	// 2字节 110xxxxx 10xxxxxx
+	// 3字节 1110xxxx 10xxxxxx 10xxxxxx
+	// 4字节 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	// 5字节 111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	// 6字节 1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+
+	if (unicode < 0x7F + 1) {               // 单字节编码
+		return [unicode];
+	}
+	else if (unicode < 0x7FF + 1) {         // 两字节编码
+		return [
+			0b11000000 | (unicode >> 6),
+			0b10000000 | (unicode >> 0 & 0b00111111),
+		];
+	} else if (unicode < 0xFFFF + 1) {      // 三字节编码
+		return [
+			0b11100000 | (unicode >> 12),
+			0b10000000 | (unicode >> 6 & 0b00111111),
+			0b10000000 | (unicode >> 0 & 0b00111111),
+		];
+	} else if (unicode < 0x10FFFF + 1) {    // 四字节编码
+		return [
+			0b11110000 | (unicode >> 18),
+			0b10000000 | (unicode >> 12 & 0b00111111),
+			0b10000000 | (unicode >> 6  & 0b00111111),
+			0b10000000 | (unicode >> 0  & 0b00111111),
+		];
+	} else if (unicode < 0x3FFFFFF + 1) {   // 五字节编码
+		if (unicode > 0x200000 - 1) {
+			return [
+				0b11111000 | (unicode >> 24),
+				0b10000000 | (unicode >> 18 & 0b00111111),
+				0b10000000 | (unicode >> 12 & 0b00111111),
+				0b10000000 | (unicode >> 6  & 0b00111111),
+				0b10000000 | (unicode >> 0  & 0b00111111),
+			];
+		} else { // 这个区间没有编码
+			return [];
 		}
-		for (var i = len - 1; i > 0; i--) {
-			bytes[i] = 0b10000000 | (unicode & 0b00111111);
-			unicode >>= 6;
-		}
-		bytes[0] |= unicode;
+	} else {                                //六字节编码
+		return [
+			0b11111100 | (unicode >> 30),
+			0b10000000 | (unicode >> 24 & 0b00111111),
+			0b10000000 | (unicode >> 18 & 0b00111111),
+			0b10000000 | (unicode >> 12 & 0b00111111),
+			0b10000000 | (unicode >> 6  & 0b00111111),
+			0b10000000 | (unicode >> 0  & 0b00111111),
+		];
 	}
-	return bytes;
-}
-
-function encodeUTF8WordLength(unicode: number): number {
-	if (unicode < 0x7F + 1) {             // 单字节编码
-		return 1;
-	} else {
-		if (unicode < 0x7FF + 1) {            // 两字节编码
-			return 2;
-		} else if (unicode < 0xFFFF + 1) {      // 三字节编码
-			return 3;
-		} else if (unicode < 0x10FFFF + 1) {    // 四字节编码
-			return 4;
-		} else if (unicode < 0x3FFFFFF + 1) {   // 五字节编码
-			if (unicode > 0x200000 - 1) {
-				return 5;
-			} else { // 这个区间没有编码
-				return 1;
-			}
-		} else {                               //六字节编码
-			return 6;
-		}
-	}
-}
-
-function encodeUTF8Length(str: string): number {
-	var r = 0;
-	for (var i = 0, l = str.length; i < l; i++) {
-		r += encodeUTF8WordLength(str.charCodeAt(i));
-	}
-	return r;
-}
-
-// string => bytes
-// Convert str to utf8 to a bytes
-function encodeUTF8(str: string): number[] {
-	var bytes: number[] = [];
-	for (var i = 0, l = str.length; i < l; i++) {
-		bytes.push( ...encodeUTF8Word(str.charCodeAt(i)) );
-	}
-	return bytes;
-}
-
-// string => bytes
-function encodeLatin1From(str: string): number[] {
-	var bytes: number[] = [];
-	for (var i = 0, l = str.length; i < l; i++)
-		bytes.push(str.charCodeAt(i) % 256 );
-	return bytes;
-}
-
-// string => bytes
-function encodeAsciiFrom(str: string): number[] {
-	var bytes: number[] = [];
-	for (var i = 0, l = str.length; i < l; i++)
-		bytes.push(str.charCodeAt(i) % 128 );
-	return bytes;
-}
-
-// bytes => string
-function encodeHexFrom(bytes: ArrayNumber, start: number, end: number): string {
-	checkOffset(bytes, start, end);
-	var str = '';
-	for(var i = start; i < end; i++) {
-		str += hex_tab.charAt(bytes[i] >> 4) + hex_tab.charAt(bytes[i] & 0xF);
-	}
-	return str;
-}
-
-// bytes => string
-function encodeBase64From(bytes: ArrayNumber, start: number, end: number): string {
-	checkOffset(bytes, start, end);
-	var size = end - start;
-	var str = '';
-	for (var i = start; i < end; i += 3) {
-		var triplet = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
-		for (var j = 0; j < 4; j++) {
-			if (i * 8 + j * 6 > size * 8)
-				str += b64pad;
-			else 
-				str += base64_tab.charAt((triplet >> 6*(3-j)) & 0x3F);
-		}
-	}
-	return str;
-}
-
-function encodeBase58From(bytes: ArrayNumber, start: number, end: number): string {
-	return base58().encode(bytes, start, end);
-}
-
-// decode
-
-function checkOffset(bytes: ArrayNumber, start: number, end: number): void {
-	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
-	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
-	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
-	// utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 }
 
 // convert utf8 bytes to unicode
@@ -256,13 +180,98 @@ function decodeUTF8Word(bytes: ArrayNumber, offset: number) {
 	return [1,0]; // skip char
 }
 
+// convert unicode to utf-16 codeing
+function encodeUTF16Word(unicode: number): number[] {
+	// Unicode renge            Unicode                   UTF-16                                bytes
+	// 0000 0000 ~ 0000 FFFF    xxxxxxxx xxxxxxxx         xxxxxxxx xxxxxxxx                     2
+	// 0001 0000 ~ 0010 FFFF    yyyy yyyy yyxx xxxx xxxx  110110yy yyyyyyyy 110111xx xxxxxxxx   4
+	if (unicode < 0xFFFF + 1) {  // 双字节编码 0xffff
+		return [unicode];
+	} else {                       // 四字节编码 0xffffffff
+		unicode -= 0x10000;
+		return [
+			0b1101100000000000 | (unicode >> 10),
+			0b1101110000000000 | (unicode & 0b1111111111),   // low
+		];
+	}
+}
+
+function decodeUTF16Word(bytes: ArrayNumber, offset: number) {
+	let str = offset;
+	let c = bytes[str]; str++;
+	if (c >> 10 == 0b110110) { // 4 bytes encode
+		let c2 = bytes[str];
+		if (c2 >> 10 == 0b110111) {
+			return [2, (((c & 0b1111111111) << 10) | (c2 & 0b1111111111)) + 0x10000];
+		} else { // error use 2 bytes encode
+			return [1, c];
+		}
+	} else { // 2 bytes encode 0xxxxxxx
+		return [1, c];
+	}
+}
+
+// --------------------------------------------------
+
+function encodeUTF8WordLength(unicode: number): number {
+	if (unicode < 0x7F + 1) {             // 单字节编码
+		return 1;
+	} else if (unicode < 0x7FF + 1) {     // 两字节编码
+		return 2;
+	} else if (unicode < 0xFFFF + 1) {    // 三字节编码
+		return 3;
+	} else if (unicode < 0x10FFFF + 1) {  // 四字节编码
+		return 4;
+	} else if (unicode < 0x3FFFFFF + 1) { // 五字节编码
+		if (unicode > 0x200000 - 1) {
+			return 5;
+		} else { // 这个区间没有编码
+			return 1;
+		}
+	} else {                              //六字节编码
+		return 6;
+	}
+}
+
+function encodeUTF16WordLength(unicode: number): number {
+	if (unicode < 0xFFFF + 1) {  // bytes 2
+		return 1;
+	} else {                     // bytes 4
+		return 2;
+	}
+}
+
+function encodeUTF8Length(str: string): number {
+	var r = 0;
+	for (var i = 0, l = str.length; i < l; i++) {
+		r += encodeUTF8WordLength(str.charCodeAt(i));
+	}
+	return r;
+}
+
+// string => bytes
+// Convert str to utf8 to a bytes
+function encodeUTF8(str: string): number[] {
+	var bytes: number[] = [];
+	for (let i = 0, l = str.length; i < l;) {
+		let [j,unicode] = decodeUTF16Word([
+			str.charCodeAt(i),
+			str.charCodeAt(i+1)
+		], 0);
+		bytes.push( ...encodeUTF8Word(unicode) );
+		i += j;
+	}
+	return bytes;
+}
+
 // convert utf8 bytes to a str
 function decodeUTF8From(bytes: ArrayNumber, start: number, end: number): string {
 	checkOffset(bytes, start, end);
 	var str = [];
 	for(var i = start; i < end;) {
-		var [len,unicode] = decodeUTF8Word(bytes, i);
-		str.push(String.fromCharCode(unicode));
+		let [len,unicode] = decodeUTF8Word(bytes, i);
+		let utf16 = encodeUTF16Word(unicode);
+		str.push(String.fromCharCode(...utf16));
 		i+=len;
 	}
 	return str.join('');
@@ -271,6 +280,66 @@ function decodeUTF8From(bytes: ArrayNumber, start: number, end: number): string 
 // bytes => string
 function decodeUTF8(bytes: ArrayNumber): string {
 	return decodeUTF8From(bytes, 0, bytes.length);
+}
+
+// ---------------------- utf8 end ----------------------
+
+// encode
+
+// string => bytes
+function encodeLatin1From(str: string): number[] {
+	var bytes: number[] = [];
+	for (var i = 0, l = str.length; i < l; i++)
+		bytes.push(str.charCodeAt(i) % 256 );
+	return bytes;
+}
+
+// string => bytes
+function encodeAsciiFrom(str: string): number[] {
+	var bytes: number[] = [];
+	for (var i = 0, l = str.length; i < l; i++)
+		bytes.push(str.charCodeAt(i) % 128 );
+	return bytes;
+}
+
+// bytes => string
+function encodeHexFrom(bytes: ArrayNumber, start: number, end: number): string {
+	checkOffset(bytes, start, end);
+	var str = '';
+	for(var i = start; i < end; i++) {
+		str += hex_tab.charAt(bytes[i] >> 4) + hex_tab.charAt(bytes[i] & 0xF);
+	}
+	return str;
+}
+
+// bytes => string
+function encodeBase64From(bytes: ArrayNumber, start: number, end: number): string {
+	checkOffset(bytes, start, end);
+	var size = end - start;
+	var str = '';
+	for (var i = start; i < end; i += 3) {
+		var triplet = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
+		for (var j = 0; j < 4; j++) {
+			if (i * 8 + j * 6 > size * 8)
+				str += b64pad;
+			else 
+				str += base64_tab.charAt((triplet >> 6*(3-j)) & 0x3F);
+		}
+	}
+	return str;
+}
+
+function encodeBase58From(bytes: ArrayNumber, start: number, end: number): string {
+	return base58().encode(bytes, start, end);
+}
+
+// decode
+
+function checkOffset(bytes: ArrayNumber, start: number, end: number): void {
+	utils.assert(start >= 0, errno.ERR_BAD_ARGUMENT);
+	utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
+	utils.assert(end <= bytes.length, errno.ERR_BAD_ARGUMENT);
+	// utils.assert(end >= start, errno.ERR_BAD_ARGUMENT);
 }
 
 // bytes => string
@@ -395,6 +464,9 @@ export default {
 	encodeHexFrom,
 	encodeBase64From,
 	encodeBase58From,
+	encodeUTF16Word,
+	decodeUTF16Word,
+	encodeUTF16WordLength,
 	// decode
 	decodeUTF8Word,
 	decodeUTF8From,
