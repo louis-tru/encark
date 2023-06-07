@@ -48,6 +48,7 @@ export abstract class Service {
 	private m_headers: http.IncomingHttpHeaders | undefined;
 
 	static type: string = 'service';
+	static public: boolean = true;
 
 	// @public:
 	/**

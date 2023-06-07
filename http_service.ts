@@ -382,7 +382,7 @@ export class Descriptors extends HttpService {
 
 		for (let key of this.server.services) {
 			let service = this.server.getService(key);
-			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_') {
+			if (!/^(StaticService|fmt)$/.test(key) && key[0] != '_' && service.public) {
 				let methods: string[] = [], events: string[] = [];
 				let item = { type: service.type, methods, events };
 				let self = service.prototype as any;
