@@ -35,7 +35,7 @@ import {StaticService} from './static_service';
 import {Session} from './session';
 import * as http from 'http';
 import * as zlib from 'zlib';
-import {IncomingForm} from './incoming_form';
+import {IncomingForm,IFileStream} from './incoming_form';
 import {RuleResult} from './router';
 import errno from './errno';
 
@@ -147,7 +147,6 @@ export class HttpService extends StaticService {
 	 * @overwrite
 	 */
 	async onAction(rule: RuleResult) {
-
 		var self = this;
 		var action = rule.action;
 
@@ -182,7 +181,8 @@ export class HttpService extends StaticService {
 			}
 
 			if (self.server.printLog) {
-				console.log(`REQUEST  ID${self._id}`, ...(auth ? []: ['ILLEGAL ACCESS, onAuth']), self.pathname, self.headers, self.params, self.data);
+				console.log(`REQUEST  ID${self._id}`, ...(auth ? []: ['ILLEGAL ACCESS, onAuth']),
+					self.pathname, self.headers, self.params, self.data);
 			}
 
 			if (!auth) {
@@ -215,20 +215,12 @@ export class HttpService extends StaticService {
 		};
 
 		if (this.request.method == 'POST') {
-			var form = this.form = new IncomingForm(this);
 			try {
-				var accept = this.hasAcceptFilestream(rule);
-				if (accept instanceof Promise) {
-					this.request.pause();
-					form.isUpload = await accept;
-					this.request.resume();
-				} else {
-					form.isUpload = accept;
-				}
+				this.form = this.onIncomingForm(rule);
 			} catch(err) {
-				// this._service.request.socket.destroy();
 				return self.returnError(err);
 			}
+			let form = this.form;
 			form.onEnd.on(function() {
 				Object.assign(self.data, form.fields);
 				Object.assign(self.data, form.files);
@@ -241,10 +233,17 @@ export class HttpService extends StaticService {
 	}
 
 	/**
-	 * @func hasAcceptFilestream(info) 是否接收文件流
+	 * @func onIncomingForm(info) 传入表单
 	 */
-	hasAcceptFilestream(rule: RuleResult): Promise<boolean> | boolean {
-		return false;
+	onIncomingForm(rule: RuleResult) {
+		return new IncomingForm(this);
+	}
+
+	/**
+	 * @func hasAcceptFilestream(info) 接收文件流
+	 */
+	onAcceptFilestream(path: string, name: string, type: string): IFileStream | null {
+		return null;
 	}
 
 	/**

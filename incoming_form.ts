@@ -37,7 +37,7 @@ import * as querystring from 'querystring';
 import * as crypto from 'crypto';
 import {parseJSON} from './request';
 import Document from './xml';
-import {StaticService} from './static_service';
+import * as hs from './http_service';
 import * as http from 'http';
 
 export enum STATUS {
@@ -133,11 +133,14 @@ class QuerystringParser implements Parser {
 	// @end
 }
 
-export class File {
+export interface IFileStream {
+	readonly pathname: string;
+	write(buffer: Buffer, cb: ()=>void): void;
+	end(cb: ()=>void): void;
+}
+
+export class FileStream implements IFileStream {
 	private _writeStream: fs.WriteStream | null = null;
-	private _path = '';
-	private _name = '';
-	private _type: string;
 	private _size = 0;
 	private _lastModifiedDate = 0;
 
@@ -145,61 +148,35 @@ export class File {
 		return this._size;
 	}
 
-	// @todo Next release: Show error messages when accessing these
-	get length() {
-		return this.size;
-	}
-
-	get filename() {
-		return this._name;
-	}
-
-	get pathname() {
-		return this._path;
-	}
-	
-	get mime() {
-		return this._type;
-	}
+	readonly filename: string;
+	readonly pathname: string
+	readonly mimeType: string;
 
 	get lastModifiedDate() {
 		return this._lastModifiedDate;
 	}
 
-	readonly onProgress = new EventNoticer<number>('Progress', this);
-	readonly onEnd = new EventNoticer('End', this);
-
-	constructor(path: string, name: string, type: string) {
-		this._path = path;
-		this._name = name;
-		this._type = type;
+	constructor(path: string, name: string, mimeType: string) {
+		this.pathname = path;
+		this.filename = name;
+		this.mimeType = mimeType;
 	}
 
-	private _open() {
-		this._writeStream = fs.createWriteStream(this._path);
-	}
-
-	write(buffer: Buffer, cb: any) {
+	write(buffer: Buffer, cb: ()=>void) {
 		var self = this;
 		if (!self._writeStream) 
-			self._open();
+			this._writeStream = fs.createWriteStream(this.pathname);
 		(self._writeStream as WriteStream).write(buffer, function() {
 			self._lastModifiedDate = Date.now();
 			self._size += buffer.length;
-			self.onProgress.trigger(self.size);
 			cb();
 		});
 	}
 
-	end(cb: any) {
+	end(cb: ()=>void) {
 		if (this._writeStream) {
-			this._writeStream.end(()=>{
-				this.onEnd.trigger({});
-				cb();
-			});
+			this._writeStream.end(()=>cb());
 		} else {
-			this._path = '';
-			this.onEnd.trigger({});
 			cb();
 		}
 	}
@@ -524,7 +501,7 @@ export class IncomingForm {
 	private _parser: Parser | null = null;
 	private _flushing = 0;
 	private _fields_size = 0;
-	private _service: StaticService;
+	private _service: hs.HttpService;
 
 	private _error: Error | null = null;
 	private _ended = false;
@@ -552,14 +529,8 @@ export class IncomingForm {
 	 */
 	readonly verifyFileMime = '*';
 
-	/**
-	 * is use file upload, default not upload
-	 * @type {Boolean}
-	 */
-	isUpload = false;
-
 	readonly fields: Dict = {};
-	readonly files: Dict<File[]> = {};
+	readonly files: Dict<IFileStream[]> = {};
 	
 	keepExtensions = false;
 	uploadDir = '';
@@ -583,7 +554,7 @@ export class IncomingForm {
 	 * @param {HttpService}
 	 * @constructor
 	 */
-	constructor(service: StaticService) {
+	constructor(service: hs.HttpService) {
 		this.hash = crypto.createHash(service.server.formHash || 'md5');
 		this.uploadDir = service.server.temp;
 		this._service = service;
@@ -716,13 +687,17 @@ export class IncomingForm {
 			return;
 		}
 
-		if (!this.isUpload) {
-			return this._throwError(new Error('Does not allow file uploads'));
-		}
-
 		this._flushing++;
 
-		var file = new File(this._uploadPath(part.filename), part.filename,  part.mime);
+		let file: IFileStream;
+		try {
+			file = this._service.onAcceptFilestream(this._uploadPath(part.filename), part.filename,  part.mime)!;
+			if (!file) {
+				return this._throwError(new Error('Does not allow file uploads'));
+			}
+		} catch(err:any) {
+			return this._throwError(err);
+		}
 
 		if (this.verifyFileMime != '*' && !new RegExp('\.(' + this.verifyFileMime + ')$', 'i').test(part.filename)) {
 			return this._throwError(new Error('File mime error'));
