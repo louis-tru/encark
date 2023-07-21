@@ -44,7 +44,8 @@ export function escape(param: any) {
 		return param + '';
 
 	if (param instanceof Date) 
-		return param.toString("'yyyy-MM-dd hh:mm:ss'");
+		// return param.toString("'yyyy-MM-dd hh:mm:ss'");
+		return "'" + param.toJSON() + "'";
 
 	if (buffer.isBuffer(param) || Buffer.isBuffer(param))
 		return param.length ? '0x'+param.toString('hex'): "''";
