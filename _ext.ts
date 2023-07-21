@@ -257,11 +257,11 @@ var currentTimezone = new Date().getTimezoneOffset() / -60;
 var G_slice = Array.prototype.slice;
 var G_hash_code_id = 1;
 var G_hash_code_set = new WeakSet();
-var DateToString = (Date.prototype as any).rawToString || Date.prototype.toString;
-var ErrorToString = (Error.prototype as any).rawToString || Error.prototype.toString;
+var DateToString = (Date.prototype as any).__toString__ || Date.prototype.toString;
+var ErrorToString = (Error.prototype as any).__toString__ || Error.prototype.toString;
 
-(Date.prototype as any).rawToString = DateToString;
-(Error.prototype as any).rawToString = ErrorToString;
+definePropertys(Date.prototype, {__toString__: Date.prototype.toString});
+definePropertys(Date.prototype, {__toString__: Error.prototype.toString});
 
 /**
  * @fun ext_class #  EXT class prototype objects
