@@ -155,6 +155,7 @@ export class WSClient extends Notification implements conv.MessageHandle {
 				try {
 					r.data = await self.handleCall(name, data || {}, sender || '');
 				} catch(e: any) {
+					console.error('WSClient.receiveMessage', e);
 					r.error = e;
 				}
 			} else if (msg.isEvent()) {
@@ -163,7 +164,7 @@ export class WSClient extends Notification implements conv.MessageHandle {
 					var evt = new Event(data||{}, sender || '');
 					this.triggerWithEvent(name, evt); // TODO
 				} catch(err) {
-					console.warn('WSClient#receiveMessage', err);
+					console.error('WSClient#receiveMessage', err);
 				}
 			} else {
 				return;
