@@ -709,11 +709,14 @@ export class Notification<E = DefaultEvent> {
 
 }
 
+/**
+ * typescript decorator
+*/
 export function event(target: any, name: string) {
-	if (name.substr(0, 2) !== 'on') {
+	if (name.substring(0, 2) !== 'on') {
 		throw new Error(`event name incorrect format`);
 	}
-	var event = name.substr(2);
+	var event = name.substring(2);
 	Object.defineProperty(target, name, {
 		configurable: false,
 		enumerable: true,

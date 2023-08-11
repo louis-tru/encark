@@ -387,13 +387,14 @@ export class Descriptors extends HttpService {
 				let self = service.prototype as any;
 
 				Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-					if (!/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k)) {
+					if ( !/(^(constructor|auth|requestAuth)$)|(^(_|\$|m_))/i.test(k) ) {
 						if (/^on[a-zA-Z]/.test(k)) { // event
 							if (typeof v.value != 'function')
 								events.push(k.substring(2));
 						} else { // methods
 							if (typeof v.value == 'function') {
-								methods.push(k);
+								if (!self[`__internalapi_${k}`])
+									methods.push(k);
 							}
 						}
 					}
@@ -403,7 +404,7 @@ export class Descriptors extends HttpService {
 
 				while (self !== Service.prototype) {
 					Object.entries(Object.getOwnPropertyDescriptors(self)).forEach(([k, v])=>{
-						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event
+						if (/^on[a-zA-Z]/.test(k) && typeof v.value != 'function') { // event notice
 							events.push(k.substring(2));
 						}
 					});

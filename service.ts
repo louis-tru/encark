@@ -48,7 +48,7 @@ export abstract class Service {
 	private m_headers: http.IncomingHttpHeaders | undefined;
 
 	static type: string = 'service';
-	static public: boolean = true;
+	static public: boolean = true; // public all api or hide all api
 
 	// @public:
 	/**
@@ -186,3 +186,15 @@ export abstract class Service {
 }
 
 Service.type = 'service';
+
+
+/**
+ * typescript decorator
+*/
+export function internalApi(target: any, name?: string) {
+	if (name) {
+		target[`__internalapi_${name}`] = 1;
+	} else {
+		target.public = false;
+	}
+}
