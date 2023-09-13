@@ -134,7 +134,8 @@ function querystringStringify(prefix: string, params: Dict) {
 		let val = params[i];
 		if (Array.isArray(val)) {
 			for (let j of val)
-				rev.push(i + '=' + encodeURIComponent(j));
+				if (j !== undefined)
+					rev.push(i + '=' + encodeURIComponent(j));
 		} else if (val !== undefined) {
 			rev.push(i + '=' + encodeURIComponent(val));
 		}
