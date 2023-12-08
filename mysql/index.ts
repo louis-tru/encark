@@ -410,7 +410,7 @@ class MysqlCRUD implements DatabaseCRUD {
 		return this._db.exec(sql);
 	}
 
-	async insert(table: string, row: Dict): Promise<number> {
+	insertSql(table: string, row: Dict): string {
 		var struct = this.check(table);
 		var keys = [] as string[], values = [] as string[];
 		for (var [key,val] of Object.entries(row)) {
@@ -422,71 +422,77 @@ class MysqlCRUD implements DatabaseCRUD {
 				values.push(escape(val));
 			}
 		}
-		var sql = `insert into ${table} (${keys.join(',')}) values (${values.join(',')})`;
-		var [r] = await this.exec(sql);
-		return r.insertId as number;
+		return `insert into ${table} (${keys.join(',')}) values (${values.join(',')})`;
 	}
 
-	async delete(table: string, where: Where = ''): Promise<number> {
+	deleteSql(table: string, where: Where = ''): string {
 		var struct = this.check(table);
 		if (typeof where == 'object') {
-			var sql = `delete from ${table} ${this.escape(struct, where)}`;
-			var [r] = await this.exec(sql);
+			return `delete from ${table} ${this.escape(struct, where)}`;
 		} else {
-			var sql = `delete from ${table} where ${where}`
-			var [r] = await this.exec(sql);
+			return `delete from ${table} where ${where}`;
 		}
-		return r.affectedRows as number;
 	}
 
-	async update(table: string, row: Dict, where: Where = ''): Promise<number> {
+	updateSql(table: string, row: Dict, where: Where = ''): string {
 		var struct = this.check(table);
 		var set = this.escape(struct, row, true, ',', '');
 		if (typeof where == 'object') {
-			var sql = `update ${table} set ${set} ${this.escape(struct, where)}`;
-			var [r] = await this.exec(sql);
+			return `update ${table} set ${set} ${this.escape(struct, where)}`;
 		} else {
 			var where_sql = where ? 'where ' + where: '';
-			var sql = `update ${table} set ${set} ${where_sql}`;
-			var [r] = await this.exec(sql);
+			return `update ${table} set ${set} ${where_sql}`;
 		}
-		return r.affectedRows as number;
 	}
 
-	private async _select<T = Dict>(table: string, where: Where, opts: SelectOptions, total: boolean): Promise<T[]> {
+	selectSql(table: string, where: Where = '', opts: SelectOptions = {}) {
 		let struct = this.check(table);
-		let sql;//, ls: T[];
+		let sql = '';//, ls: T[];
 		let limit_str = '';
 		if (opts.limit) {
 			limit_str = Array.isArray(opts.limit) ? ' limit ' + opts.limit.join(','): ' limit ' + opts.limit;
 		}
-		let out = total ? 'count(*) as __count': opts.out || '*';
+		let out = opts.count ? 'count(*) as __count': opts.out || '*';
 		let group = opts.group ? `group by ${opts.group}`: '';
 		let order = opts.order ? `order by ${opts.order}`: '';
 		if (typeof where == 'object') {
 			sql = `select ${out} from ${table} ${this.escape(struct, where)} ${group}`;
-			if (!total)
+			if (!opts.count)
 				sql += `${order} `;
 			sql += limit_str;
 			// console.log(sql, values)
-			var [{rows: ls}] = await this.exec(sql);
 		} else {
 			let where_sql = where ? 'where ' + where: '';
 			sql = `select ${out} from ${table} ${where_sql} ${group} `;
-			if (!total)
+			if (!opts.count)
 				sql += `${order} `;
 			sql += limit_str;
-			var [{rows: ls}] = await this.exec(sql);
 		}
+		return sql;
+	}
+
+	async insert(table: string, row: Dict): Promise<number> {
+		var [r] = await this.exec(this.insertSql(table, row));
+		return r.insertId as number;
+	}
+
+	async delete(table: string, where: Where = ''): Promise<number> {
+		var [r] = await this.exec(this.deleteSql(table, where));
+		return r.affectedRows as number;
+	}
+
+	async update(table: string, row: Dict, where: Where = ''): Promise<number> {
+		var [r] = await this.exec(this.updateSql(table, row, where));
+		return r.affectedRows as number;
+	}
+
+	async select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
+		let [{rows: ls}] = await this.exec(this.selectSql(table, where, opts));
 		return ls as T[];
 	}
 
-	select<T = Dict>(table: string, where: Where = '', opts: SelectOptions = {}): Promise<T[]> {
-		return this._select<T>(table, where, opts, false);
-	}
-
 	async selectCount(table: string, where: Where = '', opts: SelectOptions = {}): Promise<number> {
-		let d = await this._select(table, where, opts, true);
+		let d = await this.select<{__count:number}>(table, where, {...opts,count:true});
 		if (d.length) {
 			return Number(d[0].__count) || 0;
 		}
@@ -539,6 +545,10 @@ export class MysqlTools implements DatabaseTools {
 		}
 	}
 
+	insertSql(table: string, row: Dict): string {
+		return new MysqlCRUD(this.db(), this).insertSql(table, row);
+	}
+
 	async delete(table: string, where?: Where): Promise<number> {
 		var db = this.db();
 		try {
@@ -546,6 +556,10 @@ export class MysqlTools implements DatabaseTools {
 		} finally {
 			db.close();
 		}
+	}
+
+	deleteSql(table: string, where?: Where): string {
+		return new MysqlCRUD(this.db(), this).deleteSql(table, where);
 	}
 
 	async update(table: string, row: Dict, where?: Where): Promise<number> {
@@ -557,6 +571,10 @@ export class MysqlTools implements DatabaseTools {
 		}
 	}
 
+	updateSql(table: string, row: Dict, where?: Where): string {
+		return new MysqlCRUD(this.db(), this).updateSql(table, row, where);
+	}
+
 	async select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]> {
 		var db = this.db();
 		try {
@@ -564,6 +582,10 @@ export class MysqlTools implements DatabaseTools {
 		} finally {
 			db.close();
 		}
+	}
+
+	selectSql(table: string, where?: Where, opts?: SelectOptions): string {
+		return new MysqlCRUD(this.db(), this).selectSql(table, where, opts);
 	}
 
 	async selectCount(table: string, where?: Where, opts?: SelectOptions): Promise<number> {

@@ -117,14 +117,19 @@ export interface SelectOptions {
 	order?: string;
 	limit?: number | number[];
 	out?: string;
+	count?: boolean;
 }
 
 export interface DatabaseCRUD {
 	exec(sql: string): Promise<Result[]>;
 	insert(table: string, row: Dict): Promise<number>;
+	insertSql(table: string, row: Dict): string;
 	delete(table: string, where?: Where): Promise<number>;
+	deleteSql(table: string, where?: Where): string;
 	update(table: string, row: Dict, where?: Where): Promise<number>;
+	updateSql(table: string, row: Dict, where?: Where): string;
 	select<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T[]>;
+	selectSql(table: string, where?: Where, opts?: SelectOptions): string;
 	selectCount(table: string, where?: Where, opts?: SelectOptions): Promise<number>;
 	selectOne<T = Dict>(table: string, where?: Where, opts?: SelectOptions): Promise<T|null>;
 	query<T = Dict>(sql: string): Promise<T[]>;
