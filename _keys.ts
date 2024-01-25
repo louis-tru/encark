@@ -219,7 +219,7 @@ function read_key_value_item(self: Parser) {
 
 	var item = parse_indent(self, code);
 	var content = item.content;
-	var mat = content.match(/\@?[^\s\@,]+|,/); // 查询key
+	var mat = content.match(/\@?[^\s\@,:]+|,/); // 查询key
 
 	if (!mat) {
 		throw error(self, 'Key Illegal characters');
@@ -230,6 +230,8 @@ function read_key_value_item(self: Parser) {
 
 	if (key.length < content.length) {
 		var char = content[key.length]; //content.substr(key.length, 1);
+
+		//console.log(`----------${char}`, key, key.length);
 
 		switch (char) {
 			case ':':
