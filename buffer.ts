@@ -102,7 +102,8 @@ export interface IBuffer extends Uint8Array {
 	write(arg0: FromArg, selfOffset?: number, encoding?: IBufferEncoding): number;
 	compare(target: Uint8Array, start?: number, end?: number, thisStart?: number, thisEnd?: number): number;
 	equals(b: Uint8Array): boolean;
-	readInt8(offset?: number): number; // read be
+	// read
+	readInt8(offset?: number): number;
 	readUInt8(offset?: number): number;
 	readInt16BE(offset?: number): number;
 	readUInt16BE(offset?: number): number;
@@ -120,7 +121,8 @@ export interface IBuffer extends Uint8Array {
 	readDoubleBE(offset?: number): number;
 	readBigUIntBE(offset?: number, end?: number): bigint;
 	readBigUIntLE(offset?: number, end?: number): bigint;
-	writeInt8(value: number, offset?: number): number; // write be
+	// write
+	writeInt8(value: number, offset?: number): number;
 	writeUInt8(value: number, offset?: number): number;
 	writeInt16BE(value: number, offset?: number): number;
 	writeUInt16BE(value: number, offset?: number): number;
