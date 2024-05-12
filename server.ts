@@ -41,7 +41,7 @@ export * from './_server';
 /**
 	* @class Server Impl
 	*/
-export class ServerIMPL extends Server {
+export class ServerImpl extends Server {
 
 	private m_checkIntervalId: any;
 
@@ -137,7 +137,8 @@ export class ServerIMPL extends Server {
 }
 
 export default {
-	ServerIMPL: ServerIMPL,
+	ServerImpl,
+	ServerIMPL: ServerImpl,
 	setShared: _server.setShared,
 	get shared() { return _server.shared },
 };
