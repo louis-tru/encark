@@ -46,9 +46,9 @@ declare class WSConversationIMPL extends conv.WSConversation {
 	pong(): Promise<void>;
 }
 
-if (utils.haveWeb) {
+if (utils.isWeb) {
 	var conv_impl = require('./conv_web').default;
-} else if (utils.haveNode) {
+} else if (utils.isNode) {
 	var conv_impl = require('./conv_node').default;
 } else {
 	throw new Error('Unimplementation');

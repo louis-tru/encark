@@ -50,12 +50,12 @@ var _rng: (len: number)=>IBuffer = function(len: number) {
 	return rnds;
 };
 
-if (utils.haveNode) { // node 
+if (utils.isNode) { // node 
 	const crypto = require('crypto');
 	_rng = function(len: number) {
 		return buffer.from(crypto.randomBytes(len));
 	};
-} else if (utils.haveWeb) {
+} else if (utils.isWeb) {
 
 	// Unique ID creation requires a high quality random # generator.  In the
 	// browser this is a little complicated due to unknown quality of Math.random()

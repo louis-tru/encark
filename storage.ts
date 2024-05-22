@@ -32,9 +32,9 @@ import util from './util';
 import url from './path';
 import {DelayCall} from './delay_call';
 
-const { haveNode, haveQuark, haveWeb } = util;
+const { isNode, isQuark, isWeb } = util;
 
-if (haveWeb) {
+if (isWeb) {
 
 	var sync_local = function(self: Storage) {}
 	var commit = function(self: Storage) {}
@@ -57,9 +57,9 @@ if (haveWeb) {
 	};
 
 } else {
-	if (haveQuark) {
-		var fs = __require__('_fs');
-	} else if (haveNode) {
+	if (isQuark) {
+		var fs = __binding__('_fs');
+	} else if (isNode) {
 		var fs = require('fs');
 	}
 
@@ -118,10 +118,10 @@ export class Storage implements IStorageSync {
 	private m_sync: any;
 
 	constructor(path?: string) {
-		this.m_path = url.fallbackPath(path?path:(haveWeb ? location.origin: url.cwd()) + '/' + '.storage');
+		this.m_path = url.fallbackPath(path?path:(isWeb ? location.origin: url.cwd()) + '/' + '.storage');
 		this.m_value = {};
 
-		if (haveWeb) {
+		if (isWeb) {
 			this.m_sync = { call: util.noop };
 			this.m_prefix = util.hash(this.m_path || 'default') + '_';
 			this.m_value = localStorage;
@@ -172,7 +172,7 @@ export class Storage implements IStorageSync {
 	}
 
 	clearSync() {
-		if (haveWeb) {
+		if (isWeb) {
 			var keys: any[] = [];
 			for (var i in this.m_value) {
 				if (i.substring(0, this.m_prefix.length) == this.m_prefix) {

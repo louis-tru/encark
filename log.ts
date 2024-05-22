@@ -33,12 +33,12 @@ import path from './path';
 import { Notification } from './event';
 import path2 from './path';
 
-const { haveNode, haveQuark, haveWeb } = utils;
+const { isNode, isQuark, isWeb } = utils;
 const fb = path2.fallbackPath;
 
-if (haveQuark) {
-	var fs = __require__('_fs');
-} else if (haveNode) {
+if (isQuark) {
+	var fs = __binding__('_fs');
+} else if (isNode) {
 	var fs = require('./fs');
 }
 
@@ -109,7 +109,7 @@ export class Console extends Notification {
 
 	reopen(cut = false) {
 		if (this.m_pathname) {
-			if (haveWeb) {
+			if (isWeb) {
 				this.m_fd = 0;
 			} else {
 				var now = new Date();

@@ -1,5 +1,5 @@
 
-// export * from __require__('_http');
+// export * from __binding__('_http');
 
 import event, {EventNoticer,Event} from './event'
 

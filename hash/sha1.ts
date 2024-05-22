@@ -44,7 +44,7 @@ export function sha1_str(s: string | Bytes) { return bin2str(sha1(s)) }
 
 export var sha1: (s: string | Bytes)=>IBuffer;
 
-if (utils.haveNode) {
+if (utils.isNode) {
 	let crypto = require('crypto');
 	sha1 = (s: string | Bytes)=>buffer.from(crypto.createHash('sha1').update(s).digest());
 } else {

@@ -31,7 +31,7 @@
 import _path from './_path';
 import _pkgutil from './_pkgutil';
 
-const haveWeb = typeof globalThis.window == 'object';
+const isWeb = typeof globalThis.window == 'object';
 
 function split_path(self: any) {
 	if (self._is_split) return;
@@ -153,7 +153,7 @@ export class URL {
 		* @constructor
 		*/
 	constructor(path: string = '') {
-		if (!path && haveWeb) {
+		if (!path && isWeb) {
 			path = location.href;
 		}
 		(this as any)._value = path;

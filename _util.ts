@@ -28,21 +28,20 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-if (typeof __require__ == 'function') {
+if (typeof __binding__ == 'function') {
 	require('quark/_ext');
 } else {
 	require('./_ext');
 }
 
-import './_ext';
 import {Event, Notification, EventNoticer} from './event';
 
 const base64_chars =
 	'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
 
-const haveNode: boolean = !!globalThis.process;
-const haveQuark: boolean = !!globalThis.__require__;
-const haveWeb: boolean = !!globalThis.document;
+const isNode: boolean = !!globalThis.process;
+const isQuark: boolean = !!globalThis.__binding__;
+const isWeb: boolean = !!globalThis.document;
 
 type Platform = 'darwin' | 'linux' | 'win32' | 'android'
 | 'freebsd'
@@ -96,14 +95,14 @@ var _processHandles = {
 	},
 };
 
-if (haveQuark) {
-	var _util = __require__('_util');
+if (isQuark) {
+	var _util = __binding__('_util');
 	platform = <Platform>_util.platform;
 	argv = _util.argv;
 	gc = _util.garbageCollection;
 	_process = require('quark/_util')._process;
 }
-else if (haveNode) {
+else if (isNode) {
 	let _nodeProcess = (globalThis as any).process;
 	platform = _nodeProcess.platform;
 	argv = process.argv;
@@ -124,7 +123,7 @@ else if (haveNode) {
 	}
 	_process = new NodeProcess();
 }
-else if (haveWeb) {
+else if (isWeb) {
 	let USER_AGENT = navigator.userAgent;
 	let mat = USER_AGENT.match(/\(i[^;]+?; (U; )?CPU.+?OS (\d).+?Mac OS X/);
 	let ios = !!mat;
@@ -204,10 +203,10 @@ if (!globalThis.setImmediate) {
 }
 
 const nextTick: <A extends any[], R>(cb: (...args: A) => R, ...args: A) => void = 
-haveNode ? process.nextTick: function(cb, ...args): void {
+isNode ? process.nextTick: function(cb, ...args): void {
 	if (typeof cb != 'function')
 		throw new Error('callback must be a function');
-	if (haveQuark) {
+	if (isQuark) {
 		_util.nextTick(()=>cb(...args));
 	} else {
 		setImmediate(()=>cb(...args));
@@ -228,9 +227,9 @@ export default {
 	hash: hash,
 	nextTick: nextTick,
 	platform: platform,
-	haveNode: haveNode,
-	haveQuark: haveQuark,
-	haveWeb: haveWeb,
+	isNode: isNode,
+	isQuark: isQuark,
+	isWeb: isWeb,
 	argv: argv,
 	webFlags: webFlags,
 	exit: (code?: number)=>{ _process.exit(code) },

@@ -33,7 +33,7 @@ import _util from './_util' ;
 
 export type Optopns = Dict<string|string[]>;
 
-const {haveNode, haveQuark, haveWeb} = _util;
+const {isNode, isQuark, isWeb} = _util;
 const PREFIX = 'file:///';
 const options: Optopns = {};  // start options
 
@@ -48,14 +48,14 @@ var _path: any;
 var _quark_pkgutil: any;
 var debug = false;
 
-if (haveQuark) {
-	_quark_pkgutil = __require__('_pkguitl');
-	_path = __require__('_path');
-	win32 = __require__('_util').platform == 'win32';
+if (isQuark) {
+	_quark_pkgutil = __binding__('_pkguitl');
+	_path = __binding__('_path');
+	win32 = __binding__('_util').platform == 'win32';
 	cwd = _path.cwd;
 	_cwd = cwd;
 	chdir = _path.chdir;
-} else if (haveNode) {
+} else if (isNode) {
 	_path = require('path');
 	win32 = process.platform == 'win32';
 	cwd = process.cwd;
@@ -70,7 +70,7 @@ if (haveQuark) {
 		return cwd() == path;
 	};
 	process.execArgv = process.execArgv || [];
-} else if (haveWeb) { // web
+} else if (isWeb) { // web
 	var origin = location.origin;
 	let pathname = location.pathname;
 	let dirname = pathname.substring(0, pathname.lastIndexOf('/'));
@@ -154,7 +154,7 @@ function resolve(...args: string[]) {
 				prefix = PREFIX + mat[2] + '/';
 				path = path.substring(2);
 			} else {
-				if (haveWeb) {
+				if (isWeb) {
 					prefix = origin + '/';
 				} else {
 					prefix = PREFIX; //'file:///';
@@ -174,7 +174,7 @@ function resolve(...args: string[]) {
 		}
 	} else { // Relative path, no network protocol
 		var cwd = _cwd();
-		if (haveWeb) {
+		if (isWeb) {
 			prefix = origin + '/';
 			path = cwd.substring(prefix.length) + '/' + path;
 		} else {
@@ -217,7 +217,7 @@ function isNetwork(path: string): boolean {
 	return /^(https?):\/\/[^\/]+/i.test(path);
 }
 
-if (haveNode && !haveQuark) {
+if (isNode && !isQuark) {
 	var fs = require('fs');
 	require('module').Module._extensions['.keys'] = 
 		function(module: NodeModule, filename: string): any {
@@ -281,11 +281,11 @@ function readConfigFile(pathname: string, pathname2: string) {
 var configDir = '';
 
 function getConfig(): Dict {
-	if (haveQuark) {
+	if (isQuark) {
 		return _quark_pkgutil.config;
 	}
 	if (!config) {
-		if (haveNode) {
+		if (isNode) {
 			if (configDir) {
 				config = readConfigFile(configDir + '/.config', configDir + '/config');
 			} else {
@@ -315,9 +315,9 @@ function initArgv() { // init
 	}
 	parseOptions(args, options);
 
-	if (haveQuark) {
-		debug = __require__('_util').debug;
-	} else if (haveNode) {
+	if (isQuark) {
+		debug = __binding__('_util').debug;
+	} else if (isNode) {
 		if (process.execArgv.some(s=>(s+'').indexOf('--inspect') == 0)) {
 			debug = true;
 		}
@@ -340,7 +340,7 @@ export default {
 	get options() { return options },
 	get config() { return getConfig() },
 	set config(cfg: any) {
-		if (haveQuark) {
+		if (isQuark) {
 			_quark_pkgutil.config = cfg;
 		} else {
 			if (typeof cfg == 'string') {

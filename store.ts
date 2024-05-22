@@ -36,7 +36,7 @@ import { WSConversation, WSClient, METHOD_CALL_TIMEOUT } from './ws/cli';
 import {IBuffer} from './buffer';
 import * as log from './log';
 
-if (utils.haveWeb) {
+if (utils.isWeb) {
 	var default_host = path.getParam('D_SDK_HOST') || '127.0.0.1';
 	var default_port = path.getParam('D_SDK_PORT') || '';
 	var default_ssl = !!Number(path.getParam('D_SDK_SSL')) || false;

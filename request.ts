@@ -33,19 +33,19 @@ import buffer,{IBuffer} from './buffer';
 import url from './path';
 import errno from './errno';
 
-const { haveQuark, haveNode, haveWeb } = utils;
+const { isQuark, isNode, isWeb } = utils;
 const _user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
 
-if (haveQuark) {
+if (isQuark) {
 	var user_agent = _user_agent;
-	var httpQuark = __require__('_http');
+	var httpQuark = __binding__('_http');
 }
-else if (haveWeb) {
+else if (isWeb) {
 	var user_agent = navigator.userAgent;
 	var XMLHttpRequest = globalThis.XMLHttpRequest;
 }
-else if (haveNode) {
+else if (isNode) {
 	var user_agent = _user_agent;
 	var http = require('http');
 	var https = require('https');
@@ -393,9 +393,9 @@ function requestNode(options: Options, soptions: Dict,
 
 // request implementation
 var _request_platform = 
-	haveQuark ? requestQuark:
-	haveWeb ? requestWeb:
-	haveNode ? requestNode:
+	isQuark ? requestQuark:
+	isWeb ? requestWeb:
+	isNode ? requestNode:
 	utils.unrealized;
 
 /**
@@ -478,7 +478,7 @@ export function request(pathname: string, opts?: Options): PromiseResult<IBuffer
 		var GLOBAL_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
 		var proxy = options.proxy || GLOBAL_PROXY;
 
-		if (proxy && (!haveWeb || proxy != GLOBAL_PROXY)) {
+		if (proxy && (!isWeb || proxy != GLOBAL_PROXY)) {
 			// set proxy
 			if (/^https?:\/\//.test(proxy)) {
 				var proxyUrl = new url.URL(proxy);
@@ -571,7 +571,7 @@ export class Request {
 		this.m_prefix = prefix || utils.config.web_service;
 
 		if (!this.m_prefix) {
-			if (haveWeb) {
+			if (isWeb) {
 				this.m_prefix = location.origin;
 			} else {
 				this.m_prefix = 'http://localhost';

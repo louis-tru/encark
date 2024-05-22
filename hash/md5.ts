@@ -44,7 +44,7 @@ export function md5_str(s: string | Bytes) { return bin2str(md5(s)) }
 
 export var md5: (s: string | Bytes)=>IBuffer;
 
-if (utils.haveNode) {
+if (utils.isNode) {
 	let crypto = require('crypto');
 	md5 = (s: string | Bytes)=>buffer.from(crypto.createHash('md5').update(s).digest());
 } else {

@@ -85,7 +85,7 @@ function gen_func(queue: List<QValue>, api: Api) {
 var _ungzip: (buffer: Buffer) => Promise<Buffer>;
 var _gzip: (buffer: Buffer) => Promise<Buffer>;
 
-if (utils.haveNode) {
+if (utils.isNode) {
 	var zlib = require('zlib');
 	_ungzip = gen_func(new List(), zlib.inflateRaw);
 	_gzip = gen_func(new List(), zlib.deflateRaw);

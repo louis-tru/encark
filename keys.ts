@@ -33,12 +33,12 @@ import _keys from './_keys';
 
 var readFile: (path: string)=>string;
 
-if (util.haveQuark) {
-	let reader = __require__('_reader');
+if (util.isQuark) {
+	let reader = __binding__('_fs').reader;
 	readFile = function(path: string) {
 		return reader.readFileSync(path, 'utf8');
 	};
-} else if (util.haveNode) {
+} else if (util.isNode) {
 	let fs = require('fs');
 	readFile = function(path: string) {
 		return fs.readFileSync(path, 'utf8');

@@ -72,7 +72,7 @@ interface Dict<T = any> {
 	[key: string]: T;
 }
 
-type TimeoutResult = any; // NodeJS.Timeout | number;
+type TimeoutResult = any;
 
 interface Function {
 	hashCode(): number;
@@ -108,16 +108,16 @@ interface Number {
 
 	/**
 	* 转换为前后固定位数的字符串
-	* @arg before {Number}  小数点前固定位数
-	* @arg [after] {Number} 小数点后固定位数
+	* @param before {Number}  小数点前固定位数
+	* @param [after] {Number} 小数点后固定位数
 	*/
 	toFixedBefore(before: number, after?: number): string;
 
 	/**
 	 * 转换为前后固定位数的字符串,但不包含小数点后面为0
-	 * @arg after {Number}  小数点前固定位数
-	 * @arg split {Number?}  分割小数点前的字符
-	 * @arg symbol {String?}  分割小数点前的字符
+	 * @param after {Number}  小数点前固定位数
+	 * @param split {Number?}  分割小数点前的字符
+	 * @param symbol {String?}  分割小数点前的字符
 	*/
 	toFixedVariable(this: number, after: number, split?: number, symbol?: string): string;
 
@@ -141,10 +141,10 @@ interface DateConstructor {
 	 * var date = Date.parseDate(i); //返回的新时间
 	 * </code></pre>
 	 * @func parseDate(str[,format[,timezone]])
-	 * @arg str {String}        要解析的字符串
-	 * @arg [format] {String}   date format   default yyyyMMddhhmmssfff
-	 * @arg [timezone] {Number} 要解析的时间所在时区,默认为当前时区
-	 * @ret {Date}              返回新时间
+	 * @param str {String}        要解析的字符串
+	 * @param [format] {String}   date format   default yyyyMMddhhmmssfff
+	 * @param [timezone] {Number} 要解析的时间所在时区,默认为当前时区
+	 * @return {Date}              返回新时间
 	 */
 	parseDate(date_str: string, format?: string, timezone?: number): Date;
 
@@ -162,9 +162,9 @@ interface DateConstructor {
 		* str = Date.formatTimeSpan(time_span, format); // str = '166分42秒'
 		* </code></pre>
 		* @func formatTimeSpan(ts[,format])
-		* @arg ts {Number} 要格式化的时间戳
-		* @arg [format]  {String} 要格式化的时间戳格式
-		* @ret {String} 返回的格式化后的时间戳
+		* @param ts {Number} 要格式化的时间戳
+		* @param [format]  {String} 要格式化的时间戳格式
+		* @return {String} 返回的格式化后的时间戳
 		*/
 	formatTimeSpan(time_span: number, format?: string): string;
 
@@ -176,8 +176,8 @@ interface Date {
 
 	/**
 	 * @func add 给当前Date时间追加毫秒,改变时间值
-	 * @arg ms {Number}  要添追加的毫秒值
-	 * @ret {Date}
+	 * @param ms {Number}  要添追加的毫秒值
+	 * @return {Date}
 	 */
 	add(ms: number): Date;
 
@@ -195,9 +195,9 @@ interface Date {
 		* dateStr = date.toString(format); // dateStr的值为 '2008-12-10 10'
 		* </code></pre>
 		* @func date_to_string(date[,foramt])
-		* @arg date {Date}
-		* @arg [format] {String} 要转换的字符串格式
-		* @ret {String} 返回格式化后的时间字符串
+		* @param date {Date}
+		* @param [format] {String} 要转换的字符串格式
+		* @return {String} 返回格式化后的时间字符串
 		*/
 	toString(format?: string, timezone?: number): string;
 
@@ -229,8 +229,7 @@ interface Error {
 	description?: string;
 	child?: Error[];
 	[prop: string]: any;
-	ext: (desc: ErrorDescribe)=>this;
-	filter(keys: string[], exclude?: string[]): any[];
+	extend: (desc: ErrorDescribe)=>this;
 }
 
 declare function setTimeout<A extends any[]>(cb: (...args: A)=>void, timeout?: number, ...args: A): TimeoutResult;
@@ -241,8 +240,8 @@ declare function clearInterval(id?: TimeoutResult): void;
 declare function clearImmediate(id?: TimeoutResult): void;
 
 (function(_: any) {
-// if (Date.formatTimeSpan !== undefined)
-// 	return;
+if (Date.formatTimeSpan !== undefined)
+	return;
 
 if (typeof globalThis == 'undefined') {
 	var globa = arguments[0]('(typeof global == "object" ? global: 0)');
@@ -264,7 +263,7 @@ definePropertys(Date.prototype, {__toString__: Date.prototype.toString});
 definePropertys(Date.prototype, {__toString__: Error.prototype.toString});
 
 /**
- * @fun ext_class #  EXT class prototype objects
+ * @method ext_class #  EXT class prototype objects
  */
 function definePropertys(obj: any, extd: any): void {
 	for (var i in extd) {
@@ -563,7 +562,6 @@ definePropertys(Date.prototype, {
 			return DateToString.call(this);
 		}
 	},
-
 });
 
 const errors: Dict<Function> = {
@@ -629,18 +627,13 @@ definePropertys(Error, {
 	setStackTraceJSON(enable: boolean) {
 		stackTraceJSON = !!enable;
 	},
-
 });
 
 definePropertys(Error.prototype, {
 
-	ext(desc: ErrorDescribe) {
+	extend(desc: ErrorDescribe) {
 		Object.assign(this, desc);
 		return this;
-	},
-
-	filter(this: Error, keys: string[], exclude?: string[]) {
-		return Object.values(this);
 	},
 
 	hashCode(): number {
@@ -660,6 +653,10 @@ definePropertys(Error.prototype, {
 		if (stackTraceJSON)
 			r.stack = err.stack || '';
 		return r;
+	},
+
+	toStringStyled() {
+		return this.toString();
 	},
 
 	toString(this: Error) {

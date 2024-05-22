@@ -30,7 +30,7 @@
 
 import util from './util';
 
-const { haveWeb } = util;
+const { isWeb } = util;
 
 interface ClientCookie {
 
@@ -84,7 +84,7 @@ interface ClientCookie {
 
 var ImplCookie;
 
-if (haveWeb)
+if (isWeb)
 
 /**
  * @class ClientCookie
