@@ -39,11 +39,11 @@ import {RuleResult} from './router';
 export * from './_server';
 
 /**
-	* @class Server Impl
+	* @class ServerImpl
 	*/
 export class ServerImpl extends Server {
 
-	private m_checkIntervalId: any;
+	private _checkIntervalId: any;
 
 	//Handle http and websocket and http-heartbeat request
 	protected initialize(server: http.Server) {
@@ -68,7 +68,7 @@ export class ServerImpl extends Server {
 				return;
 
 			var url = decodeURI(req.url || ''); // 解码
-			var rule = this.router.find(url);   // 通过url查找目标服务信息
+			var rule = this.router.match(url);   // 通过url查找目标服务信息
 			var name = rule.service;
 			var cls = this.getService(name) as unknown as typeof StaticService;
 
@@ -118,7 +118,7 @@ export class ServerImpl extends Server {
 		});
 
 		this.addEventListener('Startup', ()=>{
-			this.m_checkIntervalId = setInterval(()=>{
+			this._checkIntervalId = setInterval(()=>{
 				var time = Date.now();
 				for (var [,conv] of this._wsConversations) {
 					if (conv.keepAliveTime * 2 + conv.lastPacketTime < time) {
@@ -129,7 +129,7 @@ export class ServerImpl extends Server {
 		});
 
 		server.on('close', ()=>{
-			clearInterval(this.m_checkIntervalId);
+			clearInterval(this._checkIntervalId);
 			this._isRun = false;
 			this.trigger('Stop', {});
 		});

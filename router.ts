@@ -129,7 +129,7 @@ export class Router  {
 	 * @param  {String} url
 	 * @return {Object}
 	 */
-	find(url: string): RuleResult {
+	match(url: string): RuleResult {
 		
 		for (var rule of this.m_rules) {
 			var mat = url.match(rule.match);

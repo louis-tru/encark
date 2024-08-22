@@ -30,7 +30,7 @@
 
 import {EventNoticer,Event} from './event';
 import * as fs from 'fs';
-import * as Path from 'path';
+import * as path from 'path';
 import {StringDecoder} from 'string_decoder';
 import {WriteStream} from 'fs';
 import * as querystring from 'querystring';
@@ -184,7 +184,6 @@ export class FileStream implements IFileStream {
 }
 
 class MultipartParser implements Parser {
-
 	private boundary: Buffer;
 	private lookbehind: Buffer;
 	private boundaryChars: Dict = {};
@@ -235,7 +234,7 @@ class MultipartParser implements Parser {
 				if (start !== undefined && start === end) {
 					return;
 				}
-				var callbackSymbol = 'on' + name.substr(0, 1).toUpperCase() + name.substr(1);
+				var callbackSymbol = 'on' + name.substring(0, 1).toUpperCase() + name.substring(1);
 				if (callbackSymbol in self) {
 					(<any>self)[callbackSymbol](buffer, start, end);
 				}
@@ -497,42 +496,38 @@ export interface FileData {
 }
 
 export class IncomingForm {
-	
 	private _parser: Parser | null = null;
 	private _flushing = 0;
 	private _fields_size = 0;
 	private _service: hs.HttpService;
-
 	private _error: Error | null = null;
 	private _ended = false;
-	readonly hash: crypto.Hash;
 
-	get ended() {
-		return this._ended;
-	}
+	readonly hash: crypto.Hash;
+	readonly fields: Dict = {};
+	readonly files: Dict<IFileStream[]> = {};
+
+	get ended() { return this._ended }
 
 	/**
 	 * default size 2MB
 	 * @type {Number}
 	 */
-	readonly maxFieldsSize = 5 * 1024 * 1024;
+	maxFieldsSize = 5 * 1024 * 1024;
 	
 	/**
 	 * default size 5MB
 	 * @type {Number}
 	 */
-	readonly maxFilesSize = 5 * 1024 * 1024;
+	maxFilesSize = 5 * 1024 * 1024;
 	
 	/**
 	 * verifyFileMime 'js|jpg|jpeg|png' default as '*' ...
 	 * @type {String}
 	 */
-	readonly verifyFileMime = '*';
+	verifyFileMime = '*';
 
-	readonly fields: Dict = {};
-	readonly files: Dict<IFileStream[]> = {};
-	
-	keepExtensions = false;
+	keepExtensions = true;
 	uploadDir = '';
 	encoding: BufferEncoding = 'utf-8';
 	headers: http.IncomingHttpHeaders = {};
@@ -574,7 +569,6 @@ export class IncomingForm {
 	 * parse
 	 */
 	parse() {
-
 		var self = this;
 		var req = this._service.request;
 
@@ -607,7 +601,6 @@ export class IncomingForm {
 			this._throwError(new Error('unintialized parser'));
 			return;
 		}
-
 		this.hash.update(buffer);
 		
 		this.bytesReceived += buffer.length;
@@ -657,15 +650,11 @@ export class IncomingForm {
 		return true;
 	}
 
-	onpart(part: Part) {
+	onPart(part: Part) {
 		// this method can be overwritten by the user
-		this.handle_part(part);
-	}
-
-	handle_part(part: Part) {
 		var self = this;
 
-		if (part.filename === undefined) {
+		if (!part.filename) {
 			var value = '';
 			var decoder = new StringDecoder(this.encoding);
 
@@ -787,62 +776,62 @@ export class IncomingForm {
 	_initMultipart(boundary: string) {
 		this.type = 'multipart';
 
-		var parser = new MultipartParser(boundary);
-		var self = this;
-		var headerField = '';
-		var headerValue = '';
-		var part: Part;
+		let self = this;
+		let headerField = '';
+		let headerValue = '';
+		let part: Part;
 
-		(<any>parser).onPartBegin = function() {
-			part = new Part();
-		};
-
-		(<any>parser).onHeaderField = function (b: Buffer, start: number, end: number) {
-			headerField += b.toString(self.encoding, start, end);
-		};
-
-		(<any>parser).onHeaderValue = function (b: Buffer, start: number, end: number) {
-			headerValue += b.toString(self.encoding, start, end);
-		};
-
-		(<any>parser).onHeaderEnd = function () {
-
-			headerField = headerField.toLowerCase();
-			part.headers[headerField] = headerValue;
-
-			var m;
-			if (headerField == 'content-disposition') {
-				if (m = headerValue.match(/name="([^"]+)"/i)) {
-					part.name = m[1];
-				}
-
-				part.filename = self._fileName(headerValue) || '';
-			} else if (headerField == 'content-type') {
-				part.mime = headerValue;
+		class MultipartParserImpl extends MultipartParser {
+			onPartBegin() {
+				part = new Part();
 			}
 
-			headerField = '';
-			headerValue = '';
-		};
+			onHeaderField(b: Buffer, start: number, end: number) {
+				headerField += b.toString(self.encoding, start, end);
+			}
 
-		(<any>parser).onHeadersEnd = function () {
-			self.onpart(part);
-		};
+			onHeaderValue(b: Buffer, start: number, end: number) {
+				headerValue += b.toString(self.encoding, start, end);
+			}
 
-		(<any>parser).onPartData = function (b: Buffer, start: number, end: number) {
-			part.onData.trigger(b.slice(start, end));
-		};
+			onHeaderEnd() {
+				headerField = headerField.toLowerCase();
+				part.headers[headerField] = headerValue;
 
-		(<any>parser).onPartEnd = function () {
-			part.onEnd.trigger({});
-		};
+				var m;
+				if (headerField == 'content-disposition') {
+					if (m = headerValue.match(/name="([^"]+)"/i)) {
+						part.name = m[1];
+					}
+	
+					part.filename = self._fileName(headerValue) || '';
+				} else if (headerField == 'content-type') {
+					part.mime = headerValue;
+				}
+	
+				headerField = '';
+				headerValue = '';
+			}
 
-		(<any>parser).onEnd = function () {
-			self._ended = true;
-			self._maybeEnd();
-		};
+			onHeadersEnd() {
+				self.onPart(part);
+			}
 
-		this._parser = parser;
+			onPartData(b: Buffer, start: number, end: number) {
+				part.onData.trigger(b.slice(start, end));
+			}
+	
+			onPartEnd() {
+				part.onEnd.trigger({});
+			}
+	
+			onEnd() {
+				self._ended = true;
+				self._maybeEnd();
+			}
+		}
+
+		this._parser = new MultipartParserImpl(boundary);
 	}
 
 	private _initUrlencodedOrJsonOrXml(type: string) {
@@ -881,19 +870,16 @@ export class IncomingForm {
 	}
 
 	private _uploadPath(filename: string) {
-		var name = '';
-		for (var i = 0; i < 32; i++) {
+		let name = '';
+		for (let i = 0; i < 32; i++) {
 			name += Math.floor(Math.random() * 16).toString(16);
 		}
-
 		if (this.keepExtensions) {
-			var ext = Path.extname(filename);
+			let ext = path.extname(filename);
 			ext = ext.replace(/(\.[a-z0-9]+).*/, '$1');
-
 			name += ext;
 		}
-
-		return Path.join(this.uploadDir, 'temp_upload_' + name);
+		return path.join(this.uploadDir, 'upload_' + name);
 	}
 
 	private _maybeEnd() {
