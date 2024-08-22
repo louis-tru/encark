@@ -652,14 +652,14 @@ export class IncomingForm {
 
 	onPart(part: Part) {
 		// this method can be overwritten by the user
-		var self = this;
+		let self = this;
 
 		if (!part.filename) {
-			var value = '';
-			var decoder = new StringDecoder(this.encoding);
+			let value = '';
+			let decoder = new StringDecoder(this.encoding);
 
 			part.onData.on(function (e) {
-				var buffer = <Buffer>e.data;
+				let buffer = <Buffer>e.data;
 				self._fields_size += buffer.length;
 				if (self._fields_size > self.maxFieldsSize) {
 					self._throwError(new Error('maxFieldsSize exceeded, received ' + self._fields_size + ' bytes of field data'));
@@ -695,7 +695,7 @@ export class IncomingForm {
 		this.onFileBegin.trigger({ name: part.name, file: file });
 
 		part.onData.on(function(e) {
-			var buffer = <Buffer>e.data;
+			let buffer = <Buffer>e.data;
 			self.pause();
 
 			self._fields_size += buffer.length;
@@ -716,7 +716,7 @@ export class IncomingForm {
 			file.end(function () {
 				self._flushing--;
 
-				var files = self.files[part.name];
+				let files = self.files[part.name];
 				if (!files)
 					self.files[part.name] = files = [];
 				files.push(file);
