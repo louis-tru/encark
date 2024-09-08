@@ -35,14 +35,14 @@ import {
 	Options,Result,defaultOptions,
 	userAgent,querystringStringify,stringifyXml, Request
 } from './request';
-import somes from './util';
+import util from './util';
 import errno from './errno';
 
 export function http2request(session: http2.ClientHttp2Session, url: string, opts?: Options): Promise<Result<Buffer>> {
 	var options = Object.assign({}, defaultOptions, opts);
 	var { params, method, signer } = options;
 
-	return somes.promise<Result<Buffer>>(async (resolve, reject)=>{
+	return util.promise<Result<Buffer>>(async (resolve, reject)=>{
 		var uri = new URL(url);
 		uri.clearHash();
 	

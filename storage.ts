@@ -51,7 +51,7 @@ if (isWeb) {
 		try { 
 			return JSON.parse(val);
 		} catch(e) {
-			console.warn('somes#storage#paese_value', e);
+			console.warn('suark#storage#paese_value', e);
 		}
 		return null;
 	};

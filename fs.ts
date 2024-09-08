@@ -87,7 +87,7 @@ function inl_copy_file(path: string, target: string, options: any, cb: any) {
 		function error(e:any) {
 			read.destroy();
 			write.destroy();
-			console.warn('somes#fs#inl_copy_file', e);
+			console.warn('suark#fs#inl_copy_file', e);
 			cb(e);
 		}
 		

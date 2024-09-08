@@ -24,3 +24,5 @@ delete pkg.scripts.prepare;
 fs.writeFileSync(
 	`${__dirname}/out/${pkg.name}/package.json`, JSON.stringify(pkg, null, 2),
 );
+
+fs.unlinkSync(`${__dirname}/out/${pkg.name}/package-lock.json`);
