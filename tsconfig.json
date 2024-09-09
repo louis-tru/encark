@@ -5,7 +5,7 @@
 		"target": "ES2018",
 		"moduleResolution": "node",
 		"sourceMap": false,
-		"outDir": "out/suark",
+		"outDir": "out/encark",
 		"rootDir": ".",
 		"baseUrl": ".",
 		"declaration": true,

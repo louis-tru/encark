@@ -1,5 +1,5 @@
 {
-	"name": "suark",
+	"name": "encark",
 	"version": "0.1.0",
 	"description": "This is a collection of tools, independent of any other libraries",
 	"main": "index.js",
@@ -7,11 +7,11 @@
 	"author": {
 		"name": "louistru",
 		"email": "louistru@hotmail.com",
-		"url": "https://github.com/louis-tru/suark/"
+		"url": "https://github.com/louis-tru/encark/"
 	},
 	"scripts": {
 		"_prepare": "npm run build",
-		"build": "tsc && cp LICENSE *.md *.types *.json *.keys out/suark && node _.js"
+		"build": "tsc && cp LICENSE *.md *.types *.json *.keys out/encark && node _.js"
 	},
 	"devDependencies": {
 		"@types/node": "~14.14.22"
@@ -39,8 +39,8 @@
 	],
 	"license": "BSD-2-Clause",
 	"bugs": {
-		"url": "https://github.com/louis-tru/suark/issues",
+		"url": "https://github.com/louis-tru/encark/issues",
 		"email": "louistru@hotmail.com"
 	},
-	"homepage": "https://github.com/louis-tru/suark/"
+	"homepage": "https://github.com/louis-tru/encark/"
 }
